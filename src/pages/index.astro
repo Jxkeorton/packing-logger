@@ -10,9 +10,12 @@ import {
   totalPacks,
 } from '../lib/packing';
 import { groupByInvoiceMonth, groupByWeek } from '../lib/invoice';
+import { formatDuration, formatWhen } from '../lib/format';
+import { readFastestFive } from '../lib/times';
 import AggregateTable from '../components/AggregateTable.astro';
 
 const state = await loadTodayState();
+const topTimes = await readFastestFive();
 
 // A wider window of history feeds the week/month rollups; the day-by-day
 // table only shows the most recent slice of it.
@@ -53,6 +56,12 @@ const money = (n: number) => `£${n.toFixed(2)}`;
   </head>
   <body>
     <div class="page">
+      <div class="app-tabs" role="tablist" aria-label="Section">
+        <button type="button" class="app-tab" data-app-tab="pack" role="tab" aria-selected="true">Pack</button>
+        <button type="button" class="app-tab" data-app-tab="timer" role="tab" aria-selected="false">Timer</button>
+      </div>
+
+      <div class="app-view" data-app-view="pack">
       <header class="masthead">
         <div class="stamp" aria-hidden="false">
           <span class="stamp-label">Manifest</span>
@@ -172,6 +181,35 @@ const money = (n: number) => `£${n.toFixed(2)}`;
       <footer class="foot">
         <a class="foot-download" href="/api/export.csv" download>Download full log (.csv)</a>
       </footer>
+      </div>
+
+      <div class="app-view" data-app-view="timer" hidden>
+        <div class="timer">
+          <div class="timer-display" id="timerDisplay">0:00.0</div>
+          <button type="button" class="timer-button" id="timerButton" data-running="false">Start</button>
+        </div>
+
+        <section class="fastest">
+          <h2 class="fastest-title">Fastest 5</h2>
+          <div id="fastestBoard">
+            {
+              topTimes.length === 0 ? (
+                <p class="fastest-empty">Time a pack job to start the board.</p>
+              ) : (
+                <ol class="fastest-list">
+                  {topTimes.map((t, i) => (
+                    <li class:list={['fastest-row', { 'is-first': i === 0 }]}>
+                      <span class="fastest-rank">{i + 1}</span>
+                      <span class="fastest-duration">{formatDuration(t.ms)}</span>
+                      <span class="fastest-when">{formatWhen(t.at)}</span>
+                    </li>
+                  ))}
+                </ol>
+              )
+            }
+          </div>
+        </section>
+      </div>
     </div>
 
     <style>
@@ -582,9 +620,174 @@ const money = (n: number) => `£${n.toFixed(2)}`;
           gap: 14px;
         }
       }
+
+      /* ---- App-level tabs ---- */
+
+      .app-tabs {
+        display: flex;
+        gap: 8px;
+      }
+
+      .app-tab {
+        flex: 1;
+        appearance: none;
+        border: 1px solid var(--line);
+        background: var(--panel);
+        color: var(--ink-soft);
+        font-family: 'Inter', sans-serif;
+        font-weight: 700;
+        font-size: 14px;
+        padding: 10px;
+        border-radius: 10px;
+        cursor: pointer;
+      }
+
+      .app-tab[aria-selected='true'] {
+        background: var(--ink);
+        border-color: var(--ink);
+        color: var(--canvas);
+      }
+
+      .app-view {
+        display: flex;
+        flex-direction: column;
+        gap: 22px;
+      }
+
+      .app-view[hidden] {
+        display: none;
+      }
+
+      /* ---- Timer ---- */
+
+      .timer {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        box-shadow: var(--shadow);
+        padding: 40px 20px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 24px;
+      }
+
+      .timer-display {
+        font-family: 'Space Grotesk', sans-serif;
+        font-weight: 700;
+        font-size: 64px;
+        letter-spacing: -0.02em;
+        font-variant-numeric: tabular-nums;
+        color: var(--ink);
+      }
+
+      .timer-button {
+        appearance: none;
+        border: none;
+        width: 100%;
+        max-width: 280px;
+        height: 64px;
+        border-radius: 999px;
+        font-family: 'Space Grotesk', sans-serif;
+        font-weight: 700;
+        font-size: 20px;
+        color: #fff;
+        background: var(--student);
+        cursor: pointer;
+        touch-action: manipulation;
+        transition: transform 0.08s ease, filter 0.08s ease;
+      }
+
+      .timer-button:active {
+        transform: scale(0.96);
+      }
+
+      .timer-button:focus-visible {
+        outline: 3px solid var(--gold);
+        outline-offset: 2px;
+      }
+
+      .timer-button[data-running='true'] {
+        background: var(--tandem);
+      }
+
+      /* ---- Fastest 5 board ---- */
+
+      .fastest {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        padding: 14px 16px 6px;
+      }
+
+      .fastest-title {
+        margin: 0 0 10px;
+        font-size: 15px;
+        font-weight: 700;
+      }
+
+      /*
+       * :global() here because the board is re-rendered client-side via
+       * innerHTML after each timed pack job — Astro only auto-scopes
+       * elements it renders itself, not ones a script injects later.
+       */
+      :global(.fastest-list) {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+      }
+
+      :global(.fastest-row) {
+        display: grid;
+        grid-template-columns: 22px auto 1fr;
+        align-items: baseline;
+        gap: 10px;
+        padding: 10px 0;
+        border-top: 1px solid var(--line);
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 13px;
+      }
+
+      :global(.fastest-row.is-first) {
+        color: var(--gold);
+      }
+
+      :global(.fastest-rank) {
+        color: var(--ink-soft);
+        font-size: 12px;
+      }
+
+      :global(.fastest-row.is-first .fastest-rank) {
+        color: var(--gold);
+      }
+
+      :global(.fastest-duration) {
+        font-weight: 600;
+        font-size: 16px;
+      }
+
+      :global(.fastest-when) {
+        text-align: right;
+        color: var(--ink-soft);
+        font-size: 12px;
+      }
+
+      :global(.fastest-row.is-first .fastest-when) {
+        color: inherit;
+        opacity: 0.8;
+      }
+
+      :global(.fastest-empty) {
+        margin: 0;
+        padding: 10px 0 14px;
+        color: var(--ink-soft);
+        font-size: 14px;
+      }
     </style>
 
     <script>
+      import { formatDuration, formatWhen } from '../lib/format';
+
       const RATES: Record<string, number> = {
         tandem: 11,
         instructor: 6.5,
@@ -682,6 +885,86 @@ const money = (n: number) => `£${n.toFixed(2)}`;
             view.hidden = view.dataset.view !== tab.dataset.tab;
           });
         });
+      });
+
+      const appTabs = document.querySelectorAll<HTMLButtonElement>('.app-tab');
+      const appViews = document.querySelectorAll<HTMLElement>('.app-view');
+      appTabs.forEach((tab) => {
+        tab.addEventListener('click', () => {
+          appTabs.forEach((t) => t.setAttribute('aria-selected', String(t === tab)));
+          appViews.forEach((view) => {
+            view.hidden = view.dataset.appView !== tab.dataset.appTab;
+          });
+        });
+      });
+
+      // ---- Stopwatch ----
+
+      const timerButton = document.getElementById('timerButton') as HTMLButtonElement | null;
+      const timerDisplay = document.getElementById('timerDisplay');
+      let timerHandle: number | undefined;
+      let startedAt = 0;
+
+      function renderElapsed() {
+        if (timerDisplay) timerDisplay.textContent = formatDuration(Date.now() - startedAt);
+      }
+
+      interface PackTime {
+        ms: number;
+        at: string;
+      }
+
+      function renderFastestBoard(top5: PackTime[]) {
+        const board = document.getElementById('fastestBoard');
+        if (!board) return;
+        if (top5.length === 0) {
+          board.innerHTML = '<p class="fastest-empty">Time a pack job to start the board.</p>';
+          return;
+        }
+        const rows = top5
+          .map(
+            (t, i) => `
+              <li class="fastest-row${i === 0 ? ' is-first' : ''}">
+                <span class="fastest-rank">${i + 1}</span>
+                <span class="fastest-duration">${formatDuration(t.ms)}</span>
+                <span class="fastest-when">${formatWhen(t.at)}</span>
+              </li>`,
+          )
+          .join('');
+        board.innerHTML = `<ol class="fastest-list">${rows}</ol>`;
+      }
+
+      async function savePackTime(ms: number) {
+        try {
+          const res = await fetch('/api/pack-time', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ms }),
+          });
+          if (!res.ok) return;
+          const data = await res.json();
+          renderFastestBoard(data.top5);
+        } catch (err) {
+          console.error('Failed to save pack time', err);
+        }
+      }
+
+      timerButton?.addEventListener('click', () => {
+        const running = timerButton.dataset.running === 'true';
+        if (!running) {
+          startedAt = Date.now();
+          timerButton.dataset.running = 'true';
+          timerButton.textContent = 'Stop';
+          renderElapsed();
+          timerHandle = window.setInterval(renderElapsed, 100);
+        } else {
+          window.clearInterval(timerHandle);
+          const elapsed = Date.now() - startedAt;
+          timerButton.dataset.running = 'false';
+          timerButton.textContent = 'Start';
+          if (timerDisplay) timerDisplay.textContent = '0:00.0';
+          void savePackTime(elapsed);
+        }
       });
     </script>
   </body>
