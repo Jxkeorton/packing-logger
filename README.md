@@ -4,6 +4,10 @@ A mobile-first pack job counter for a skydive rigger. Tap `+`/`−` to log each
 pack job as you finish it, see today's total earnings at a glance, and every
 tap is saved straight away — no "end of day" step required.
 
+The History panel groups your log by day, by Monday–Sunday week, or by
+invoice month — invoice months run cutoff to cutoff (the Sunday before the
+last Tuesday of each calendar month), not calendar month to calendar month.
+
 ## Categories & rates
 
 | Category   | Rate      |
@@ -13,7 +17,7 @@ tap is saved straight away — no "end of day" step required.
 | Student    | £6.50     |
 | Sport      | £6.50     |
 
-## Running it
+## Running it locally
 
 ```bash
 npm install
@@ -25,39 +29,41 @@ for the same computer, and a `Network` one (something like
 `http://192.168.x.x:4321`). Open the **Network** URL on your phone (same
 wifi) to use it from the packing floor.
 
-For something you leave running day to day rather than restarting each
-morning, build once and run the standalone server:
+Locally, data is stored in the `data/` folder next to the project — no
+account or setup needed:
 
-```bash
-npm run build
-npm run start
-```
+- `data/state.json` — today's running counts.
+- `data/packing-log.csv` — one row per day, kept up to date on every tap.
 
-(`npm run start` runs `node ./dist/server/entry.mjs`, listening on the same
-network address.)
+Both are excluded from git (see `.gitignore`), since they're your personal
+work records, not source code.
 
-## How the data is stored
+## Deploying to Vercel
 
-- `data/state.json` — today's running counts. Not meant to be edited by hand.
-- `data/packing-log.csv` — one row per day, automatically kept up to date:
+This project is set up to deploy on [Vercel](https://vercel.com) via
+`@astrojs/vercel`. Because Vercel's functions don't have a persistent local
+disk, the same read/write calls that hit `data/` locally are backed by
+[Vercel Blob](https://vercel.com/docs/vercel-blob) in production instead —
+see [`src/lib/storage.ts`](src/lib/storage.ts). No code changes are needed
+to switch between the two; it's picked automatically based on whether
+`BLOB_READ_WRITE_TOKEN` is set.
 
-  ```csv
-  date,tandem,instructor,student,sport,total_packs,total_earnings
-  2026-08-22,6,2,1,0,9,84.00
-  ```
+To deploy:
 
-Every button tap immediately updates (or inserts) today's row in the CSV —
-you don't need to do anything at the end of the day. When the app is opened
-on a new date, it notices the date has changed, makes sure the previous
-day's row is saved, and starts today at zero.
+1. Push this repo to GitHub (already done) and import it in Vercel, or run
+   `vercel link` from this folder.
+2. In the project's **Storage** tab on vercel.com, create a Blob store and
+   connect it to the project (this sets `BLOB_READ_WRITE_TOKEN`
+   automatically for you).
+3. Deploy with `vercel --prod`, or just push to the connected GitHub repo.
 
-Both files live in the `data/` folder next to the project and are excluded
-from git (see `.gitignore`), since they're your personal work records, not
-source code. Back them up or open the CSV in a spreadsheet whenever you like
-— nothing else touches that file while the server isn't running.
+You can always download the full CSV log from the app itself via the
+"Download full log (.csv)" link at the bottom of the page — this works the
+same way whether the log lives in `data/` or in Blob storage.
 
 ## Tech
 
-Built with [Astro](https://astro.build) in server mode (`@astrojs/node`) so
-button taps can write straight to the local CSV file. No database, no
-external services — everything stays on the machine you run it on.
+Built with [Astro](https://astro.build) in server mode, using
+[`@astrojs/vercel`](https://docs.astro.build/en/guides/integrations-guide/vercel/)
+so it deploys straight to Vercel, with local dev falling back to plain files
+so no cloud account is needed to just run it on your own machine.

@@ -1,16 +1,15 @@
 // @ts-check
 import { defineConfig } from 'astro/config';
 
-import node from '@astrojs/node';
+import vercel from '@astrojs/vercel';
 
 // https://astro.build/config
 export default defineConfig({
   output: 'server',
-  adapter: node({
-    mode: 'standalone',
-  }),
+  adapter: vercel(),
   server: {
-    // Listen on the LAN so it can be opened from a phone on the same wifi.
+    // Listen on the LAN so it can be opened from a phone on the same wifi
+    // during local dev (`npm run dev`).
     host: true,
     port: 4321,
   },

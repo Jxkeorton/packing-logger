@@ -5,12 +5,25 @@ import {
   RATES,
   loadTodayState,
   readHistory,
+  toHistoryRow,
   totalEarnings,
   totalPacks,
 } from '../lib/packing';
+import { groupByInvoiceMonth, groupByWeek } from '../lib/invoice';
+import AggregateTable from '../components/AggregateTable.astro';
 
 const state = await loadTodayState();
-const history = await readHistory();
+
+// A wider window of history feeds the week/month rollups; the day-by-day
+// table only shows the most recent slice of it.
+const fullHistory = await readHistory(400);
+const dayRows = fullHistory.slice(0, 14);
+
+// Today isn't in the CSV-backed history yet (it's still being logged), but
+// it belongs in this week's and this invoice month's running totals.
+const combined = [...fullHistory, toHistoryRow(state)];
+const weekRows = groupByWeek(combined).slice(0, 12);
+const monthRows = groupByInvoiceMonth(combined).slice(0, 12);
 
 const dateObj = new Date(`${state.date}T00:00:00`);
 const dateDisplay = dateObj.toLocaleDateString('en-GB', {
@@ -20,7 +33,6 @@ const dateDisplay = dateObj.toLocaleDateString('en-GB', {
 });
 
 const money = (n: number) => `£${n.toFixed(2)}`;
-const historyMoney = (n: number) => `£${n.toFixed(2)}`;
 ---
 
 <html lang="en">
@@ -104,48 +116,61 @@ const historyMoney = (n: number) => `£${n.toFixed(2)}`;
           <span class="history-toggle-icon" id="historyToggleIcon">&rsaquo;</span>
         </button>
         <div class="history-panel" id="historyPanel" hidden>
-          {
-            history.length === 0 ? (
-              <p class="history-empty">Nothing logged yet before today.</p>
-            ) : (
-              <div class="history-scroll">
-                <table class="history-table">
-                  <thead>
-                    <tr>
-                      <th scope="col">Date</th>
-                      {CATEGORIES.map((c) => (
-                        <th scope="col" class={`th-${c}`}>
-                          {CATEGORY_LABELS[c].slice(0, 3)}
-                        </th>
-                      ))}
-                      <th scope="col">Packs</th>
-                      <th scope="col">Earned</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {history.map((row) => (
+          <div class="history-tabs" role="tablist" aria-label="Group history by">
+            <button type="button" class="history-tab" data-tab="day" role="tab" aria-selected="true">Day</button>
+            <button type="button" class="history-tab" data-tab="week" role="tab" aria-selected="false">Week</button>
+            <button type="button" class="history-tab" data-tab="month" role="tab" aria-selected="false">Month</button>
+          </div>
+
+          <div class="history-view" data-view="day">
+            {
+              dayRows.length === 0 ? (
+                <p class="history-empty">Nothing logged yet before today.</p>
+              ) : (
+                <div class="history-scroll">
+                  <table class="history-table">
+                    <thead>
                       <tr>
-                        <td class="history-date">{row.date}</td>
+                        <th scope="col">Date</th>
                         {CATEGORIES.map((c) => (
-                          <td class={`td-${c}`}>{row.counts[c]}</td>
+                          <th scope="col" class={`th-${c}`}>
+                            {CATEGORY_LABELS[c].slice(0, 3)}
+                          </th>
                         ))}
-                        <td>{row.totalPacks}</td>
-                        <td>{historyMoney(row.totalEarnings)}</td>
+                        <th scope="col">Packs</th>
+                        <th scope="col">Earned</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )
-          }
+                    </thead>
+                    <tbody>
+                      {dayRows.map((row) => (
+                        <tr>
+                          <td class="history-date">{row.date}</td>
+                          {CATEGORIES.map((c) => (
+                            <td class={`td-${c}`}>{row.counts[c]}</td>
+                          ))}
+                          <td>{row.totalPacks}</td>
+                          <td>{money(row.totalEarnings)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )
+            }
+          </div>
+
+          <div class="history-view" data-view="week" hidden>
+            <AggregateTable rows={weekRows} currentLabel="This week" prefix="week" />
+          </div>
+
+          <div class="history-view" data-view="month" hidden>
+            <AggregateTable rows={monthRows} currentLabel="This invoice month" prefix="month" />
+          </div>
         </div>
       </section>
 
       <footer class="foot">
-        <p>
-          Every tap is saved straight away &mdash; today's row in <code>data/packing-log.csv</code> always
-          matches what's on screen.
-        </p>
+        <a class="foot-download" href="/api/export.csv" download>Download full log (.csv)</a>
       </footer>
     </div>
 
@@ -454,6 +479,31 @@ const historyMoney = (n: number) => `£${n.toFixed(2)}`;
         padding: 4px 0 8px;
       }
 
+      .history-tabs {
+        display: flex;
+        gap: 6px;
+        padding: 10px 16px 6px;
+      }
+
+      .history-tab {
+        appearance: none;
+        border: 1px solid var(--line);
+        background: transparent;
+        color: var(--ink-soft);
+        font-family: 'Inter', sans-serif;
+        font-weight: 600;
+        font-size: 12.5px;
+        padding: 6px 12px;
+        border-radius: 999px;
+        cursor: pointer;
+      }
+
+      .history-tab[aria-selected='true'] {
+        background: var(--ink);
+        border-color: var(--ink);
+        color: var(--canvas);
+      }
+
       .history-empty {
         margin: 0;
         padding: 14px 16px;
@@ -518,19 +568,13 @@ const historyMoney = (n: number) => `£${n.toFixed(2)}`;
         text-align: center;
       }
 
-      .foot p {
-        margin: 0;
-        font-size: 12px;
-        color: var(--ink-soft);
-        line-height: 1.5;
-      }
-
-      .foot code {
-        font-family: 'JetBrains Mono', monospace;
-        background: var(--panel);
-        border: 1px solid var(--line);
-        padding: 1px 5px;
-        border-radius: 4px;
+      .foot-download {
+        display: inline-block;
+        font-size: 12.5px;
+        font-weight: 600;
+        color: var(--instructor);
+        text-decoration: none;
+        border-bottom: 1px solid currentColor;
       }
 
       @media (min-width: 480px) {
@@ -564,6 +608,8 @@ const historyMoney = (n: number) => `£${n.toFixed(2)}`;
         }
         const data = await res.json();
         applyState(data.state.counts, data.totalPacks, data.totalEarnings);
+        if (data.currentWeek) applyAggregate('week', data.currentWeek);
+        if (data.currentMonth) applyAggregate('month', data.currentMonth);
         bump(category);
       }
 
@@ -578,6 +624,25 @@ const historyMoney = (n: number) => `£${n.toFixed(2)}`;
         const totalEarningsEl = document.getElementById('totalEarnings');
         if (totalPacksEl) totalPacksEl.textContent = String(packs);
         if (totalEarningsEl) totalEarningsEl.textContent = money(earnings);
+      }
+
+      interface Aggregate {
+        counts: Record<string, number>;
+        totalPacks: number;
+        totalEarnings: number;
+      }
+
+      // Keeps the "this week" / "this invoice month" row's numbers current
+      // as taps land, without re-rendering the whole history table.
+      function applyAggregate(prefix: 'week' | 'month', agg: Aggregate) {
+        for (const category of Object.keys(agg.counts)) {
+          const cell = document.querySelector(`[data-agg-count="${prefix}:${category}"]`);
+          if (cell) cell.textContent = String(agg.counts[category]);
+        }
+        const packsCell = document.querySelector(`[data-agg-total="${prefix}:packs"]`);
+        const earningsCell = document.querySelector(`[data-agg-total="${prefix}:earnings"]`);
+        if (packsCell) packsCell.textContent = String(agg.totalPacks);
+        if (earningsCell) earningsCell.textContent = money(agg.totalEarnings);
       }
 
       function bump(category: string) {
@@ -606,6 +671,17 @@ const historyMoney = (n: number) => `£${n.toFixed(2)}`;
         const expanded = historyToggle.getAttribute('aria-expanded') === 'true';
         historyToggle.setAttribute('aria-expanded', String(!expanded));
         if (historyPanel) historyPanel.hidden = expanded;
+      });
+
+      const historyTabs = document.querySelectorAll<HTMLButtonElement>('.history-tab');
+      const historyViews = document.querySelectorAll<HTMLElement>('.history-view');
+      historyTabs.forEach((tab) => {
+        tab.addEventListener('click', () => {
+          historyTabs.forEach((t) => t.setAttribute('aria-selected', String(t === tab)));
+          historyViews.forEach((view) => {
+            view.hidden = view.dataset.view !== tab.dataset.tab;
+          });
+        });
       });
     </script>
   </body>

@@ -26,3 +26,4 @@ pnpm-debug.log*
 # local packing data (state + CSV log) - personal work data, not source
 /data/*
 !/data/.gitkeep
+.vercel

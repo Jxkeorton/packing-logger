@@ -1,0 +1,78 @@
+---
+import { CATEGORIES, CATEGORY_LABELS } from '../lib/packing';
+import type { AggregateRow } from '../lib/invoice';
+
+interface Props {
+  rows: AggregateRow[];
+  currentLabel: string;
+  prefix: 'week' | 'month';
+}
+
+const { rows, currentLabel, prefix } = Astro.props;
+
+const money = (n: number) => `£${n.toFixed(2)}`;
+---
+
+<div class="history-scroll">
+  <table class="history-table">
+    <thead>
+      <tr>
+        <th scope="col">Range</th>
+        {
+          CATEGORIES.map((c) => (
+            <th scope="col" class={`th-${c}`}>
+              {CATEGORY_LABELS[c].slice(0, 3)}
+            </th>
+          ))
+        }
+        <th scope="col">Packs</th>
+        <th scope="col">Earned</th>
+      </tr>
+    </thead>
+    <tbody>
+      {
+        rows.map((row) => (
+          <tr class={row.isCurrent ? 'is-current' : undefined} data-current-row={row.isCurrent ? prefix : undefined}>
+            <td class="history-date">
+              {row.isCurrent ? (
+                <>
+                  <span class="current-label">{currentLabel}</span>
+                  <span class="current-range">{row.rangeLabel}</span>
+                </>
+              ) : (
+                row.rangeLabel
+              )}
+            </td>
+            {CATEGORIES.map((c) => (
+              <td class={`td-${c}`} data-agg-count={row.isCurrent ? `${prefix}:${c}` : undefined}>
+                {row.counts[c]}
+              </td>
+            ))}
+            <td data-agg-total={row.isCurrent ? `${prefix}:packs` : undefined}>{row.totalPacks}</td>
+            <td data-agg-total={row.isCurrent ? `${prefix}:earnings` : undefined}>{money(row.totalEarnings)}</td>
+          </tr>
+        ))
+      }
+    </tbody>
+  </table>
+</div>
+
+<style>
+  .is-current {
+    background: var(--panel-strong, rgba(184, 134, 46, 0.08));
+  }
+
+  .current-label {
+    display: block;
+    font-family: 'Inter', sans-serif;
+    font-weight: 700;
+    color: var(--gold);
+    font-size: 12px;
+  }
+
+  .current-range {
+    display: block;
+    font-size: 11px;
+    color: var(--ink-soft);
+  }
+</style>

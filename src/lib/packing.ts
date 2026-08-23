@@ -1,6 +1,4 @@
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
-import { existsSync } from 'node:fs';
-import path from 'node:path';
+import { readText, writeText } from './storage';
 
 // Categories of pack job, in display order.
 export const CATEGORIES = ['tandem', 'instructor', 'student', 'sport'] as const;
@@ -28,9 +26,8 @@ export interface DayState {
   counts: Counts;
 }
 
-const DATA_DIR = path.join(process.cwd(), 'data');
-const STATE_FILE = path.join(DATA_DIR, 'state.json');
-const CSV_FILE = path.join(DATA_DIR, 'packing-log.csv');
+const STATE_KEY = 'state.json';
+const CSV_KEY = 'packing-log.csv';
 
 const CSV_HEADER = 'date,tandem,instructor,student,sport,total_packs,total_earnings';
 
@@ -55,15 +52,10 @@ export function totalEarnings(counts: Counts): number {
   return CATEGORIES.reduce((sum, c) => sum + counts[c] * RATES[c], 0);
 }
 
-async function ensureDataDir() {
-  if (!existsSync(DATA_DIR)) {
-    await mkdir(DATA_DIR, { recursive: true });
-  }
-}
-
 async function readState(): Promise<DayState | null> {
+  const raw = await readText(STATE_KEY);
+  if (!raw) return null;
   try {
-    const raw = await readFile(STATE_FILE, 'utf-8');
     const parsed = JSON.parse(raw);
     if (
       parsed &&
@@ -80,8 +72,7 @@ async function readState(): Promise<DayState | null> {
 }
 
 async function writeState(state: DayState): Promise<void> {
-  await ensureDataDir();
-  await writeFile(STATE_FILE, JSON.stringify(state, null, 2), 'utf-8');
+  await writeText(STATE_KEY, JSON.stringify(state, null, 2));
 }
 
 function formatMoney(n: number): string {
@@ -97,8 +88,8 @@ function csvEscapeDate(date: string): string {
 /** Read all rows currently in the CSV log, keyed by date. */
 async function readCsvRows(): Promise<Map<string, string>> {
   const rows = new Map<string, string>();
-  if (!existsSync(CSV_FILE)) return rows;
-  const raw = await readFile(CSV_FILE, 'utf-8');
+  const raw = await readText(CSV_KEY);
+  if (!raw) return rows;
   const lines = raw.split('\n').filter((l: string) => l.trim().length > 0);
   for (const line of lines) {
     if (line.trim() === CSV_HEADER) continue;
@@ -110,7 +101,6 @@ async function readCsvRows(): Promise<Map<string, string>> {
 
 /** Insert or update the CSV row for a given day's totals, keeping dates in order. */
 async function upsertCsvRow(state: DayState): Promise<void> {
-  await ensureDataDir();
   const rows = await readCsvRows();
   const packs = totalPacks(state.counts);
   const earnings = totalEarnings(state.counts);
@@ -127,7 +117,7 @@ async function upsertCsvRow(state: DayState): Promise<void> {
 
   const sortedDates = [...rows.keys()].sort();
   const body = sortedDates.map((d) => rows.get(d)).join('\n');
-  await writeFile(CSV_FILE, `${CSV_HEADER}\n${body}\n`, 'utf-8');
+  await writeText(CSV_KEY, `${CSV_HEADER}\n${body}\n`);
 }
 
 /**
@@ -167,11 +157,25 @@ export async function adjustCount(category: Category, delta: number): Promise<Da
   return next;
 }
 
+/** The raw CSV log, for download/export. */
+export async function readCsvFile(): Promise<string> {
+  return (await readText(CSV_KEY)) ?? `${CSV_HEADER}\n`;
+}
+
 export interface HistoryRow {
   date: string;
   counts: Counts;
   totalPacks: number;
   totalEarnings: number;
+}
+
+export function toHistoryRow(state: DayState): HistoryRow {
+  return {
+    date: state.date,
+    counts: state.counts,
+    totalPacks: totalPacks(state.counts),
+    totalEarnings: totalEarnings(state.counts),
+  };
 }
 
 /** Most recent history rows (excluding today), newest first. */
