@@ -1,6 +1,10 @@
 // Small key/value-ish text storage, backed by:
-//   - Vercel Blob, when deployed there (BLOB_READ_WRITE_TOKEN is set automatically
-//     once a Blob store is connected to the project)
+//   - Vercel Blob, when deployed there and a store is connected to the
+//     project. The @vercel/blob SDK authenticates either via a static
+//     BLOB_READ_WRITE_TOKEN, or (the current default when you "Connect"
+//     a store in the dashboard) via BLOB_STORE_ID plus a short-lived OIDC
+//     token Vercel injects into the function at request time — so BLOB_STORE_ID
+//     is the reliable signal that a store is wired up, not the token itself.
 //   - the local `data/` folder otherwise, so `npm run dev` needs no cloud setup.
 import { existsSync } from 'node:fs';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
@@ -10,7 +14,7 @@ import { get, put } from '@vercel/blob';
 const DATA_DIR = path.join(process.cwd(), 'data');
 const BLOB_PREFIX = 'packing-logger';
 
-const useBlob = Boolean(process.env.BLOB_READ_WRITE_TOKEN);
+const useBlob = Boolean(process.env.BLOB_READ_WRITE_TOKEN || process.env.BLOB_STORE_ID);
 
 async function ensureDataDir() {
   if (!existsSync(DATA_DIR)) {
