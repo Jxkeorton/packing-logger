@@ -43,7 +43,7 @@ const money = (n: number) => `£${n.toFixed(2)}`;
     <meta charset="utf-8" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
-    <meta name="theme-color" content="#1b1f1d" />
+    <meta name="theme-color" content="#122c41" />
     <meta name="generator" content={Astro.generator} />
     <title>Packing Log</title>
     <meta name="description" content="Daily pack job counter and earnings log for a skydive rigger." />
@@ -221,44 +221,62 @@ const money = (n: number) => `£${n.toFixed(2)}`;
     </div>
 
     <style>
+      /*
+       * Palette lifted from a Dolomites lake photo: pale sky/water for the
+       * canvas, with the mountain, tree-line and deep-water tones from the
+       * shot doing the accenting — same relationship as the photo itself
+       * (light backdrop, dark forms in front of it).
+       */
       :root {
-        --canvas: #ede6d6;
-        --panel: #f8f4ea;
-        --ink: #1b1f1d;
-        --ink-soft: #5b6259;
-        --line: #c9bea6;
-        --line-strong: #a99b78;
-        --gold: #b8862e;
+        --canvas: #e9f3f6;
+        --panel: #f6fafb;
+        --ink: #14202b;
+        --ink-soft: #4c6575;
+        --line: #d3e1e8;
+        --line-strong: #a9c2ce;
+        --gold: #2185b6;
 
-        --tandem: #c4432b;
-        --tandem-soft: #f1d9d2;
-        --instructor: #1f6f8b;
-        --instructor-soft: #d3e4e9;
-        --student: #3d8a5c;
-        --student-soft: #dbe9df;
-        --sport: #7a4e68;
-        --sport-soft: #e5dbe2;
+        --tandem: #122c41;
+        --tandem-soft: #dbe3e9;
+        --instructor: #08445b;
+        --instructor-soft: #d3e3e8;
+        --student: #035042;
+        --student-soft: #d6e8e3;
+        --sport: #2e647a;
+        --sport-soft: #dee7eb;
+
+        /* Kept off the main palette on purpose — red still reads as "delete"
+           regardless of the rest of the theme. */
+        --danger: #b3423a;
+        --danger-soft: #f1dedc;
 
         --radius: 14px;
-        --shadow: 0 1px 0 rgba(27, 31, 29, 0.06), 0 6px 16px -8px rgba(27, 31, 29, 0.25);
+        --shadow: 0 1px 0 rgba(20, 32, 43, 0.05), 0 6px 16px -8px rgba(20, 32, 43, 0.22);
 
         color-scheme: light;
       }
 
       @media (prefers-color-scheme: dark) {
         :root {
-          --canvas: #14171a;
-          --panel: #1d2124;
-          --ink: #ede8dc;
-          --ink-soft: #9aa39a;
-          --line: #34393c;
-          --line-strong: #454b4e;
-          --gold: #d9a648;
+          --canvas: #0b1620;
+          --panel: #13232f;
+          --ink: #dceaf0;
+          --ink-soft: #8ca7b5;
+          --line: #223444;
+          --line-strong: #34495b;
+          --gold: #4fb6e0;
 
-          --tandem-soft: #3a2420;
-          --instructor-soft: #1d2f34;
-          --student-soft: #1f2f25;
-          --sport-soft: #2c2330;
+          --tandem: #3c6e96;
+          --tandem-soft: #1b2c3a;
+          --instructor: #2e8caf;
+          --instructor-soft: #16303b;
+          --student: #1e9678;
+          --student-soft: #123328;
+          --sport: #6398b2;
+          --sport-soft: #22333d;
+
+          --danger: #d6685f;
+          --danger-soft: #3a211f;
 
           color-scheme: dark;
         }
@@ -624,7 +642,7 @@ const money = (n: number) => `£${n.toFixed(2)}`;
         display: inline-block;
         font-size: 12.5px;
         font-weight: 600;
-        color: var(--instructor);
+        color: var(--gold);
         text-decoration: none;
         border-bottom: 1px solid currentColor;
       }
@@ -722,7 +740,7 @@ const money = (n: number) => `£${n.toFixed(2)}`;
       }
 
       .timer-button[data-running='true'] {
-        background: var(--tandem);
+        background: var(--danger);
       }
 
       /* ---- Fastest 5 board ---- */
@@ -808,8 +826,8 @@ const money = (n: number) => `£${n.toFixed(2)}`;
 
       :global(.fastest-delete:hover),
       :global(.fastest-delete:focus-visible) {
-        background: var(--tandem-soft);
-        color: var(--tandem);
+        background: var(--danger-soft);
+        color: var(--danger);
         outline: none;
       }
 
