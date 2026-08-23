@@ -1,0 +1,161 @@
+---
+const hasError = Astro.url.searchParams.get('error') === '1';
+---
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#122c41" />
+    <meta name="robots" content="noindex" />
+    <title>Packing Log — Sign in</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <main class="wrap">
+      <form class="card" method="POST" action="/api/login">
+        <h1 class="title">Packing Log</h1>
+        <p class="subtitle">Enter the password to continue.</p>
+        <input
+          class="field"
+          type="password"
+          name="password"
+          placeholder="Password"
+          autocomplete="current-password"
+          autofocus
+          required
+        />
+        {hasError && <p class="error">Wrong password — try again.</p>}
+        <button class="submit" type="submit">Sign in</button>
+      </form>
+    </main>
+
+    <style>
+      :root {
+        --canvas: #e9f3f6;
+        --panel: #f6fafb;
+        --ink: #14202b;
+        --ink-soft: #4c6575;
+        --line: #d3e1e8;
+        --gold: #2185b6;
+        --danger: #b3423a;
+        --radius: 14px;
+        --shadow: 0 1px 0 rgba(20, 32, 43, 0.05), 0 6px 16px -8px rgba(20, 32, 43, 0.22);
+        color-scheme: light;
+      }
+
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --canvas: #0b1620;
+          --panel: #13232f;
+          --ink: #dceaf0;
+          --ink-soft: #8ca7b5;
+          --line: #223444;
+          --gold: #4fb6e0;
+          --danger: #d6685f;
+          color-scheme: dark;
+        }
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+      }
+
+      body {
+        background: var(--canvas);
+        color: var(--ink);
+        font-family: 'Inter', system-ui, sans-serif;
+        min-height: 100dvh;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      .wrap {
+        min-height: 100dvh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+      }
+
+      .card {
+        width: 100%;
+        max-width: 360px;
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        box-shadow: var(--shadow);
+        padding: 32px 28px;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+
+      .title {
+        margin: 0;
+        font-family: 'Space Grotesk', sans-serif;
+        font-weight: 700;
+        font-size: 24px;
+        letter-spacing: -0.01em;
+      }
+
+      .subtitle {
+        margin: 0 0 18px;
+        color: var(--ink-soft);
+        font-size: 14px;
+      }
+
+      .field {
+        appearance: none;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 14px 14px;
+        font-size: 16px;
+        font-family: inherit;
+        color: var(--ink);
+        background: var(--canvas);
+      }
+
+      .field:focus-visible {
+        outline: 3px solid var(--gold);
+        outline-offset: 1px;
+      }
+
+      .error {
+        margin: 10px 0 0;
+        color: var(--danger);
+        font-size: 13px;
+      }
+
+      .submit {
+        appearance: none;
+        border: none;
+        margin-top: 16px;
+        height: 52px;
+        border-radius: 999px;
+        font-family: 'Space Grotesk', sans-serif;
+        font-weight: 700;
+        font-size: 16px;
+        color: #fff;
+        background: var(--gold);
+        cursor: pointer;
+        touch-action: manipulation;
+      }
+
+      .submit:active {
+        transform: scale(0.97);
+      }
+    </style>
+  </body>
+</html>

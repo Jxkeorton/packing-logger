@@ -61,6 +61,20 @@ You can always download the full CSV log from the app itself via the
 "Download full log (.csv)" link at the bottom of the page — this works the
 same way whether the log lives in `data/` or in Blob storage.
 
+## Locking it down with a password
+
+By default the app is open to anyone with the URL. To require a password:
+
+1. In the Vercel project's **Settings → Environment Variables**, add
+   `APP_PASSWORD` (Production, and Preview if you want) set to whatever
+   password you want to use.
+2. Redeploy. Every page and API route now redirects to a login screen until
+   the right password is entered; a "Log out" link appears at the bottom of
+   the page once it's on.
+
+Leaving `APP_PASSWORD` unset — the default — disables the gate entirely, so
+local dev (`npm run dev`) never needs it set. See `.env.example`.
+
 ## Tech
 
 Built with [Astro](https://astro.build) in server mode, using
