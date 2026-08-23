@@ -202,6 +202,14 @@ const money = (n: number) => `£${n.toFixed(2)}`;
                       <span class="fastest-rank">{i + 1}</span>
                       <span class="fastest-duration">{formatDuration(t.ms)}</span>
                       <span class="fastest-when">{formatWhen(t.at)}</span>
+                      <button
+                        type="button"
+                        class="fastest-delete"
+                        data-at={t.at}
+                        aria-label={`Delete the ${formatDuration(t.ms)} time`}
+                      >
+                        &times;
+                      </button>
                     </li>
                   ))}
                 </ol>
@@ -745,10 +753,10 @@ const money = (n: number) => `£${n.toFixed(2)}`;
 
       :global(.fastest-row) {
         display: grid;
-        grid-template-columns: 22px auto 1fr;
-        align-items: baseline;
+        grid-template-columns: 22px auto 1fr auto;
+        align-items: center;
         gap: 10px;
-        padding: 10px 0;
+        padding: 6px 0;
         border-top: 1px solid var(--line);
         font-family: 'JetBrains Mono', monospace;
         font-size: 13px;
@@ -781,6 +789,32 @@ const money = (n: number) => `£${n.toFixed(2)}`;
       :global(.fastest-row.is-first .fastest-when) {
         color: inherit;
         opacity: 0.8;
+      }
+
+      :global(.fastest-delete) {
+        appearance: none;
+        border: none;
+        background: transparent;
+        color: var(--ink-soft);
+        font-family: 'Inter', sans-serif;
+        font-size: 20px;
+        line-height: 1;
+        width: 28px;
+        height: 28px;
+        border-radius: 8px;
+        cursor: pointer;
+        touch-action: manipulation;
+      }
+
+      :global(.fastest-delete:hover),
+      :global(.fastest-delete:focus-visible) {
+        background: var(--tandem-soft);
+        color: var(--tandem);
+        outline: none;
+      }
+
+      :global(.fastest-delete:active) {
+        transform: scale(0.9);
       }
 
       :global(.fastest-empty) {
@@ -934,6 +968,7 @@ const money = (n: number) => `£${n.toFixed(2)}`;
                 <span class="fastest-rank">${i + 1}</span>
                 <span class="fastest-duration">${formatDuration(t.ms)}</span>
                 <span class="fastest-when">${formatWhen(t.at)}</span>
+                <button type="button" class="fastest-delete" data-at="${t.at}" aria-label="Delete the ${formatDuration(t.ms)} time">&times;</button>
               </li>`,
           )
           .join('');
@@ -954,6 +989,29 @@ const money = (n: number) => `£${n.toFixed(2)}`;
           console.error('Failed to save pack time', err);
         }
       }
+
+      async function deletePackTime(at: string) {
+        try {
+          const res = await fetch('/api/pack-time', {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ at }),
+          });
+          if (!res.ok) return;
+          const data = await res.json();
+          renderFastestBoard(data.top5);
+        } catch (err) {
+          console.error('Failed to delete pack time', err);
+        }
+      }
+
+      // Delegated so it keeps working after renderFastestBoard() replaces
+      // the rows' innerHTML.
+      document.getElementById('fastestBoard')?.addEventListener('click', (event) => {
+        const button = (event.target as HTMLElement).closest<HTMLButtonElement>('.fastest-delete');
+        if (!button?.dataset.at) return;
+        void deletePackTime(button.dataset.at);
+      });
 
       timerButton?.addEventListener('click', () => {
         const running = timerButton.dataset.running === 'true';

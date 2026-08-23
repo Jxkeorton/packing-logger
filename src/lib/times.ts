@@ -62,3 +62,13 @@ export async function recordTime(ms: number): Promise<{ time: PackTime | null; t
 
   return { time: entry, top5: fastestFive(trimmed) };
 }
+
+/** Remove one recorded time (matched by its `at` timestamp) and return the updated top 5. */
+export async function deleteTime(at: string): Promise<PackTime[]> {
+  const times = await readTimes();
+  const remaining = times.filter((t) => t.at !== at);
+  if (remaining.length !== times.length) {
+    await writeTimes(remaining);
+  }
+  return fastestFive(remaining);
+}
