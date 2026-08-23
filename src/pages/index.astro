@@ -1,0 +1,612 @@
+---
+import {
+  CATEGORIES,
+  CATEGORY_LABELS,
+  RATES,
+  loadTodayState,
+  readHistory,
+  totalEarnings,
+  totalPacks,
+} from '../lib/packing';
+
+const state = await loadTodayState();
+const history = await readHistory();
+
+const dateObj = new Date(`${state.date}T00:00:00`);
+const dateDisplay = dateObj.toLocaleDateString('en-GB', {
+  weekday: 'long',
+  day: 'numeric',
+  month: 'long',
+});
+
+const money = (n: number) => `£${n.toFixed(2)}`;
+const historyMoney = (n: number) => `£${n.toFixed(2)}`;
+---
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#1b1f1d" />
+    <meta name="generator" content={Astro.generator} />
+    <title>Packing Log</title>
+    <meta name="description" content="Daily pack job counter and earnings log for a skydive rigger." />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <div class="page">
+      <header class="masthead">
+        <div class="stamp" aria-hidden="false">
+          <span class="stamp-label">Manifest</span>
+          <span class="stamp-date" id="dateDisplay">{dateDisplay}</span>
+        </div>
+        <div class="totals">
+          <div class="totals-block">
+            <span class="totals-value" id="totalEarnings">{money(totalEarnings(state.counts))}</span>
+            <span class="totals-label">earned today</span>
+          </div>
+          <div class="totals-divider" aria-hidden="true"></div>
+          <div class="totals-block totals-block--packs">
+            <span class="totals-value totals-value--packs" id="totalPacks">{totalPacks(state.counts)}</span>
+            <span class="totals-label">packs today</span>
+          </div>
+        </div>
+      </header>
+
+      <main class="categories">
+        {
+          CATEGORIES.map((category) => (
+            <section class="card" data-category={category}>
+              <div class="card-top">
+                <h2 class="card-label">{CATEGORY_LABELS[category]}</h2>
+                <span class="card-rate">£{RATES[category].toFixed(2)} / pack</span>
+              </div>
+              <div class="card-controls">
+                <button
+                  class="stepper stepper--minus"
+                  type="button"
+                  data-action="decrement"
+                  data-category={category}
+                  aria-label={`Remove one ${CATEGORY_LABELS[category]} pack job`}
+                >
+                  &minus;
+                </button>
+                <span class="card-count" data-count={category}>
+                  {state.counts[category]}
+                </span>
+                <button
+                  class="stepper stepper--plus"
+                  type="button"
+                  data-action="increment"
+                  data-category={category}
+                  aria-label={`Add one ${CATEGORY_LABELS[category]} pack job`}
+                >
+                  &plus;
+                </button>
+              </div>
+              <div class="card-subtotal" data-subtotal={category}>
+                £{(state.counts[category] * RATES[category]).toFixed(2)}
+              </div>
+            </section>
+          ))
+        }
+      </main>
+
+      <section class="history">
+        <button class="history-toggle" id="historyToggle" type="button" aria-expanded="false" aria-controls="historyPanel">
+          <span>History</span>
+          <span class="history-toggle-icon" id="historyToggleIcon">&rsaquo;</span>
+        </button>
+        <div class="history-panel" id="historyPanel" hidden>
+          {
+            history.length === 0 ? (
+              <p class="history-empty">Nothing logged yet before today.</p>
+            ) : (
+              <div class="history-scroll">
+                <table class="history-table">
+                  <thead>
+                    <tr>
+                      <th scope="col">Date</th>
+                      {CATEGORIES.map((c) => (
+                        <th scope="col" class={`th-${c}`}>
+                          {CATEGORY_LABELS[c].slice(0, 3)}
+                        </th>
+                      ))}
+                      <th scope="col">Packs</th>
+                      <th scope="col">Earned</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {history.map((row) => (
+                      <tr>
+                        <td class="history-date">{row.date}</td>
+                        {CATEGORIES.map((c) => (
+                          <td class={`td-${c}`}>{row.counts[c]}</td>
+                        ))}
+                        <td>{row.totalPacks}</td>
+                        <td>{historyMoney(row.totalEarnings)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )
+          }
+        </div>
+      </section>
+
+      <footer class="foot">
+        <p>
+          Every tap is saved straight away &mdash; today's row in <code>data/packing-log.csv</code> always
+          matches what's on screen.
+        </p>
+      </footer>
+    </div>
+
+    <style>
+      :root {
+        --canvas: #ede6d6;
+        --panel: #f8f4ea;
+        --ink: #1b1f1d;
+        --ink-soft: #5b6259;
+        --line: #c9bea6;
+        --line-strong: #a99b78;
+        --gold: #b8862e;
+
+        --tandem: #c4432b;
+        --tandem-soft: #f1d9d2;
+        --instructor: #1f6f8b;
+        --instructor-soft: #d3e4e9;
+        --student: #3d8a5c;
+        --student-soft: #dbe9df;
+        --sport: #7a4e68;
+        --sport-soft: #e5dbe2;
+
+        --radius: 14px;
+        --shadow: 0 1px 0 rgba(27, 31, 29, 0.06), 0 6px 16px -8px rgba(27, 31, 29, 0.25);
+
+        color-scheme: light;
+      }
+
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --canvas: #14171a;
+          --panel: #1d2124;
+          --ink: #ede8dc;
+          --ink-soft: #9aa39a;
+          --line: #34393c;
+          --line-strong: #454b4e;
+          --gold: #d9a648;
+
+          --tandem-soft: #3a2420;
+          --instructor-soft: #1d2f34;
+          --student-soft: #1f2f25;
+          --sport-soft: #2c2330;
+
+          color-scheme: dark;
+        }
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+      }
+
+      body {
+        background: var(--canvas);
+        color: var(--ink);
+        font-family: 'Inter', system-ui, sans-serif;
+        min-height: 100dvh;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      .page {
+        max-width: 560px;
+        margin: 0 auto;
+        padding: 20px 16px calc(40px + env(safe-area-inset-bottom));
+        display: flex;
+        flex-direction: column;
+        gap: 22px;
+      }
+
+      /* ---- Masthead ---- */
+
+      .masthead {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+
+      .stamp {
+        align-self: flex-start;
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        padding: 8px 16px;
+        border: 2px dashed var(--line-strong);
+        border-radius: 10px;
+        transform: rotate(-1.5deg);
+        color: var(--ink);
+      }
+
+      .stamp-label {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 11px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--gold);
+      }
+
+      .stamp-date {
+        font-family: 'Space Grotesk', sans-serif;
+        font-weight: 700;
+        font-size: 19px;
+        letter-spacing: -0.01em;
+      }
+
+      .totals {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        padding: 16px 18px;
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        box-shadow: var(--shadow);
+      }
+
+      .totals-block {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+
+      .totals-value {
+        font-family: 'Space Grotesk', sans-serif;
+        font-weight: 700;
+        font-size: 34px;
+        line-height: 1;
+        letter-spacing: -0.02em;
+        color: var(--gold);
+        font-variant-numeric: tabular-nums;
+      }
+
+      .totals-value--packs {
+        color: var(--ink);
+      }
+
+      .totals-label {
+        font-size: 12px;
+        color: var(--ink-soft);
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
+
+      .totals-divider {
+        width: 1px;
+        align-self: stretch;
+        background: var(--line);
+      }
+
+      .totals-block--packs {
+        flex: 1;
+      }
+
+      /* ---- Category cards ---- */
+
+      .categories {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+
+      .card {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        padding: 14px 16px 16px;
+        box-shadow: var(--shadow);
+        border-left: 5px solid var(--accent, var(--line-strong));
+      }
+
+      .card[data-category='tandem'] {
+        --accent: var(--tandem);
+      }
+      .card[data-category='instructor'] {
+        --accent: var(--instructor);
+      }
+      .card[data-category='student'] {
+        --accent: var(--student);
+      }
+      .card[data-category='sport'] {
+        --accent: var(--sport);
+      }
+
+      .card-top {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 8px;
+      }
+
+      .card-label {
+        margin: 0;
+        font-size: 17px;
+        font-weight: 700;
+        letter-spacing: -0.01em;
+      }
+
+      .card-rate {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 12px;
+        color: var(--ink-soft);
+      }
+
+      .card-controls {
+        display: grid;
+        grid-template-columns: 64px 1fr 64px;
+        align-items: center;
+        gap: 12px;
+        margin-top: 10px;
+      }
+
+      .stepper {
+        appearance: none;
+        border: none;
+        border-radius: 12px;
+        width: 100%;
+        height: 56px;
+        font-size: 28px;
+        line-height: 1;
+        font-family: 'Space Grotesk', sans-serif;
+        font-weight: 700;
+        color: #fff;
+        background: var(--accent);
+        cursor: pointer;
+        touch-action: manipulation;
+        transition: transform 0.08s ease, filter 0.08s ease;
+      }
+
+      .stepper--minus {
+        background: transparent;
+        color: var(--accent);
+        border: 2px solid var(--accent);
+      }
+
+      .stepper:active {
+        transform: scale(0.93);
+        filter: brightness(0.95);
+      }
+
+      .stepper:focus-visible {
+        outline: 3px solid var(--gold);
+        outline-offset: 2px;
+      }
+
+      .card-count {
+        text-align: center;
+        font-family: 'Space Grotesk', sans-serif;
+        font-weight: 700;
+        font-size: 40px;
+        font-variant-numeric: tabular-nums;
+        transition: transform 0.12s ease;
+      }
+
+      .card-count.bump {
+        transform: scale(1.18);
+      }
+
+      .card-subtotal {
+        margin-top: 8px;
+        text-align: right;
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 13px;
+        color: var(--ink-soft);
+      }
+
+      /* ---- History ---- */
+
+      .history {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        overflow: hidden;
+      }
+
+      .history-toggle {
+        width: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        background: transparent;
+        border: none;
+        padding: 14px 16px;
+        font-family: 'Inter', sans-serif;
+        font-weight: 600;
+        font-size: 15px;
+        color: var(--ink);
+        cursor: pointer;
+      }
+
+      .history-toggle-icon {
+        transition: transform 0.15s ease;
+        font-size: 20px;
+        color: var(--ink-soft);
+      }
+
+      .history-toggle[aria-expanded='true'] .history-toggle-icon {
+        transform: rotate(90deg);
+      }
+
+      .history-panel {
+        border-top: 1px solid var(--line);
+        padding: 4px 0 8px;
+      }
+
+      .history-empty {
+        margin: 0;
+        padding: 14px 16px;
+        color: var(--ink-soft);
+        font-size: 14px;
+      }
+
+      .history-scroll {
+        overflow-x: auto;
+        padding: 0 8px;
+      }
+
+      .history-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 12.5px;
+        white-space: nowrap;
+      }
+
+      .history-table th,
+      .history-table td {
+        padding: 8px 8px;
+        text-align: right;
+      }
+
+      .history-table th:first-child,
+      .history-table td:first-child {
+        text-align: left;
+      }
+
+      .history-table thead th {
+        color: var(--ink-soft);
+        font-weight: 600;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .history-table tbody tr:not(:last-child) td {
+        border-bottom: 1px solid var(--line);
+      }
+
+      .th-tandem,
+      .td-tandem {
+        color: var(--tandem);
+      }
+      .th-instructor,
+      .td-instructor {
+        color: var(--instructor);
+      }
+      .th-student,
+      .td-student {
+        color: var(--student);
+      }
+      .th-sport,
+      .td-sport {
+        color: var(--sport);
+      }
+
+      /* ---- Footer ---- */
+
+      .foot {
+        text-align: center;
+      }
+
+      .foot p {
+        margin: 0;
+        font-size: 12px;
+        color: var(--ink-soft);
+        line-height: 1.5;
+      }
+
+      .foot code {
+        font-family: 'JetBrains Mono', monospace;
+        background: var(--panel);
+        border: 1px solid var(--line);
+        padding: 1px 5px;
+        border-radius: 4px;
+      }
+
+      @media (min-width: 480px) {
+        .categories {
+          gap: 14px;
+        }
+      }
+    </style>
+
+    <script>
+      const RATES: Record<string, number> = {
+        tandem: 11,
+        instructor: 6.5,
+        student: 6.5,
+        sport: 6.5,
+      };
+
+      function money(n: number) {
+        return `£${n.toFixed(2)}`;
+      }
+
+      async function adjust(category: string, delta: number) {
+        const res = await fetch('/api/adjust', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ category, delta }),
+        });
+        if (!res.ok) {
+          console.error('Failed to save pack job', await res.text());
+          return;
+        }
+        const data = await res.json();
+        applyState(data.state.counts, data.totalPacks, data.totalEarnings);
+        bump(category);
+      }
+
+      function applyState(counts: Record<string, number>, packs: number, earnings: number) {
+        for (const category of Object.keys(counts)) {
+          const countEl = document.querySelector(`[data-count="${category}"]`);
+          const subtotalEl = document.querySelector(`[data-subtotal="${category}"]`);
+          if (countEl) countEl.textContent = String(counts[category]);
+          if (subtotalEl) subtotalEl.textContent = money(counts[category] * RATES[category]);
+        }
+        const totalPacksEl = document.getElementById('totalPacks');
+        const totalEarningsEl = document.getElementById('totalEarnings');
+        if (totalPacksEl) totalPacksEl.textContent = String(packs);
+        if (totalEarningsEl) totalEarningsEl.textContent = money(earnings);
+      }
+
+      function bump(category: string) {
+        const countEl = document.querySelector(`[data-count="${category}"]`);
+        if (!countEl) return;
+        countEl.classList.remove('bump');
+        // Force reflow so the animation can restart on rapid taps.
+        void (countEl as HTMLElement).offsetWidth;
+        countEl.classList.add('bump');
+      }
+
+      document.querySelectorAll<HTMLButtonElement>('.stepper').forEach((button) => {
+        button.addEventListener('click', () => {
+          const category = button.dataset.category!;
+          const delta = button.dataset.action === 'increment' ? 1 : -1;
+          button.disabled = true;
+          adjust(category, delta).finally(() => {
+            button.disabled = false;
+          });
+        });
+      });
+
+      const historyToggle = document.getElementById('historyToggle');
+      const historyPanel = document.getElementById('historyPanel');
+      historyToggle?.addEventListener('click', () => {
+        const expanded = historyToggle.getAttribute('aria-expanded') === 'true';
+        historyToggle.setAttribute('aria-expanded', String(!expanded));
+        if (historyPanel) historyPanel.hidden = expanded;
+      });
+    </script>
+  </body>
+</html>
