@@ -542,19 +542,25 @@ const money = (n: number) => `£${n.toFixed(2)}`;
         color: var(--canvas);
       }
 
-      .history-empty {
+      /*
+       * :global() throughout this block because the Week/Month tables are
+       * rendered by AggregateTable.astro, a separate component with its own
+       * Astro CSS scope — plain class selectors here would only ever match
+       * the Day table, which lives directly in this file.
+       */
+      :global(.history-empty) {
         margin: 0;
         padding: 14px 16px;
         color: var(--ink-soft);
         font-size: 14px;
       }
 
-      .history-scroll {
+      :global(.history-scroll) {
         overflow-x: auto;
         padding: 0 8px;
       }
 
-      .history-table {
+      :global(.history-table) {
         width: 100%;
         border-collapse: collapse;
         font-family: 'JetBrains Mono', monospace;
@@ -562,41 +568,41 @@ const money = (n: number) => `£${n.toFixed(2)}`;
         white-space: nowrap;
       }
 
-      .history-table th,
-      .history-table td {
+      :global(.history-table th),
+      :global(.history-table td) {
         padding: 8px 8px;
         text-align: right;
       }
 
-      .history-table th:first-child,
-      .history-table td:first-child {
+      :global(.history-table th:first-child),
+      :global(.history-table td:first-child) {
         text-align: left;
       }
 
-      .history-table thead th {
+      :global(.history-table thead th) {
         color: var(--ink-soft);
         font-weight: 600;
         border-bottom: 1px solid var(--line);
       }
 
-      .history-table tbody tr:not(:last-child) td {
+      :global(.history-table tbody tr:not(:last-child) td) {
         border-bottom: 1px solid var(--line);
       }
 
-      .th-tandem,
-      .td-tandem {
+      :global(.th-tandem),
+      :global(.td-tandem) {
         color: var(--tandem);
       }
-      .th-instructor,
-      .td-instructor {
+      :global(.th-instructor),
+      :global(.td-instructor) {
         color: var(--instructor);
       }
-      .th-student,
-      .td-student {
+      :global(.th-student),
+      :global(.td-student) {
         color: var(--student);
       }
-      .th-sport,
-      .td-sport {
+      :global(.th-sport),
+      :global(.td-sport) {
         color: var(--sport);
       }
 
