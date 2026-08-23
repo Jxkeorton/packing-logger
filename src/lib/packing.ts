@@ -157,6 +157,22 @@ export async function adjustCount(category: Category, delta: number): Promise<Da
   return next;
 }
 
+/**
+ * Set (overwrite) a day's counts directly — for backfilling a day you
+ * forgot to log, or correcting a mistake, rather than tapping through
+ * +/- from zero. If `date` is today, today's live counts are updated too
+ * so the on-screen totals stay in sync; otherwise only the CSV row for
+ * that date is touched.
+ */
+export async function setDayCounts(date: string, counts: Counts): Promise<DayState> {
+  const dayState: DayState = { date, counts };
+  await upsertCsvRow(dayState);
+  if (date === todayKey()) {
+    await writeState(dayState);
+  }
+  return dayState;
+}
+
 /** The raw CSV log, for download/export. */
 export async function readCsvFile(): Promise<string> {
   return (await readText(CSV_KEY)) ?? `${CSV_HEADER}\n`;
