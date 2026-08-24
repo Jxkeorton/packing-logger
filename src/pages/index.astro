@@ -22,6 +22,8 @@ import {
 } from '../lib/tandem';
 import { groupByInvoiceMonth as groupTandemByInvoiceMonth, groupByWeek as groupTandemByWeek } from '../lib/tandem-invoice';
 import { readInvoiceSettings } from '../lib/invoice-settings';
+import { readLogbook, nextJumpNumber } from '../lib/logbook';
+import { readLogbookSettings } from '../lib/logbook-settings';
 import { formatDuration, formatWhen } from '../lib/format';
 import { readFastestFive } from '../lib/times';
 import { authEnabled } from '../lib/auth';
@@ -52,6 +54,12 @@ const tandemWeekRows = groupTandemByWeek(tandemCombined).slice(0, 12);
 const tandemMonthRows = groupTandemByInvoiceMonth(tandemCombined).slice(0, 12);
 
 const invoiceSettings = await readInvoiceSettings();
+
+// The personal jump logbook — a separate ledger again, numbered from a
+// configurable starting offset rather than a running daily count.
+const logbookSettings = await readLogbookSettings();
+const logbookEntries = await readLogbook(logbookSettings.baseJumps);
+const nextLogbookNumber = await nextJumpNumber(logbookSettings.baseJumps);
 
 const dateObj = new Date(`${state.date}T00:00:00`);
 const dateDisplay = dateObj.toLocaleDateString('en-GB', {
@@ -84,6 +92,7 @@ const money = (n: number) => `£${n.toFixed(2)}`;
       <div class="app-tabs" role="tablist" aria-label="Section">
         <button type="button" class="app-tab" data-app-tab="packing" role="tab" aria-selected="true">Packing</button>
         <button type="button" class="app-tab" data-app-tab="tandems" role="tab" aria-selected="false">Tandems</button>
+        <button type="button" class="app-tab" data-app-tab="logbook" role="tab" aria-selected="false">Logbook</button>
       </div>
 
       <div class="app-view" data-app-view="packing" id="packingView">
@@ -421,6 +430,282 @@ const money = (n: number) => `£${n.toFixed(2)}`;
             data-download-name="tandem-log.csv"
           >
             Download full tandem log (.csv)
+          </button>
+        </footer>
+      </div>
+
+      <div class="app-view" data-app-view="logbook" id="logbookView" hidden>
+        <header class="masthead">
+          <div class="stamp" aria-hidden="false">
+            <span class="stamp-label">Logbook</span>
+            <span class="stamp-date">{dateDisplay}</span>
+          </div>
+          <div class="totals">
+            <div class="totals-block totals-block--packs">
+              <span class="totals-value totals-value--packs" id="logbookTotalJumps">{nextLogbookNumber - 1}</span>
+              <span class="totals-label">jumps logged</span>
+            </div>
+          </div>
+        </header>
+
+        <section class="logbook-form-card">
+          <div class="logbook-form-top">
+            <h2 class="logbook-form-title" id="logbookFormTitle">Log a jump</h2>
+            <span class="logbook-form-number" id="logbookNextNumber">#{nextLogbookNumber}</span>
+          </div>
+          <form id="logbookForm">
+            <input type="hidden" id="logbookEditingAt" value="" />
+            <div class="logbook-form-grid">
+              <label class="invoice-field">
+                <span>Date *</span>
+                <input type="date" id="logbookDate" required value={state.date} />
+              </label>
+              <label class="invoice-field">
+                <span>Place</span>
+                <input type="text" id="logbookPlace" placeholder="e.g. Langar" autocomplete="off" maxlength="120" />
+              </label>
+              <label class="invoice-field">
+                <span>Exit altitude</span>
+                <input type="text" id="logbookAltitude" placeholder="e.g. 13,000 ft" autocomplete="off" maxlength="120" />
+              </label>
+              <label class="invoice-field">
+                <span>Equipment</span>
+                <select id="logbookEquipment">
+                  <option value="" data-canopy="" data-container="" data-aad="">
+                    No equipment selected
+                  </option>
+                  {
+                    logbookSettings.equipment.map((eq) => (
+                      <option value={eq.id} data-canopy={eq.canopy} data-container={eq.container} data-aad={eq.aad}>
+                        {eq.name}
+                      </option>
+                    ))
+                  }
+                </select>
+              </label>
+              <label class="invoice-field">
+                <span>Aircraft</span>
+                <select id="logbookAircraft">
+                  <option value="">No aircraft selected</option>
+                  {
+                    logbookSettings.aircraft.map((ac) => (
+                      <option value={ac.id}>{ac.plate}</option>
+                    ))
+                  }
+                </select>
+              </label>
+            </div>
+            <label class="invoice-field">
+              <span>Description</span>
+              <textarea id="logbookDescription" rows="3" placeholder="Freefall, exercises, canopy notes…"></textarea>
+            </label>
+            <div class="invoice-settings-actions">
+              <button type="submit" class="invoice-settings-save" id="logbookSubmit">Log jump</button>
+              <button type="button" class="logbook-cancel-edit" id="logbookCancelEdit" hidden>Cancel edit</button>
+              <span class="invoice-settings-status" id="logbookFormStatus" role="status"></span>
+            </div>
+          </form>
+        </section>
+
+        <section class="logbook-list-card">
+          <ul class="logbook-list" id="logbookList">
+            {
+              logbookEntries.length === 0 ? (
+                <li class="logbook-empty">No jumps logged yet.</li>
+              ) : (
+                logbookEntries.map((e) => {
+                  const shortDate = new Date(`${e.date}T00:00:00`).toLocaleDateString('en-GB', {
+                    day: 'numeric',
+                    month: 'short',
+                    year: 'numeric',
+                  });
+                  return (
+                    <li
+                      class="logbook-entry"
+                      data-at={e.at}
+                      data-date={e.date}
+                      data-place={e.place}
+                      data-altitude={e.exitAltitude}
+                      data-aircraft={e.aircraft}
+                      data-canopy={e.canopy}
+                      data-container={e.container}
+                      data-aad={e.aad}
+                      data-description={e.description}
+                    >
+                      <button type="button" class="logbook-row" data-toggle={e.at} aria-expanded="false">
+                        <span class="logbook-row-number">#{e.number}</span>
+                        <span class="logbook-row-date">{shortDate}</span>
+                        <span class="logbook-row-place">{e.place || '—'}</span>
+                        <span class="logbook-row-chevron">&rsaquo;</span>
+                      </button>
+                      <div class="logbook-details" id={`logbookDetails-${e.at}`} hidden>
+                        <dl class="logbook-details-grid">
+                          <div>
+                            <dt>Exit altitude</dt>
+                            <dd>{e.exitAltitude || '—'}</dd>
+                          </div>
+                          <div>
+                            <dt>Aircraft</dt>
+                            <dd>{e.aircraft || '—'}</dd>
+                          </div>
+                          <div>
+                            <dt>Canopy</dt>
+                            <dd>{e.canopy || '—'}</dd>
+                          </div>
+                          <div>
+                            <dt>Container</dt>
+                            <dd>{e.container || '—'}</dd>
+                          </div>
+                          <div>
+                            <dt>AAD</dt>
+                            <dd>{e.aad || '—'}</dd>
+                          </div>
+                        </dl>
+                        {e.description && <p class="logbook-details-description">{e.description}</p>}
+                        <div class="logbook-details-actions">
+                          <button type="button" class="logbook-edit" data-edit={e.at}>
+                            Edit
+                          </button>
+                          <button type="button" class="logbook-delete" data-delete={e.at}>
+                            Delete
+                          </button>
+                        </div>
+                      </div>
+                    </li>
+                  );
+                })
+              )
+            }
+          </ul>
+        </section>
+
+        <section class="history">
+          <button class="history-toggle" id="equipmentToggle" type="button" aria-expanded="false" aria-controls="equipmentPanel">
+            <span>Equipment</span>
+            <span class="history-toggle-icon" id="equipmentToggleIcon">&rsaquo;</span>
+          </button>
+          <div class="history-panel invoice-settings-panel" id="equipmentPanel" hidden>
+            <ul class="equipment-list" id="equipmentList">
+              {
+                logbookSettings.equipment.length === 0 ? (
+                  <li class="equipment-empty">No equipment saved yet.</li>
+                ) : (
+                  logbookSettings.equipment.map((eq) => (
+                    <li class="equipment-row" data-id={eq.id}>
+                      <div class="equipment-row-text">
+                        <span class="equipment-row-name">{eq.name}</span>
+                        <span class="equipment-row-detail">
+                          {[eq.canopy, eq.container, eq.aad].filter(Boolean).join(' · ') || 'No details saved'}
+                        </span>
+                      </div>
+                      <button type="button" class="equipment-delete" data-equipment-delete={eq.id} aria-label={`Remove ${eq.name}`}>
+                        &times;
+                      </button>
+                    </li>
+                  ))
+                )
+              }
+            </ul>
+            <form id="equipmentForm" class="equipment-form">
+              <label class="invoice-field">
+                <span>Name</span>
+                <input type="text" id="equipmentName" placeholder="e.g. Main rig" autocomplete="off" maxlength="80" required />
+              </label>
+              <div class="logbook-form-grid">
+                <label class="invoice-field">
+                  <span>Canopy</span>
+                  <input type="text" id="equipmentCanopy" placeholder="e.g. Sabre2 190" autocomplete="off" maxlength="80" />
+                </label>
+                <label class="invoice-field">
+                  <span>Container</span>
+                  <input type="text" id="equipmentContainer" placeholder="e.g. Wings X 190" autocomplete="off" maxlength="80" />
+                </label>
+                <label class="invoice-field">
+                  <span>AAD</span>
+                  <input type="text" id="equipmentAad" placeholder="e.g. Cypres 2" autocomplete="off" maxlength="80" />
+                </label>
+              </div>
+              <div class="invoice-settings-actions">
+                <button type="submit" class="invoice-settings-save">Save equipment</button>
+                <span class="invoice-settings-status" id="equipmentStatus" role="status"></span>
+              </div>
+            </form>
+          </div>
+        </section>
+
+        <section class="history">
+          <button class="history-toggle" id="aircraftToggle" type="button" aria-expanded="false" aria-controls="aircraftPanel">
+            <span>Aircraft</span>
+            <span class="history-toggle-icon" id="aircraftToggleIcon">&rsaquo;</span>
+          </button>
+          <div class="history-panel invoice-settings-panel" id="aircraftPanel" hidden>
+            <ul class="equipment-list" id="aircraftList">
+              {
+                logbookSettings.aircraft.length === 0 ? (
+                  <li class="equipment-empty">No aircraft saved yet.</li>
+                ) : (
+                  logbookSettings.aircraft.map((ac) => (
+                    <li class="equipment-row" data-id={ac.id}>
+                      <div class="equipment-row-text">
+                        <span class="equipment-row-name">{ac.plate}</span>
+                      </div>
+                      <button type="button" class="equipment-delete" data-aircraft-delete={ac.id} aria-label={`Remove ${ac.plate}`}>
+                        &times;
+                      </button>
+                    </li>
+                  ))
+                )
+              }
+            </ul>
+            <form id="aircraftForm" class="equipment-form">
+              <label class="invoice-field invoice-field--narrow">
+                <span>Registration</span>
+                <input type="text" id="aircraftPlate" placeholder="e.g. G-SDSK" autocomplete="off" maxlength="20" required />
+              </label>
+              <div class="invoice-settings-actions">
+                <button type="submit" class="invoice-settings-save">Save aircraft</button>
+                <span class="invoice-settings-status" id="aircraftStatus" role="status"></span>
+              </div>
+            </form>
+          </div>
+        </section>
+
+        <section class="history">
+          <button
+            class="history-toggle"
+            id="logbookSettingsToggle"
+            type="button"
+            aria-expanded="false"
+            aria-controls="logbookSettingsPanel"
+          >
+            <span>Settings</span>
+            <span class="history-toggle-icon" id="logbookSettingsToggleIcon">&rsaquo;</span>
+          </button>
+          <div class="history-panel invoice-settings-panel" id="logbookSettingsPanel" hidden>
+            <p class="invoice-settings-hint">
+              Jumps you logged before using this app — added to the count above so numbering carries on correctly.
+            </p>
+            <form id="logbookSettingsForm">
+              <label class="invoice-field invoice-field--narrow">
+                <span>Jumps logged before this app</span>
+                <input type="number" id="logbookBaseJumps" min="0" step="1" value={logbookSettings.baseJumps} required />
+              </label>
+              <div class="invoice-settings-actions">
+                <button type="submit" class="invoice-settings-save">Save</button>
+                <span class="invoice-settings-status" id="logbookSettingsStatus" role="status"></span>
+              </div>
+            </form>
+          </div>
+        </section>
+
+        <footer class="foot">
+          <button
+            type="button"
+            class="foot-download"
+            data-download="/api/logbook-export.csv"
+            data-download-name="logbook.csv"
+          >
+            Download full logbook (.csv)
           </button>
         </footer>
       </div>
@@ -1088,7 +1373,8 @@ const money = (n: number) => `£${n.toFixed(2)}`;
       }
 
       .invoice-field input,
-      .invoice-field textarea {
+      .invoice-field textarea,
+      .invoice-field select {
         width: 100%;
         padding: 9px 12px;
         border-radius: 10px;
@@ -1101,8 +1387,13 @@ const money = (n: number) => `£${n.toFixed(2)}`;
         resize: vertical;
       }
 
+      .invoice-field select {
+        height: 40px;
+      }
+
       .invoice-field input:focus-visible,
-      .invoice-field textarea:focus-visible {
+      .invoice-field textarea:focus-visible,
+      .invoice-field select:focus-visible {
         outline: 3px solid var(--gold);
         outline-offset: 1px;
       }
@@ -1394,6 +1685,289 @@ const money = (n: number) => `£${n.toFixed(2)}`;
         padding: 10px 0 14px;
         color: var(--ink-soft);
         font-size: 14px;
+      }
+
+      /* ---- Logbook: add-jump form ---- */
+
+      .logbook-form-card {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        box-shadow: var(--shadow);
+        padding: 14px 16px 16px;
+      }
+
+      .logbook-form-top {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 8px;
+        margin-bottom: 10px;
+      }
+
+      .logbook-form-title {
+        margin: 0;
+        font-size: 17px;
+        font-weight: 700;
+        letter-spacing: -0.01em;
+      }
+
+      .logbook-form-number {
+        font-family: 'JetBrains Mono', monospace;
+        font-weight: 600;
+        font-size: 14px;
+        color: var(--gold);
+      }
+
+      .logbook-form-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0 10px;
+      }
+
+      .logbook-cancel-edit {
+        appearance: none;
+        border: none;
+        background: transparent;
+        color: var(--ink-soft);
+        font-family: 'Inter', sans-serif;
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+        padding: 0;
+        text-decoration: underline;
+      }
+
+      @media (max-width: 420px) {
+        .logbook-form-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      /* ---- Logbook: entry list ---- */
+
+      .logbook-list-card {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        box-shadow: var(--shadow);
+        overflow: hidden;
+      }
+
+      :global(.logbook-list) {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+      }
+
+      :global(.logbook-empty) {
+        margin: 0;
+        padding: 16px;
+        color: var(--ink-soft);
+        font-size: 14px;
+      }
+
+      :global(.logbook-entry) {
+        border-top: 1px solid var(--line);
+      }
+
+      :global(.logbook-entry:first-child) {
+        border-top: none;
+      }
+
+      :global(.logbook-row) {
+        appearance: none;
+        border: none;
+        background: transparent;
+        width: 100%;
+        display: grid;
+        grid-template-columns: 44px 84px 1fr 16px;
+        align-items: center;
+        gap: 10px;
+        padding: 12px 14px;
+        font-family: 'Inter', sans-serif;
+        color: var(--ink);
+        text-align: left;
+        cursor: pointer;
+        touch-action: manipulation;
+      }
+
+      :global(.logbook-row-number) {
+        font-family: 'JetBrains Mono', monospace;
+        font-weight: 600;
+        font-size: 13px;
+        color: var(--gold);
+      }
+
+      :global(.logbook-row-date) {
+        font-size: 12.5px;
+        color: var(--ink-soft);
+        white-space: nowrap;
+      }
+
+      :global(.logbook-row-place) {
+        font-size: 14px;
+        font-weight: 600;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      :global(.logbook-row-chevron) {
+        font-size: 18px;
+        color: var(--ink-soft);
+        transition: transform 0.15s ease;
+        justify-self: end;
+      }
+
+      :global(.logbook-row[aria-expanded='true'] .logbook-row-chevron) {
+        transform: rotate(90deg);
+      }
+
+      :global(.logbook-details) {
+        padding: 0 14px 14px;
+      }
+
+      :global(.logbook-details-grid) {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px 14px;
+        margin: 0;
+      }
+
+      :global(.logbook-details-grid dt) {
+        margin: 0;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--ink-soft);
+      }
+
+      :global(.logbook-details-grid dd) {
+        margin: 2px 0 0;
+        font-size: 13.5px;
+      }
+
+      :global(.logbook-details-description) {
+        margin: 12px 0 0;
+        padding-top: 10px;
+        border-top: 1px solid var(--line);
+        font-size: 13.5px;
+        white-space: pre-wrap;
+      }
+
+      :global(.logbook-details-actions) {
+        display: flex;
+        gap: 14px;
+        margin-top: 12px;
+      }
+
+      :global(.logbook-edit),
+      :global(.logbook-delete) {
+        appearance: none;
+        border: none;
+        background: transparent;
+        font-family: 'Inter', sans-serif;
+        font-weight: 600;
+        font-size: 12.5px;
+        padding: 4px 0;
+        cursor: pointer;
+        touch-action: manipulation;
+      }
+
+      :global(.logbook-edit) {
+        color: var(--gold);
+      }
+
+      :global(.logbook-delete) {
+        color: var(--ink-soft);
+      }
+
+      :global(.logbook-delete:hover),
+      :global(.logbook-delete:focus-visible) {
+        color: var(--danger);
+        outline: none;
+      }
+
+      /* ---- Logbook: equipment list ---- */
+
+      .equipment-list {
+        list-style: none;
+        margin: 0 0 12px;
+        padding: 0;
+      }
+
+      :global(.equipment-row) {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        padding: 9px 2px;
+        border-top: 1px solid var(--line);
+      }
+
+      :global(.equipment-row:first-child) {
+        border-top: none;
+      }
+
+      :global(.equipment-row-text) {
+        display: flex;
+        flex-direction: column;
+        gap: 1px;
+        overflow: hidden;
+      }
+
+      :global(.equipment-row-name) {
+        font-size: 13.5px;
+        font-weight: 600;
+      }
+
+      :global(.equipment-row-detail) {
+        font-size: 12px;
+        color: var(--ink-soft);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      :global(.equipment-delete) {
+        appearance: none;
+        border: none;
+        background: transparent;
+        color: var(--ink-soft);
+        font-family: 'Inter', sans-serif;
+        font-size: 18px;
+        line-height: 1;
+        width: 26px;
+        height: 26px;
+        flex: none;
+        border-radius: 8px;
+        cursor: pointer;
+        touch-action: manipulation;
+      }
+
+      :global(.equipment-delete:hover),
+      :global(.equipment-delete:focus-visible) {
+        background: var(--danger-soft);
+        color: var(--danger);
+        outline: none;
+      }
+
+      :global(.equipment-empty) {
+        margin: 0 0 12px;
+        padding: 9px 2px;
+        color: var(--ink-soft);
+        font-size: 13px;
+      }
+
+      .equipment-form {
+        padding-top: 4px;
+        border-top: 1px solid var(--line);
+      }
+
+      .equipment-form .invoice-field {
+        margin-top: 10px;
+        margin-bottom: 0;
       }
     </style>
 
@@ -1887,6 +2461,542 @@ const money = (n: number) => `£${n.toFixed(2)}`;
           void savePackTime(elapsed);
         }
       });
+
+      // ---- Logbook ----
+
+      interface LogbookEntryData {
+        date: string;
+        place: string;
+        exitAltitude: string;
+        canopy: string;
+        container: string;
+        aad: string;
+        aircraft: string;
+        description: string;
+        at: string;
+        number: number;
+      }
+
+      interface EquipmentData {
+        id: string;
+        name: string;
+        canopy: string;
+        container: string;
+        aad: string;
+      }
+
+      function formatShortDate(dateStr: string): string {
+        const d = new Date(`${dateStr}T00:00:00`);
+        return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+      }
+
+      function dash(value: string): string {
+        return value ? escapeHtml(value) : '—';
+      }
+
+      function logbookRowHtml(e: LogbookEntryData): string {
+        const description = e.description
+          ? `<p class="logbook-details-description">${escapeHtml(e.description)}</p>`
+          : '';
+        return `
+          <li class="logbook-entry" data-at="${e.at}" data-date="${e.date}" data-place="${escapeHtml(e.place)}" data-altitude="${escapeHtml(e.exitAltitude)}" data-aircraft="${escapeHtml(e.aircraft)}" data-canopy="${escapeHtml(e.canopy)}" data-container="${escapeHtml(e.container)}" data-aad="${escapeHtml(e.aad)}" data-description="${escapeHtml(e.description)}">
+            <button type="button" class="logbook-row" data-toggle="${e.at}" aria-expanded="false">
+              <span class="logbook-row-number">#${e.number}</span>
+              <span class="logbook-row-date">${formatShortDate(e.date)}</span>
+              <span class="logbook-row-place">${dash(e.place)}</span>
+              <span class="logbook-row-chevron">&rsaquo;</span>
+            </button>
+            <div class="logbook-details" id="logbookDetails-${e.at}" hidden>
+              <dl class="logbook-details-grid">
+                <div><dt>Exit altitude</dt><dd>${dash(e.exitAltitude)}</dd></div>
+                <div><dt>Aircraft</dt><dd>${dash(e.aircraft)}</dd></div>
+                <div><dt>Canopy</dt><dd>${dash(e.canopy)}</dd></div>
+                <div><dt>Container</dt><dd>${dash(e.container)}</dd></div>
+                <div><dt>AAD</dt><dd>${dash(e.aad)}</dd></div>
+              </dl>
+              ${description}
+              <div class="logbook-details-actions">
+                <button type="button" class="logbook-edit" data-edit="${e.at}">Edit</button>
+                <button type="button" class="logbook-delete" data-delete="${e.at}">Delete</button>
+              </div>
+            </div>
+          </li>`;
+      }
+
+      function renderLogbookList(entries: LogbookEntryData[]) {
+        const list = document.getElementById('logbookList');
+        if (!list) return;
+        list.innerHTML =
+          entries.length === 0
+            ? '<li class="logbook-empty">No jumps logged yet.</li>'
+            : entries.map(logbookRowHtml).join('');
+      }
+
+      function applyLogbookState(entries: LogbookEntryData[], nextNumber: number) {
+        renderLogbookList(entries);
+        const totalEl = document.getElementById('logbookTotalJumps');
+        if (totalEl) totalEl.textContent = String(nextNumber - 1);
+        const nextEl = document.getElementById('logbookNextNumber');
+        if (nextEl && logbookForm?.dataset.editing !== 'true') nextEl.textContent = `#${nextNumber}`;
+      }
+
+      const logbookForm = document.getElementById('logbookForm') as HTMLFormElement | null;
+      const logbookList = document.getElementById('logbookList');
+      const logbookFormTitle = document.getElementById('logbookFormTitle');
+      const logbookNextNumberEl = document.getElementById('logbookNextNumber');
+      const logbookEditingAt = document.getElementById('logbookEditingAt') as HTMLInputElement | null;
+      const logbookDate = document.getElementById('logbookDate') as HTMLInputElement | null;
+      const logbookPlace = document.getElementById('logbookPlace') as HTMLInputElement | null;
+      const logbookAltitude = document.getElementById('logbookAltitude') as HTMLInputElement | null;
+      const logbookEquipment = document.getElementById('logbookEquipment') as HTMLSelectElement | null;
+      const logbookAircraft = document.getElementById('logbookAircraft') as HTMLSelectElement | null;
+      const logbookDescription = document.getElementById('logbookDescription') as HTMLTextAreaElement | null;
+      const logbookSubmit = document.getElementById('logbookSubmit') as HTMLButtonElement | null;
+      const logbookCancelEdit = document.getElementById('logbookCancelEdit') as HTMLButtonElement | null;
+      const logbookFormStatus = document.getElementById('logbookFormStatus');
+      const todayDateValue = logbookDate?.value ?? '';
+
+      function selectedEquipment(): { canopy: string; container: string; aad: string } {
+        const option = logbookEquipment?.selectedOptions[0];
+        return {
+          canopy: option?.dataset.canopy ?? '',
+          container: option?.dataset.container ?? '',
+          aad: option?.dataset.aad ?? '',
+        };
+      }
+
+      // Picks the dropdown option whose saved values match a jump's snapshot
+      // exactly, so re-opening a jump for editing shows the right equipment
+      // pre-selected when it still matches a saved profile. If the profile
+      // was since edited or deleted, this just leaves "No equipment
+      // selected" chosen — the entry's own canopy/container/AAD text stays
+      // untouched unless the field is changed.
+      function selectEquipmentMatching(canopy: string, container: string, aad: string) {
+        if (!logbookEquipment) return;
+        for (const option of Array.from(logbookEquipment.options)) {
+          if ((option.dataset.canopy ?? '') === canopy && (option.dataset.container ?? '') === container && (option.dataset.aad ?? '') === aad) {
+            logbookEquipment.value = option.value;
+            return;
+          }
+        }
+        logbookEquipment.value = '';
+      }
+
+      function selectedAircraftText(): string {
+        return logbookAircraft?.selectedOptions[0]?.textContent ?? '';
+      }
+
+      // Same idea as selectEquipmentMatching, but aircraft only has one
+      // field, so it's a plain text match against the option's label.
+      function selectAircraftMatching(plate: string) {
+        if (!logbookAircraft) return;
+        for (const option of Array.from(logbookAircraft.options)) {
+          if (option.textContent === plate) {
+            logbookAircraft.value = option.value;
+            return;
+          }
+        }
+        logbookAircraft.value = '';
+      }
+
+      function enterAddMode() {
+        if (!logbookForm) return;
+        logbookForm.dataset.editing = 'false';
+        if (logbookEditingAt) logbookEditingAt.value = '';
+        if (logbookFormTitle) logbookFormTitle.textContent = 'Log a jump';
+        if (logbookSubmit) logbookSubmit.textContent = 'Log jump';
+        if (logbookCancelEdit) logbookCancelEdit.hidden = true;
+        logbookForm.reset();
+        if (logbookDate) logbookDate.value = todayDateValue;
+        const totalEl = document.getElementById('logbookTotalJumps');
+        if (logbookNextNumberEl && totalEl) {
+          logbookNextNumberEl.textContent = `#${Number(totalEl.textContent) + 1}`;
+        }
+      }
+
+      function enterEditMode(entry: HTMLElement) {
+        if (!logbookForm) return;
+        const { at, date, place, altitude, aircraft, canopy, container, aad, description } = entry.dataset;
+        logbookForm.dataset.editing = 'true';
+        if (logbookEditingAt) logbookEditingAt.value = at ?? '';
+        if (logbookDate) logbookDate.value = date ?? '';
+        if (logbookPlace) logbookPlace.value = place ?? '';
+        if (logbookAltitude) logbookAltitude.value = altitude ?? '';
+        if (logbookDescription) logbookDescription.value = description ?? '';
+        selectEquipmentMatching(canopy ?? '', container ?? '', aad ?? '');
+        selectAircraftMatching(aircraft ?? '');
+        if (logbookFormTitle) logbookFormTitle.textContent = 'Edit jump';
+        if (logbookSubmit) logbookSubmit.textContent = 'Save changes';
+        if (logbookCancelEdit) logbookCancelEdit.hidden = false;
+        if (logbookNextNumberEl) {
+          const row = document.querySelector(`.logbook-row[data-toggle="${at}"] .logbook-row-number`);
+          logbookNextNumberEl.textContent = row?.textContent ?? '';
+        }
+        logbookForm.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+
+      logbookCancelEdit?.addEventListener('click', enterAddMode);
+
+      logbookForm?.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const equipment = selectedEquipment();
+        const editingAt = logbookEditingAt?.value || '';
+        const payload = {
+          at: editingAt || undefined,
+          date: logbookDate?.value ?? '',
+          place: logbookPlace?.value ?? '',
+          exitAltitude: logbookAltitude?.value ?? '',
+          aircraft: selectedAircraftText(),
+          description: logbookDescription?.value ?? '',
+          ...equipment,
+        };
+
+        if (logbookSubmit) logbookSubmit.disabled = true;
+        if (logbookFormStatus) {
+          logbookFormStatus.textContent = 'Saving…';
+          logbookFormStatus.removeAttribute('data-state');
+        }
+
+        try {
+          const res = await fetch('/api/logbook', {
+            method: editingAt ? 'PUT' : 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          });
+          if (!res.ok) {
+            const data = await res.json().catch(() => null);
+            throw new Error(data?.error ?? 'Failed to save');
+          }
+          const data = await res.json();
+          applyLogbookState(data.entries, data.nextNumber);
+          if (logbookFormStatus) {
+            logbookFormStatus.textContent = editingAt ? 'Saved' : 'Logged';
+            logbookFormStatus.dataset.state = 'ok';
+          }
+          enterAddMode();
+          window.setTimeout(() => {
+            if (logbookFormStatus) logbookFormStatus.textContent = '';
+          }, 2000);
+        } catch (err) {
+          console.error('Failed to save jump', err);
+          if (logbookFormStatus) {
+            logbookFormStatus.textContent = err instanceof Error ? err.message : 'Failed to save';
+            logbookFormStatus.dataset.state = 'error';
+          }
+        } finally {
+          if (logbookSubmit) logbookSubmit.disabled = false;
+        }
+      });
+
+      logbookList?.addEventListener('click', async (event) => {
+        const target = event.target as HTMLElement;
+
+        const toggleButton = target.closest<HTMLButtonElement>('.logbook-row');
+        if (toggleButton?.dataset.toggle) {
+          const details = document.getElementById(`logbookDetails-${toggleButton.dataset.toggle}`);
+          const expanded = toggleButton.getAttribute('aria-expanded') === 'true';
+          toggleButton.setAttribute('aria-expanded', String(!expanded));
+          if (details) details.hidden = expanded;
+          return;
+        }
+
+        const editButton = target.closest<HTMLButtonElement>('.logbook-edit');
+        if (editButton?.dataset.edit) {
+          const entry = editButton.closest<HTMLElement>('.logbook-entry');
+          if (entry) enterEditMode(entry);
+          return;
+        }
+
+        const deleteButton = target.closest<HTMLButtonElement>('.logbook-delete');
+        if (deleteButton?.dataset.delete) {
+          const at = deleteButton.dataset.delete;
+          deleteButton.disabled = true;
+          try {
+            const res = await fetch('/api/logbook', {
+              method: 'DELETE',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ at }),
+            });
+            if (!res.ok) return;
+            const data = await res.json();
+            applyLogbookState(data.entries, data.nextNumber);
+            // If the jump being deleted was the one open in the edit form,
+            // drop back to add mode rather than leaving a stale edit target.
+            if (logbookEditingAt?.value === at) enterAddMode();
+          } catch (err) {
+            console.error('Failed to delete jump', err);
+          } finally {
+            deleteButton.disabled = false;
+          }
+        }
+      });
+
+      // ---- Logbook: equipment ----
+
+      function equipmentOptionsHtml(equipment: EquipmentData[]): string {
+        const saved = equipment
+          .map(
+            (eq) =>
+              `<option value="${eq.id}" data-canopy="${escapeHtml(eq.canopy)}" data-container="${escapeHtml(eq.container)}" data-aad="${escapeHtml(eq.aad)}">${escapeHtml(eq.name)}</option>`,
+          )
+          .join('');
+        return `<option value="" data-canopy="" data-container="" data-aad="">No equipment selected</option>${saved}`;
+      }
+
+      function equipmentListHtml(equipment: EquipmentData[]): string {
+        if (equipment.length === 0) return '<li class="equipment-empty">No equipment saved yet.</li>';
+        return equipment
+          .map((eq) => {
+            const detail = [eq.canopy, eq.container, eq.aad].filter(Boolean).map(escapeHtml).join(' · ') || 'No details saved';
+            return `
+              <li class="equipment-row" data-id="${eq.id}">
+                <div class="equipment-row-text">
+                  <span class="equipment-row-name">${escapeHtml(eq.name)}</span>
+                  <span class="equipment-row-detail">${detail}</span>
+                </div>
+                <button type="button" class="equipment-delete" data-equipment-delete="${eq.id}" aria-label="Remove ${escapeHtml(eq.name)}">&times;</button>
+              </li>`;
+          })
+          .join('');
+      }
+
+      function applyEquipmentState(equipment: EquipmentData[]) {
+        const list = document.getElementById('equipmentList');
+        if (list) list.innerHTML = equipmentListHtml(equipment);
+        if (logbookEquipment) {
+          const previous = logbookEquipment.value;
+          logbookEquipment.innerHTML = equipmentOptionsHtml(equipment);
+          if (Array.from(logbookEquipment.options).some((o) => o.value === previous)) {
+            logbookEquipment.value = previous;
+          }
+        }
+      }
+
+      const equipmentForm = document.getElementById('equipmentForm') as HTMLFormElement | null;
+      const equipmentList = document.getElementById('equipmentList');
+      const equipmentStatus = document.getElementById('equipmentStatus');
+      const equipmentName = document.getElementById('equipmentName') as HTMLInputElement | null;
+      const equipmentCanopy = document.getElementById('equipmentCanopy') as HTMLInputElement | null;
+      const equipmentContainer = document.getElementById('equipmentContainer') as HTMLInputElement | null;
+      const equipmentAad = document.getElementById('equipmentAad') as HTMLInputElement | null;
+
+      equipmentForm?.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const submitButton = equipmentForm.querySelector<HTMLButtonElement>('button[type="submit"]');
+        if (submitButton) submitButton.disabled = true;
+        if (equipmentStatus) {
+          equipmentStatus.textContent = 'Saving…';
+          equipmentStatus.removeAttribute('data-state');
+        }
+
+        try {
+          const res = await fetch('/api/equipment', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              name: equipmentName?.value ?? '',
+              canopy: equipmentCanopy?.value ?? '',
+              container: equipmentContainer?.value ?? '',
+              aad: equipmentAad?.value ?? '',
+            }),
+          });
+          if (!res.ok) {
+            const data = await res.json().catch(() => null);
+            throw new Error(data?.error ?? 'Failed to save');
+          }
+          const data = await res.json();
+          applyEquipmentState(data.settings.equipment);
+          equipmentForm.reset();
+          if (equipmentStatus) {
+            equipmentStatus.textContent = 'Saved';
+            equipmentStatus.dataset.state = 'ok';
+          }
+        } catch (err) {
+          console.error('Failed to save equipment', err);
+          if (equipmentStatus) {
+            equipmentStatus.textContent = err instanceof Error ? err.message : 'Failed to save';
+            equipmentStatus.dataset.state = 'error';
+          }
+        } finally {
+          if (submitButton) submitButton.disabled = false;
+        }
+      });
+
+      equipmentList?.addEventListener('click', async (event) => {
+        const button = (event.target as HTMLElement).closest<HTMLButtonElement>('.equipment-delete');
+        const id = button?.dataset.equipmentDelete;
+        if (!id) return;
+        button.disabled = true;
+        try {
+          const res = await fetch('/api/equipment', {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id }),
+          });
+          if (!res.ok) return;
+          const data = await res.json();
+          applyEquipmentState(data.settings.equipment);
+        } catch (err) {
+          console.error('Failed to delete equipment', err);
+        } finally {
+          button.disabled = false;
+        }
+      });
+
+      // ---- Logbook: aircraft ----
+
+      interface AircraftData {
+        id: string;
+        plate: string;
+      }
+
+      function aircraftOptionsHtml(aircraft: AircraftData[]): string {
+        const saved = aircraft.map((ac) => `<option value="${ac.id}">${escapeHtml(ac.plate)}</option>`).join('');
+        return `<option value="">No aircraft selected</option>${saved}`;
+      }
+
+      function aircraftListHtml(aircraft: AircraftData[]): string {
+        if (aircraft.length === 0) return '<li class="equipment-empty">No aircraft saved yet.</li>';
+        return aircraft
+          .map(
+            (ac) => `
+              <li class="equipment-row" data-id="${ac.id}">
+                <div class="equipment-row-text">
+                  <span class="equipment-row-name">${escapeHtml(ac.plate)}</span>
+                </div>
+                <button type="button" class="equipment-delete" data-aircraft-delete="${ac.id}" aria-label="Remove ${escapeHtml(ac.plate)}">&times;</button>
+              </li>`,
+          )
+          .join('');
+      }
+
+      function applyAircraftState(aircraft: AircraftData[]) {
+        const list = document.getElementById('aircraftList');
+        if (list) list.innerHTML = aircraftListHtml(aircraft);
+        if (logbookAircraft) {
+          const previous = logbookAircraft.value;
+          logbookAircraft.innerHTML = aircraftOptionsHtml(aircraft);
+          if (Array.from(logbookAircraft.options).some((o) => o.value === previous)) {
+            logbookAircraft.value = previous;
+          }
+        }
+      }
+
+      const aircraftForm = document.getElementById('aircraftForm') as HTMLFormElement | null;
+      const aircraftList = document.getElementById('aircraftList');
+      const aircraftStatus = document.getElementById('aircraftStatus');
+      const aircraftPlate = document.getElementById('aircraftPlate') as HTMLInputElement | null;
+
+      aircraftForm?.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const submitButton = aircraftForm.querySelector<HTMLButtonElement>('button[type="submit"]');
+        if (submitButton) submitButton.disabled = true;
+        if (aircraftStatus) {
+          aircraftStatus.textContent = 'Saving…';
+          aircraftStatus.removeAttribute('data-state');
+        }
+
+        try {
+          const res = await fetch('/api/aircraft', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ plate: aircraftPlate?.value ?? '' }),
+          });
+          if (!res.ok) {
+            const data = await res.json().catch(() => null);
+            throw new Error(data?.error ?? 'Failed to save');
+          }
+          const data = await res.json();
+          applyAircraftState(data.settings.aircraft);
+          aircraftForm.reset();
+          if (aircraftStatus) {
+            aircraftStatus.textContent = 'Saved';
+            aircraftStatus.dataset.state = 'ok';
+          }
+        } catch (err) {
+          console.error('Failed to save aircraft', err);
+          if (aircraftStatus) {
+            aircraftStatus.textContent = err instanceof Error ? err.message : 'Failed to save';
+            aircraftStatus.dataset.state = 'error';
+          }
+        } finally {
+          if (submitButton) submitButton.disabled = false;
+        }
+      });
+
+      aircraftList?.addEventListener('click', async (event) => {
+        const button = (event.target as HTMLElement).closest<HTMLButtonElement>('.equipment-delete');
+        const id = button?.dataset.aircraftDelete;
+        if (!id) return;
+        button.disabled = true;
+        try {
+          const res = await fetch('/api/aircraft', {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id }),
+          });
+          if (!res.ok) return;
+          const data = await res.json();
+          applyAircraftState(data.settings.aircraft);
+        } catch (err) {
+          console.error('Failed to delete aircraft', err);
+        } finally {
+          button.disabled = false;
+        }
+      });
+
+      // ---- Logbook: settings (starting jump number) ----
+
+      const logbookSettingsForm = document.getElementById('logbookSettingsForm') as HTMLFormElement | null;
+      const logbookSettingsStatus = document.getElementById('logbookSettingsStatus');
+      const logbookBaseJumps = document.getElementById('logbookBaseJumps') as HTMLInputElement | null;
+
+      logbookSettingsForm?.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const submitButton = logbookSettingsForm.querySelector<HTMLButtonElement>('button[type="submit"]');
+        if (submitButton) submitButton.disabled = true;
+        if (logbookSettingsStatus) {
+          logbookSettingsStatus.textContent = 'Saving…';
+          logbookSettingsStatus.removeAttribute('data-state');
+        }
+
+        try {
+          const res = await fetch('/api/logbook-settings', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ baseJumps: Number(logbookBaseJumps?.value ?? 0) }),
+          });
+          if (!res.ok) {
+            const data = await res.json().catch(() => null);
+            throw new Error(data?.error ?? 'Failed to save');
+          }
+          // Every jump number downstream shifts with the base, so refetch
+          // the full list rather than patching numbers in place.
+          const listRes = await fetch('/api/logbook');
+          if (listRes.ok) {
+            const listData = await listRes.json();
+            applyLogbookState(listData.entries, listData.nextNumber);
+          }
+          if (logbookSettingsStatus) {
+            logbookSettingsStatus.textContent = 'Saved';
+            logbookSettingsStatus.dataset.state = 'ok';
+          }
+        } catch (err) {
+          console.error('Failed to save logbook settings', err);
+          if (logbookSettingsStatus) {
+            logbookSettingsStatus.textContent = err instanceof Error ? err.message : 'Failed to save';
+            logbookSettingsStatus.dataset.state = 'error';
+          }
+        } finally {
+          if (submitButton) submitButton.disabled = false;
+        }
+      });
+
+      // ---- Logbook: toggle panels ----
+
+      wireToggle('equipmentToggle', 'equipmentPanel');
+      wireToggle('aircraftToggle', 'aircraftPanel');
+      wireToggle('logbookSettingsToggle', 'logbookSettingsPanel');
     </script>
   </body>
 </html>
