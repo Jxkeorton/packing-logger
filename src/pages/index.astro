@@ -210,7 +210,9 @@ const money = (n: number) => `£${n.toFixed(2)}`;
           </section>
 
           <footer class="foot">
-            <a class="foot-download" href="/api/export.csv" download>Download full log (.csv)</a>
+            <button type="button" class="foot-download" data-download="/api/export.csv" data-download-name="packing-log.csv">
+              Download full log (.csv)
+            </button>
           </footer>
         </div>
 
@@ -412,7 +414,14 @@ const money = (n: number) => `£${n.toFixed(2)}`;
         </section>
 
         <footer class="foot">
-          <a class="foot-download" href="/api/tandem-export.csv" download>Download full tandem log (.csv)</a>
+          <button
+            type="button"
+            class="foot-download"
+            data-download="/api/tandem-export.csv"
+            data-download-name="tandem-log.csv"
+          >
+            Download full tandem log (.csv)
+          </button>
         </footer>
       </div>
 
@@ -1145,12 +1154,23 @@ const money = (n: number) => `£${n.toFixed(2)}`;
       }
 
       .foot-download {
+        appearance: none;
         display: inline-block;
+        border: none;
+        background: transparent;
+        padding: 0;
+        font-family: 'Inter', sans-serif;
         font-size: 12.5px;
         font-weight: 600;
         color: var(--gold);
         text-decoration: none;
         border-bottom: 1px solid currentColor;
+        cursor: pointer;
+      }
+
+      .foot-download:disabled {
+        opacity: 0.6;
+        cursor: default;
       }
 
       .foot-logout {
@@ -1446,6 +1466,64 @@ const money = (n: number) => `£${n.toFixed(2)}`;
         void (el as HTMLElement).offsetWidth;
         el.classList.add('bump');
       }
+
+      // ---- File downloads ----
+      //
+      // Every download on this page is behind the password gate. A plain
+      // `<a href download>` doesn't reliably carry the login cookie on iOS
+      // Safari (a long-standing WebKit bug), so instead of letting Safari
+      // fetch the URL itself, we fetch it ourselves — which we already know
+      // carries the cookie correctly, since every other API call on this
+      // page does — and hand the browser the bytes directly as a blob.
+
+      function filenameFromDisposition(header: string | null, fallback: string): string {
+        if (!header) return fallback;
+        const match = /filename\*?=(?:UTF-8'')?"?([^";]+)"?/i.exec(header);
+        return match ? decodeURIComponent(match[1]) : fallback;
+      }
+
+      async function downloadFile(url: string, fallbackName: string, button: HTMLButtonElement) {
+        const originalText = button.textContent;
+        button.disabled = true;
+        try {
+          const res = await fetch(url);
+          if (!res.ok) {
+            console.error('Download failed', url, res.status, await res.text());
+            button.textContent = 'Export failed';
+            window.setTimeout(() => {
+              button.textContent = originalText;
+            }, 2000);
+            return;
+          }
+          const blob = await res.blob();
+          const filename = filenameFromDisposition(res.headers.get('Content-Disposition'), fallbackName);
+          const objectUrl = URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.href = objectUrl;
+          link.download = filename;
+          document.body.appendChild(link);
+          link.click();
+          link.remove();
+          window.setTimeout(() => URL.revokeObjectURL(objectUrl), 2000);
+        } catch (err) {
+          console.error('Download failed', err);
+        } finally {
+          button.disabled = false;
+        }
+      }
+
+      document.querySelectorAll<HTMLButtonElement>('[data-download]').forEach((button) => {
+        button.addEventListener('click', () => {
+          void downloadFile(button.dataset.download!, button.dataset.downloadName || 'download', button);
+        });
+      });
+
+      document.querySelectorAll<HTMLButtonElement>('[data-invoice-month]').forEach((button) => {
+        button.addEventListener('click', () => {
+          const month = button.dataset.invoiceMonth!;
+          void downloadFile(`/api/tandem-invoice.pdf?month=${encodeURIComponent(month)}`, 'invoice.pdf', button);
+        });
+      });
 
       // ---- Packing counters ----
 
