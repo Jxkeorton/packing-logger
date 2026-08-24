@@ -10,10 +10,22 @@ import {
   totalPacks,
 } from '../lib/packing';
 import { groupByInvoiceMonth, groupByWeek } from '../lib/invoice';
+import {
+  CATEGORIES as TANDEM_CATEGORIES,
+  CATEGORY_LABELS as TANDEM_CATEGORY_LABELS,
+  RATES as TANDEM_RATES,
+  loadTodayState as loadTodayTandemState,
+  readHistory as readTandemHistory,
+  toHistoryRow as toTandemHistoryRow,
+  totalEarnings as totalTandemEarnings,
+  totalJumps,
+} from '../lib/tandem';
+import { groupByInvoiceMonth as groupTandemByInvoiceMonth, groupByWeek as groupTandemByWeek } from '../lib/tandem-invoice';
 import { formatDuration, formatWhen } from '../lib/format';
 import { readFastestFive } from '../lib/times';
 import { authEnabled } from '../lib/auth';
 import AggregateTable from '../components/AggregateTable.astro';
+import TandemAggregateTable from '../components/TandemAggregateTable.astro';
 
 const state = await loadTodayState();
 const topTimes = await readFastestFive();
@@ -29,6 +41,14 @@ const dayRows = fullHistory.slice(0, 14);
 const combined = [...fullHistory, toHistoryRow(state)];
 const weekRows = groupByWeek(combined).slice(0, 12);
 const monthRows = groupByInvoiceMonth(combined).slice(0, 12);
+
+// Same shape again, for the separate tandem-jump log.
+const tandemState = await loadTodayTandemState();
+const tandemFullHistory = await readTandemHistory(400);
+const tandemDayRows = tandemFullHistory.slice(0, 14);
+const tandemCombined = [...tandemFullHistory, toTandemHistoryRow(tandemState)];
+const tandemWeekRows = groupTandemByWeek(tandemCombined).slice(0, 12);
+const tandemMonthRows = groupTandemByInvoiceMonth(tandemCombined).slice(0, 12);
 
 const dateObj = new Date(`${state.date}T00:00:00`);
 const dateDisplay = dateObj.toLocaleDateString('en-GB', {
@@ -48,7 +68,7 @@ const money = (n: number) => `£${n.toFixed(2)}`;
     <meta name="theme-color" content="#122c41" />
     <meta name="generator" content={Astro.generator} />
     <title>Packing Log</title>
-    <meta name="description" content="Daily pack job counter and earnings log for a skydive rigger." />
+    <meta name="description" content="Daily pack job and tandem jump counter and earnings log for a skydive rigger." />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -59,174 +79,327 @@ const money = (n: number) => `£${n.toFixed(2)}`;
   <body>
     <div class="page">
       <div class="app-tabs" role="tablist" aria-label="Section">
-        <button type="button" class="app-tab" data-app-tab="pack" role="tab" aria-selected="true">Pack</button>
-        <button type="button" class="app-tab" data-app-tab="timer" role="tab" aria-selected="false">Timer</button>
+        <button type="button" class="app-tab" data-app-tab="packing" role="tab" aria-selected="true">Packing</button>
+        <button type="button" class="app-tab" data-app-tab="tandems" role="tab" aria-selected="false">Tandems</button>
       </div>
 
-      <div class="app-view" data-app-view="pack">
-      <header class="masthead">
-        <div class="stamp" aria-hidden="false">
-          <span class="stamp-label">Manifest</span>
-          <span class="stamp-date" id="dateDisplay">{dateDisplay}</span>
+      <div class="app-view" data-app-view="packing" id="packingView">
+        <div class="sub-tabs" role="tablist" aria-label="Packing view">
+          <button type="button" class="sub-tab" data-sub-tab="pack" role="tab" aria-selected="true">Pack</button>
+          <button type="button" class="sub-tab" data-sub-tab="timer" role="tab" aria-selected="false">Timer</button>
         </div>
-        <div class="totals">
-          <div class="totals-block">
-            <span class="totals-value" id="totalEarnings">{money(totalEarnings(state.counts))}</span>
-            <span class="totals-label">earned today</span>
-          </div>
-          <div class="totals-divider" aria-hidden="true"></div>
-          <div class="totals-block totals-block--packs">
-            <span class="totals-value totals-value--packs" id="totalPacks">{totalPacks(state.counts)}</span>
-            <span class="totals-label">packs today</span>
-          </div>
-        </div>
-      </header>
 
-      <main class="categories">
-        {
-          CATEGORIES.map((category) => (
-            <section class="card" data-category={category}>
-              <div class="card-top">
-                <h2 class="card-label">{CATEGORY_LABELS[category]}</h2>
-                <span class="card-rate">£{RATES[category].toFixed(2)} / pack</span>
+        <div class="sub-view" data-sub-view="pack">
+          <header class="masthead">
+            <div class="stamp" aria-hidden="false">
+              <span class="stamp-label">Manifest</span>
+              <span class="stamp-date" id="dateDisplay">{dateDisplay}</span>
+            </div>
+            <div class="totals">
+              <div class="totals-block">
+                <span class="totals-value" id="totalEarnings">{money(totalEarnings(state.counts))}</span>
+                <span class="totals-label">earned today</span>
               </div>
-              <div class="card-controls">
-                <button
-                  class="stepper stepper--minus"
-                  type="button"
-                  data-action="decrement"
-                  data-category={category}
-                  aria-label={`Remove one ${CATEGORY_LABELS[category]} pack job`}
-                >
-                  &minus;
-                </button>
-                <span class="card-count" data-count={category}>
-                  {state.counts[category]}
-                </span>
-                <button
-                  class="stepper stepper--plus"
-                  type="button"
-                  data-action="increment"
-                  data-category={category}
-                  aria-label={`Add one ${CATEGORY_LABELS[category]} pack job`}
-                >
-                  &plus;
-                </button>
+              <div class="totals-divider" aria-hidden="true"></div>
+              <div class="totals-block totals-block--packs">
+                <span class="totals-value totals-value--packs" id="totalPacks">{totalPacks(state.counts)}</span>
+                <span class="totals-label">packs today</span>
               </div>
-              <div class="card-subtotal" data-subtotal={category}>
-                £{(state.counts[category] * RATES[category]).toFixed(2)}
-              </div>
-            </section>
-          ))
-        }
-      </main>
+            </div>
+          </header>
 
-      <section class="history">
-        <button class="history-toggle" id="historyToggle" type="button" aria-expanded="false" aria-controls="historyPanel">
-          <span>History</span>
-          <span class="history-toggle-icon" id="historyToggleIcon">&rsaquo;</span>
-        </button>
-        <div class="history-panel" id="historyPanel" hidden>
-          <div class="history-tabs" role="tablist" aria-label="Group history by">
-            <button type="button" class="history-tab" data-tab="day" role="tab" aria-selected="true">Day</button>
-            <button type="button" class="history-tab" data-tab="week" role="tab" aria-selected="false">Week</button>
-            <button type="button" class="history-tab" data-tab="month" role="tab" aria-selected="false">Month</button>
-          </div>
-
-          <div class="history-view" data-view="day">
+          <main class="categories">
             {
-              dayRows.length === 0 ? (
-                <p class="history-empty">Nothing logged yet before today.</p>
-              ) : (
-                <div class="history-scroll">
-                  <table class="history-table">
-                    <thead>
-                      <tr>
-                        <th scope="col">Date</th>
-                        {CATEGORIES.map((c) => (
-                          <th scope="col" class={`th-${c}`}>
-                            {CATEGORY_LABELS[c].slice(0, 3)}
-                          </th>
-                        ))}
-                        <th scope="col">Packs</th>
-                        <th scope="col">Earned</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {dayRows.map((row) => (
-                        <tr>
-                          <td class="history-date">{row.date}</td>
-                          {CATEGORIES.map((c) => (
-                            <td class={`td-${c}`}>{row.counts[c]}</td>
-                          ))}
-                          <td>{row.totalPacks}</td>
-                          <td>{money(row.totalEarnings)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )
+              CATEGORIES.map((category) => (
+                <section class="card" data-category={category}>
+                  <div class="card-top">
+                    <h2 class="card-label">{CATEGORY_LABELS[category]}</h2>
+                    <span class="card-rate">£{RATES[category].toFixed(2)} / pack</span>
+                  </div>
+                  <div class="card-controls">
+                    <button
+                      class="stepper stepper--minus"
+                      type="button"
+                      data-action="decrement"
+                      data-category={category}
+                      aria-label={`Remove one ${CATEGORY_LABELS[category]} pack job`}
+                    >
+                      &minus;
+                    </button>
+                    <span class="card-count" data-count={category}>
+                      {state.counts[category]}
+                    </span>
+                    <button
+                      class="stepper stepper--plus"
+                      type="button"
+                      data-action="increment"
+                      data-category={category}
+                      aria-label={`Add one ${CATEGORY_LABELS[category]} pack job`}
+                    >
+                      &plus;
+                    </button>
+                  </div>
+                  <div class="card-subtotal" data-subtotal={category}>
+                    £{(state.counts[category] * RATES[category]).toFixed(2)}
+                  </div>
+                </section>
+              ))
             }
-          </div>
+          </main>
 
-          <div class="history-view" data-view="week" hidden>
-            <AggregateTable rows={weekRows} currentLabel="This week" prefix="week" />
-          </div>
+          <section class="history">
+            <button class="history-toggle" id="historyToggle" type="button" aria-expanded="false" aria-controls="historyPanel">
+              <span>History</span>
+              <span class="history-toggle-icon" id="historyToggleIcon">&rsaquo;</span>
+            </button>
+            <div class="history-panel" id="historyPanel" hidden>
+              <div class="history-tabs" role="tablist" aria-label="Group history by">
+                <button type="button" class="history-tab" data-tab="day" role="tab" aria-selected="true">Day</button>
+                <button type="button" class="history-tab" data-tab="week" role="tab" aria-selected="false">Week</button>
+                <button type="button" class="history-tab" data-tab="month" role="tab" aria-selected="false">Month</button>
+              </div>
 
-          <div class="history-view" data-view="month" hidden>
-            <AggregateTable rows={monthRows} currentLabel="This invoice month" prefix="month" />
-          </div>
+              <div class="history-view" data-view="day">
+                {
+                  dayRows.length === 0 ? (
+                    <p class="history-empty">Nothing logged yet before today.</p>
+                  ) : (
+                    <div class="history-scroll">
+                      <table class="history-table">
+                        <thead>
+                          <tr>
+                            <th scope="col">Date</th>
+                            {CATEGORIES.map((c) => (
+                              <th scope="col" class={`th-${c}`}>
+                                {CATEGORY_LABELS[c].slice(0, 3)}
+                              </th>
+                            ))}
+                            <th scope="col">Packs</th>
+                            <th scope="col">Earned</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {dayRows.map((row) => (
+                            <tr>
+                              <td class="history-date">{row.date}</td>
+                              {CATEGORIES.map((c) => (
+                                <td class={`td-${c}`}>{row.counts[c]}</td>
+                              ))}
+                              <td>{row.totalPacks}</td>
+                              <td>{money(row.totalEarnings)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )
+                }
+              </div>
+
+              <div class="history-view" data-view="week" hidden>
+                <AggregateTable rows={weekRows} currentLabel="This week" prefix="week" />
+              </div>
+
+              <div class="history-view" data-view="month" hidden>
+                <AggregateTable rows={monthRows} currentLabel="This invoice month" prefix="month" />
+              </div>
+            </div>
+          </section>
+
+          <footer class="foot">
+            <a class="foot-download" href="/api/export.csv" download>Download full log (.csv)</a>
+          </footer>
         </div>
-      </section>
 
-      <footer class="foot">
-        <a class="foot-download" href="/api/export.csv" download>Download full log (.csv)</a>
-        {
-          showLogout && (
+        <div class="sub-view" data-sub-view="timer" hidden>
+          <div class="timer">
+            <div class="timer-display" id="timerDisplay">0:00.0</div>
+            <button type="button" class="timer-button" id="timerButton" data-running="false">Start</button>
+          </div>
+
+          <section class="fastest">
+            <h2 class="fastest-title">Fastest 5</h2>
+            <div id="fastestBoard">
+              {
+                topTimes.length === 0 ? (
+                  <p class="fastest-empty">Time a pack job to start the board.</p>
+                ) : (
+                  <ol class="fastest-list">
+                    {topTimes.map((t, i) => (
+                      <li class:list={['fastest-row', { 'is-first': i === 0 }]}>
+                        <span class="fastest-rank">{i + 1}</span>
+                        <span class="fastest-duration">{formatDuration(t.ms)}</span>
+                        <span class="fastest-when">{formatWhen(t.at)}</span>
+                        <button
+                          type="button"
+                          class="fastest-delete"
+                          data-at={t.at}
+                          aria-label={`Delete the ${formatDuration(t.ms)} time`}
+                        >
+                          &times;
+                        </button>
+                      </li>
+                    ))}
+                  </ol>
+                )
+              }
+            </div>
+          </section>
+        </div>
+      </div>
+
+      <div class="app-view" data-app-view="tandems" id="tandemsView" hidden>
+        <header class="masthead">
+          <div class="stamp" aria-hidden="false">
+            <span class="stamp-label">Tandem Log</span>
+            <span class="stamp-date">{dateDisplay}</span>
+          </div>
+          <div class="totals">
+            <div class="totals-block">
+              <span class="totals-value" id="tandemTotalEarnings">{money(totalTandemEarnings(tandemState.counts))}</span>
+              <span class="totals-label">earned today</span>
+            </div>
+            <div class="totals-divider" aria-hidden="true"></div>
+            <div class="totals-block totals-block--packs">
+              <span class="totals-value totals-value--packs" id="tandemTotalJumps">{totalJumps(tandemState.counts)}</span>
+              <span class="totals-label">jumps today</span>
+            </div>
+          </div>
+        </header>
+
+        <section class="categories">
+          {
+            TANDEM_CATEGORIES.map((category) => (
+              <section class="card" data-tandem-category={category}>
+                <div class="card-top">
+                  <h2 class="card-label">{TANDEM_CATEGORY_LABELS[category]}</h2>
+                  <span class="card-rate">£{TANDEM_RATES[category].toFixed(2)} / jump</span>
+                </div>
+                <button type="button" class="tandem-add" data-tandem-add={category}>
+                  &plus; Add {TANDEM_CATEGORY_LABELS[category].toLowerCase()} jump
+                </button>
+                <ul class="tandem-jump-list" data-tandem-list={category}>
+                  {tandemState.entries[category].length === 0 ? (
+                    <li class="tandem-jump-empty">No jumps logged yet today.</li>
+                  ) : (
+                    tandemState.entries[category].map((jump) => (
+                      <li class="tandem-jump-row" data-at={jump.at}>
+                        <span class="tandem-jump-name">{jump.name}</span>
+                        <button
+                          type="button"
+                          class="tandem-jump-delete"
+                          data-at={jump.at}
+                          aria-label={`Remove ${jump.name}`}
+                        >
+                          &times;
+                        </button>
+                      </li>
+                    ))
+                  )}
+                </ul>
+                <div class="card-subtotal" data-tandem-subtotal={category}>
+                  £{(tandemState.counts[category] * TANDEM_RATES[category]).toFixed(2)}
+                </div>
+              </section>
+            ))
+          }
+        </section>
+
+        <section class="history">
+          <button class="history-toggle" id="tandemHistoryToggle" type="button" aria-expanded="false" aria-controls="tandemHistoryPanel">
+            <span>History</span>
+            <span class="history-toggle-icon" id="tandemHistoryToggleIcon">&rsaquo;</span>
+          </button>
+          <div class="history-panel" id="tandemHistoryPanel" hidden>
+            <div class="history-tabs" role="tablist" aria-label="Group tandem history by">
+              <button type="button" class="history-tab" data-tab="day" role="tab" aria-selected="true">Day</button>
+              <button type="button" class="history-tab" data-tab="week" role="tab" aria-selected="false">Week</button>
+              <button type="button" class="history-tab" data-tab="month" role="tab" aria-selected="false">Month</button>
+            </div>
+
+            <div class="history-view" data-view="day">
+              {
+                tandemDayRows.length === 0 ? (
+                  <p class="history-empty">Nothing logged yet before today.</p>
+                ) : (
+                  <div class="history-scroll">
+                    <table class="history-table">
+                      <thead>
+                        <tr>
+                          <th scope="col">Date</th>
+                          {TANDEM_CATEGORIES.map((c) => (
+                            <th scope="col" class={`th-${c}`}>
+                              {TANDEM_CATEGORY_LABELS[c].slice(0, 3)}
+                            </th>
+                          ))}
+                          <th scope="col">Jumps</th>
+                          <th scope="col">Earned</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {tandemDayRows.map((row) => (
+                          <tr>
+                            <td class="history-date">{row.date}</td>
+                            {TANDEM_CATEGORIES.map((c) => (
+                              <td class={`td-${c}`}>{row.counts[c]}</td>
+                            ))}
+                            <td>{row.totalJumps}</td>
+                            <td>{money(row.totalEarnings)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )
+              }
+            </div>
+
+            <div class="history-view" data-view="week" hidden>
+              <TandemAggregateTable rows={tandemWeekRows} currentLabel="This week" prefix="tweek" />
+            </div>
+
+            <div class="history-view" data-view="month" hidden>
+              <TandemAggregateTable rows={tandemMonthRows} currentLabel="This invoice month" prefix="tmonth" />
+            </div>
+          </div>
+        </section>
+
+        <footer class="foot">
+          <a class="foot-download" href="/api/tandem-export.csv" download>Download full tandem log (.csv)</a>
+        </footer>
+      </div>
+
+      <div class="modal-overlay" id="tandemNameModal" hidden>
+        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="tandemNameModalTitle">
+          <h2 class="modal-title" id="tandemNameModalTitle">Customer name</h2>
+          <p class="modal-subtitle" id="tandemNameModalSubtitle">&nbsp;</p>
+          <form id="tandemNameForm">
+            <input
+              type="text"
+              id="tandemNameInput"
+              class="modal-input"
+              placeholder="e.g. Jane Smith"
+              autocomplete="off"
+              maxlength="80"
+              required
+            />
+            <div class="modal-actions">
+              <button type="button" class="modal-cancel" id="tandemNameCancel">Cancel</button>
+              <button type="submit" class="modal-confirm">Add jump</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      {
+        showLogout && (
+          <footer class="foot foot-global">
             <form class="foot-logout" method="POST" action="/api/logout">
               <button type="submit">Log out</button>
             </form>
-          )
-        }
-      </footer>
-      </div>
-
-      <div class="app-view" data-app-view="timer" hidden>
-        <div class="timer">
-          <div class="timer-display" id="timerDisplay">0:00.0</div>
-          <button type="button" class="timer-button" id="timerButton" data-running="false">Start</button>
-        </div>
-
-        <section class="fastest">
-          <h2 class="fastest-title">Fastest 5</h2>
-          <div id="fastestBoard">
-            {
-              topTimes.length === 0 ? (
-                <p class="fastest-empty">Time a pack job to start the board.</p>
-              ) : (
-                <ol class="fastest-list">
-                  {topTimes.map((t, i) => (
-                    <li class:list={['fastest-row', { 'is-first': i === 0 }]}>
-                      <span class="fastest-rank">{i + 1}</span>
-                      <span class="fastest-duration">{formatDuration(t.ms)}</span>
-                      <span class="fastest-when">{formatWhen(t.at)}</span>
-                      <button
-                        type="button"
-                        class="fastest-delete"
-                        data-at={t.at}
-                        aria-label={`Delete the ${formatDuration(t.ms)} time`}
-                      >
-                        &times;
-                      </button>
-                    </li>
-                  ))}
-                </ol>
-              )
-            }
-          </div>
-        </section>
-      </div>
+          </footer>
+        )
+      }
     </div>
 
     <style>
@@ -253,6 +426,8 @@ const money = (n: number) => `£${n.toFixed(2)}`;
         --student-soft: #d6e8e3;
         --sport: #2e647a;
         --sport-soft: #dee7eb;
+        --videographer: #6b4f8a;
+        --videographer-soft: #e3ddec;
 
         /* Kept off the main palette on purpose — red still reads as "delete"
            regardless of the rest of the theme. */
@@ -283,6 +458,8 @@ const money = (n: number) => `£${n.toFixed(2)}`;
           --student-soft: #123328;
           --sport: #6398b2;
           --sport-soft: #22333d;
+          --videographer: #a186c9;
+          --videographer-soft: #2a2337;
 
           --danger: #d6685f;
           --danger-soft: #3a211f;
@@ -421,7 +598,8 @@ const money = (n: number) => `£${n.toFixed(2)}`;
       .card[data-category='tandem'] {
         --accent: var(--tandem);
       }
-      .card[data-category='instructor'] {
+      .card[data-category='instructor'],
+      .card[data-tandem-category='instructor'] {
         --accent: var(--instructor);
       }
       .card[data-category='student'] {
@@ -429,6 +607,9 @@ const money = (n: number) => `£${n.toFixed(2)}`;
       }
       .card[data-category='sport'] {
         --accent: var(--sport);
+      }
+      .card[data-tandem-category='videographer'] {
+        --accent: var(--videographer);
       }
 
       .card-top {
@@ -579,9 +760,10 @@ const money = (n: number) => `£${n.toFixed(2)}`;
 
       /*
        * :global() throughout this block because the Week/Month tables are
-       * rendered by AggregateTable.astro, a separate component with its own
-       * Astro CSS scope — plain class selectors here would only ever match
-       * the Day table, which lives directly in this file.
+       * rendered by AggregateTable.astro / TandemAggregateTable.astro,
+       * separate components with their own Astro CSS scope — plain class
+       * selectors here would only ever match the Day table, which lives
+       * directly in this file.
        */
       :global(.history-empty) {
         margin: 0;
@@ -640,6 +822,188 @@ const money = (n: number) => `£${n.toFixed(2)}`;
       :global(.td-sport) {
         color: var(--sport);
       }
+      :global(.th-videographer),
+      :global(.td-videographer) {
+        color: var(--videographer);
+      }
+
+      /* ---- Tandem jump list ---- */
+
+      .tandem-add {
+        appearance: none;
+        border: none;
+        border-radius: 12px;
+        width: 100%;
+        height: 46px;
+        margin-top: 10px;
+        font-family: 'Space Grotesk', sans-serif;
+        font-weight: 700;
+        font-size: 14.5px;
+        color: #fff;
+        background: var(--accent);
+        cursor: pointer;
+        touch-action: manipulation;
+        transition: transform 0.08s ease, filter 0.08s ease;
+      }
+
+      .tandem-add:active {
+        transform: scale(0.97);
+        filter: brightness(0.95);
+      }
+
+      .tandem-add:focus-visible {
+        outline: 3px solid var(--gold);
+        outline-offset: 2px;
+      }
+
+      .tandem-jump-list {
+        list-style: none;
+        margin: 4px 0 0;
+        padding: 0;
+      }
+
+      /*
+       * :global() here (and below) because the list is re-rendered
+       * client-side via innerHTML after each add/delete — Astro only
+       * auto-scopes elements it renders itself, not ones a script injects.
+       */
+      :global(.tandem-jump-row) {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        padding: 9px 2px;
+        border-top: 1px solid var(--line);
+        font-size: 13.5px;
+      }
+
+      :global(.tandem-jump-name) {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      :global(.tandem-jump-delete) {
+        appearance: none;
+        border: none;
+        background: transparent;
+        color: var(--ink-soft);
+        font-family: 'Inter', sans-serif;
+        font-size: 18px;
+        line-height: 1;
+        width: 26px;
+        height: 26px;
+        flex: none;
+        border-radius: 8px;
+        cursor: pointer;
+        touch-action: manipulation;
+      }
+
+      :global(.tandem-jump-delete:hover),
+      :global(.tandem-jump-delete:focus-visible) {
+        background: var(--danger-soft);
+        color: var(--danger);
+        outline: none;
+      }
+
+      :global(.tandem-jump-empty) {
+        margin: 0;
+        padding: 9px 2px;
+        border-top: 1px solid var(--line);
+        color: var(--ink-soft);
+        font-size: 13px;
+      }
+
+      /* ---- Customer-name modal ---- */
+
+      .modal-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(11, 22, 32, 0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 16px;
+        z-index: 20;
+      }
+
+      .modal-overlay[hidden] {
+        display: none;
+      }
+
+      .modal {
+        width: 100%;
+        max-width: 400px;
+        background: var(--panel);
+        border-radius: var(--radius);
+        box-shadow: var(--shadow);
+        padding: 20px;
+      }
+
+      .modal-title {
+        margin: 0 0 2px;
+        font-size: 17px;
+        font-weight: 700;
+      }
+
+      .modal-subtitle {
+        margin: 0 0 14px;
+        font-size: 13px;
+        color: var(--ink-soft);
+      }
+
+      .modal-input {
+        width: 100%;
+        height: 48px;
+        padding: 0 14px;
+        border-radius: 10px;
+        border: 1px solid var(--line-strong);
+        background: var(--canvas);
+        color: var(--ink);
+        font-family: 'Inter', sans-serif;
+        font-size: 16px;
+      }
+
+      .modal-input:focus-visible {
+        outline: 3px solid var(--gold);
+        outline-offset: 1px;
+      }
+
+      .modal-actions {
+        display: flex;
+        gap: 10px;
+        margin-top: 14px;
+      }
+
+      .modal-cancel,
+      .modal-confirm {
+        flex: 1;
+        appearance: none;
+        border: none;
+        border-radius: 10px;
+        height: 46px;
+        font-family: 'Space Grotesk', sans-serif;
+        font-weight: 700;
+        font-size: 15px;
+        cursor: pointer;
+        touch-action: manipulation;
+      }
+
+      .modal-cancel {
+        background: transparent;
+        border: 1px solid var(--line-strong);
+        color: var(--ink-soft);
+      }
+
+      .modal-confirm {
+        background: var(--gold);
+        color: #fff;
+      }
+
+      .modal-confirm:disabled {
+        opacity: 0.6;
+        cursor: default;
+      }
 
       /* ---- Footer ---- */
 
@@ -683,12 +1047,18 @@ const money = (n: number) => `£${n.toFixed(2)}`;
 
       /* ---- App-level tabs ---- */
 
-      .app-tabs {
+      .app-tabs,
+      .sub-tabs {
         display: flex;
         gap: 8px;
       }
 
-      .app-tab {
+      .sub-tabs {
+        margin-bottom: 2px;
+      }
+
+      .app-tab,
+      .sub-tab {
         flex: 1;
         appearance: none;
         border: 1px solid var(--line);
@@ -702,19 +1072,22 @@ const money = (n: number) => `£${n.toFixed(2)}`;
         cursor: pointer;
       }
 
-      .app-tab[aria-selected='true'] {
+      .app-tab[aria-selected='true'],
+      .sub-tab[aria-selected='true'] {
         background: var(--ink);
         border-color: var(--ink);
         color: var(--canvas);
       }
 
-      .app-view {
+      .app-view,
+      .sub-view {
         display: flex;
         flex-direction: column;
         gap: 22px;
       }
 
-      .app-view[hidden] {
+      .app-view[hidden],
+      .sub-view[hidden] {
         display: none;
       }
 
@@ -881,9 +1254,65 @@ const money = (n: number) => `£${n.toFixed(2)}`;
         sport: 6.5,
       };
 
+      const TANDEM_RATES: Record<string, number> = {
+        instructor: 42,
+        videographer: 42,
+      };
+
       function money(n: number) {
         return `£${n.toFixed(2)}`;
       }
+
+      // ---- Generic tab-group wiring, reused for the app-level Packing /
+      // Tandems tabs, the Pack / Timer sub-tabs, and each section's own
+      // Day / Week / Month history tabs. Scoped to `root` so that two
+      // independent tab groups can reuse the same class names/data
+      // attributes without cross-wiring each other's visibility.
+      function wireTabGroup(root: ParentNode, tabSelector: string, viewSelector: string, tabAttr: string, viewAttr: string) {
+        const tabs = root.querySelectorAll<HTMLButtonElement>(tabSelector);
+        const views = root.querySelectorAll<HTMLElement>(viewSelector);
+        tabs.forEach((tab) => {
+          tab.addEventListener('click', () => {
+            tabs.forEach((t) => t.setAttribute('aria-selected', String(t === tab)));
+            views.forEach((view) => {
+              view.hidden = view.dataset[viewAttr] !== tab.dataset[tabAttr];
+            });
+          });
+        });
+      }
+
+      function wireToggle(toggleId: string, panelId: string) {
+        const toggle = document.getElementById(toggleId);
+        const panel = document.getElementById(panelId);
+        toggle?.addEventListener('click', () => {
+          const expanded = toggle.getAttribute('aria-expanded') === 'true';
+          toggle.setAttribute('aria-expanded', String(!expanded));
+          if (panel) panel.hidden = expanded;
+        });
+      }
+
+      wireTabGroup(document, '.app-tab', '.app-view', 'appTab', 'appView');
+
+      const packingView = document.getElementById('packingView');
+      if (packingView) wireTabGroup(packingView, '.sub-tab', '.sub-view', 'subTab', 'subView');
+
+      const historyPanel = document.getElementById('historyPanel');
+      if (historyPanel) wireTabGroup(historyPanel, '.history-tab', '.history-view', 'tab', 'view');
+      wireToggle('historyToggle', 'historyPanel');
+
+      const tandemHistoryPanel = document.getElementById('tandemHistoryPanel');
+      if (tandemHistoryPanel) wireTabGroup(tandemHistoryPanel, '.history-tab', '.history-view', 'tab', 'view');
+      wireToggle('tandemHistoryToggle', 'tandemHistoryPanel');
+
+      function bump(el: Element | null) {
+        if (!el) return;
+        el.classList.remove('bump');
+        // Force reflow so the animation can restart on rapid taps.
+        void (el as HTMLElement).offsetWidth;
+        el.classList.add('bump');
+      }
+
+      // ---- Packing counters ----
 
       async function adjust(category: string, delta: number) {
         const res = await fetch('/api/adjust', {
@@ -899,7 +1328,7 @@ const money = (n: number) => `£${n.toFixed(2)}`;
         applyState(data.state.counts, data.totalPacks, data.totalEarnings);
         if (data.currentWeek) applyAggregate('week', data.currentWeek);
         if (data.currentMonth) applyAggregate('month', data.currentMonth);
-        bump(category);
+        bump(document.querySelector(`[data-count="${category}"]`));
       }
 
       function applyState(counts: Record<string, number>, packs: number, earnings: number) {
@@ -917,7 +1346,8 @@ const money = (n: number) => `£${n.toFixed(2)}`;
 
       interface Aggregate {
         counts: Record<string, number>;
-        totalPacks: number;
+        totalPacks?: number;
+        totalJumps?: number;
         totalEarnings: number;
       }
 
@@ -934,16 +1364,7 @@ const money = (n: number) => `£${n.toFixed(2)}`;
         if (earningsCell) earningsCell.textContent = money(agg.totalEarnings);
       }
 
-      function bump(category: string) {
-        const countEl = document.querySelector(`[data-count="${category}"]`);
-        if (!countEl) return;
-        countEl.classList.remove('bump');
-        // Force reflow so the animation can restart on rapid taps.
-        void (countEl as HTMLElement).offsetWidth;
-        countEl.classList.add('bump');
-      }
-
-      document.querySelectorAll<HTMLButtonElement>('.stepper').forEach((button) => {
+      document.querySelectorAll<HTMLButtonElement>('.stepper[data-category]').forEach((button) => {
         button.addEventListener('click', () => {
           const category = button.dataset.category!;
           const delta = button.dataset.action === 'increment' ? 1 : -1;
@@ -954,34 +1375,164 @@ const money = (n: number) => `£${n.toFixed(2)}`;
         });
       });
 
-      const historyToggle = document.getElementById('historyToggle');
-      const historyPanel = document.getElementById('historyPanel');
-      historyToggle?.addEventListener('click', () => {
-        const expanded = historyToggle.getAttribute('aria-expanded') === 'true';
-        historyToggle.setAttribute('aria-expanded', String(!expanded));
-        if (historyPanel) historyPanel.hidden = expanded;
-      });
+      // ---- Tandem jump log ----
+      //
+      // Every tandem jump is credited to a customer, so adding one prompts
+      // for a name via a small modal rather than just bumping a count.
 
-      const historyTabs = document.querySelectorAll<HTMLButtonElement>('.history-tab');
-      const historyViews = document.querySelectorAll<HTMLElement>('.history-view');
-      historyTabs.forEach((tab) => {
-        tab.addEventListener('click', () => {
-          historyTabs.forEach((t) => t.setAttribute('aria-selected', String(t === tab)));
-          historyViews.forEach((view) => {
-            view.hidden = view.dataset.view !== tab.dataset.tab;
+      const TANDEM_CATEGORY_LABELS: Record<string, string> = {
+        instructor: 'Instructor',
+        videographer: 'Videographer',
+      };
+
+      interface Jump {
+        name: string;
+        at: string;
+      }
+
+      interface TandemState {
+        counts: Record<string, number>;
+        entries: Record<string, Jump[]>;
+      }
+
+      function escapeHtml(s: string): string {
+        return s.replace(
+          /[&<>"']/g,
+          (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!,
+        );
+      }
+
+      function renderTandemList(category: string, entries: Jump[]) {
+        const list = document.querySelector(`[data-tandem-list="${category}"]`);
+        if (!list) return;
+        if (entries.length === 0) {
+          list.innerHTML = '<li class="tandem-jump-empty">No jumps logged yet today.</li>';
+          return;
+        }
+        list.innerHTML = entries
+          .map(
+            (j) => `
+              <li class="tandem-jump-row" data-at="${j.at}">
+                <span class="tandem-jump-name">${escapeHtml(j.name)}</span>
+                <button type="button" class="tandem-jump-delete" data-at="${j.at}" aria-label="Remove ${escapeHtml(j.name)}">&times;</button>
+              </li>`,
+          )
+          .join('');
+      }
+
+      function applyTandemState(state: TandemState, jumps: number, earnings: number) {
+        for (const category of Object.keys(state.counts)) {
+          renderTandemList(category, state.entries[category] ?? []);
+          const subtotalEl = document.querySelector(`[data-tandem-subtotal="${category}"]`);
+          if (subtotalEl) subtotalEl.textContent = money(state.counts[category] * TANDEM_RATES[category]);
+        }
+        const totalJumpsEl = document.getElementById('tandemTotalJumps');
+        const totalEarningsEl = document.getElementById('tandemTotalEarnings');
+        if (totalJumpsEl) totalJumpsEl.textContent = String(jumps);
+        if (totalEarningsEl) totalEarningsEl.textContent = money(earnings);
+      }
+
+      function applyTandemAggregate(prefix: 'tweek' | 'tmonth', agg: Aggregate) {
+        for (const category of Object.keys(agg.counts)) {
+          const cell = document.querySelector(`[data-agg-count="${prefix}:${category}"]`);
+          if (cell) cell.textContent = String(agg.counts[category]);
+        }
+        const jumpsCell = document.querySelector(`[data-agg-total="${prefix}:jumps"]`);
+        const earningsCell = document.querySelector(`[data-agg-total="${prefix}:earnings"]`);
+        if (jumpsCell) jumpsCell.textContent = String(agg.totalJumps);
+        if (earningsCell) earningsCell.textContent = money(agg.totalEarnings);
+      }
+
+      async function addTandemJump(category: string, name: string) {
+        const res = await fetch('/api/tandem-adjust', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ category, name }),
+        });
+        if (!res.ok) {
+          console.error('Failed to save tandem jump', await res.text());
+          return;
+        }
+        const data = await res.json();
+        applyTandemState(data.state, data.totalJumps, data.totalEarnings);
+        if (data.currentWeek) applyTandemAggregate('tweek', data.currentWeek);
+        if (data.currentMonth) applyTandemAggregate('tmonth', data.currentMonth);
+      }
+
+      async function deleteTandemJump(at: string) {
+        try {
+          const res = await fetch('/api/tandem-adjust', {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ at }),
           });
+          if (!res.ok) return;
+          const data = await res.json();
+          applyTandemState(data.state, data.totalJumps, data.totalEarnings);
+          if (data.currentWeek) applyTandemAggregate('tweek', data.currentWeek);
+          if (data.currentMonth) applyTandemAggregate('tmonth', data.currentMonth);
+        } catch (err) {
+          console.error('Failed to delete tandem jump', err);
+        }
+      }
+
+      document.querySelectorAll<HTMLElement>('[data-tandem-list]').forEach((list) => {
+        list.addEventListener('click', (event) => {
+          const button = (event.target as HTMLElement).closest<HTMLButtonElement>('.tandem-jump-delete');
+          if (!button?.dataset.at) return;
+          void deleteTandemJump(button.dataset.at);
         });
       });
 
-      const appTabs = document.querySelectorAll<HTMLButtonElement>('.app-tab');
-      const appViews = document.querySelectorAll<HTMLElement>('.app-view');
-      appTabs.forEach((tab) => {
-        tab.addEventListener('click', () => {
-          appTabs.forEach((t) => t.setAttribute('aria-selected', String(t === tab)));
-          appViews.forEach((view) => {
-            view.hidden = view.dataset.appView !== tab.dataset.appTab;
+      // ---- Customer-name modal ----
+
+      let pendingCategory: string | null = null;
+
+      const nameModal = document.getElementById('tandemNameModal');
+      const nameModalSubtitle = document.getElementById('tandemNameModalSubtitle');
+      const nameForm = document.getElementById('tandemNameForm') as HTMLFormElement | null;
+      const nameInput = document.getElementById('tandemNameInput') as HTMLInputElement | null;
+      const nameCancel = document.getElementById('tandemNameCancel');
+
+      function openNameModal(category: string) {
+        pendingCategory = category;
+        if (nameModalSubtitle) {
+          nameModalSubtitle.textContent = `${TANDEM_CATEGORY_LABELS[category] ?? category} jump — ${money(TANDEM_RATES[category])}`;
+        }
+        if (nameInput) nameInput.value = '';
+        if (nameModal) nameModal.hidden = false;
+        nameInput?.focus();
+      }
+
+      function closeNameModal() {
+        pendingCategory = null;
+        if (nameModal) nameModal.hidden = true;
+      }
+
+      document.querySelectorAll<HTMLButtonElement>('[data-tandem-add]').forEach((button) => {
+        button.addEventListener('click', () => openNameModal(button.dataset.tandemAdd!));
+      });
+
+      nameCancel?.addEventListener('click', closeNameModal);
+      nameModal?.addEventListener('click', (event) => {
+        if (event.target === nameModal) closeNameModal();
+      });
+      document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && nameModal && !nameModal.hidden) closeNameModal();
+      });
+
+      nameForm?.addEventListener('submit', (event) => {
+        event.preventDefault();
+        const name = nameInput?.value.trim();
+        const category = pendingCategory;
+        if (!name || !category) return;
+        const submitButton = nameForm.querySelector<HTMLButtonElement>('button[type="submit"]');
+        if (submitButton) submitButton.disabled = true;
+        addTandemJump(category, name)
+          .then(() => closeNameModal())
+          .finally(() => {
+            if (submitButton) submitButton.disabled = false;
           });
-        });
       });
 
       // ---- Stopwatch ----

@@ -1,14 +1,27 @@
 # Packing Log
 
-A mobile-first pack job counter for a skydive rigger. Tap `+`/`−` to log each
-pack job as you finish it, see today's total earnings at a glance, and every
-tap is saved straight away — no "end of day" step required.
+A mobile-first work counter for a skydive rigger, tandem instructor and
+tandem videographer. Tap `+`/`−` to log each job as you finish it, see
+today's total earnings at a glance, and every tap is saved straight away —
+no "end of day" step required.
 
-The History panel groups your log by day, by Monday–Sunday week, or by
-invoice month — invoice months run cutoff to cutoff (the Sunday before the
-last Tuesday of each calendar month), not calendar month to calendar month.
+The app has two top-level tabs, each with its own independent log:
+
+- **Packing** — pack jobs (with a Pack/Timer sub-tab for a stopwatch and a
+  fastest-5 board).
+- **Tandems** — tandem jumps done as an instructor or as a videographer.
+  Adding a jump asks for the customer's name, since that's what goes on the
+  invoice — see [`src/lib/tandem.ts`](src/lib/tandem.ts).
+
+Both tabs' History panels group their log by day, by Monday–Sunday week, or
+by invoice month — invoice months run cutoff to cutoff (the Sunday before
+the last Tuesday of each calendar month), not calendar month to calendar
+month. Both invoice-month schedules line up, since they share the same
+cutoff math (see [`src/lib/periods.ts`](src/lib/periods.ts)).
 
 ## Categories & rates
+
+**Packing**
 
 | Category   | Rate      |
 | ---------- | --------- |
@@ -16,6 +29,28 @@ last Tuesday of each calendar month), not calendar month to calendar month.
 | Instructor | £6.50     |
 | Student    | £6.50     |
 | Sport      | £6.50     |
+
+**Tandems**
+
+| Category     | Rate   |
+| ------------ | ------ |
+| Instructor   | £42.00 |
+| Videographer | £42.00 |
+
+Both tandem roles pay the same flat rate per jump — they're tracked as
+separate categories only so the log shows how many of each you did.
+
+## Tandem jumps & invoicing
+
+Every tandem jump is logged against a customer name, entered in the prompt
+that pops up when you tap "+ Add instructor jump" / "+ Add videographer
+jump". Today's jumps are listed under each card with a `×` to remove one
+(fixes a mis-tap or a typo'd name). Unlike packing, the tandem log is kept
+as one row per jump rather than a daily tally, so the name is never lost.
+
+"Download full tandem log (.csv)" exports that ledger directly — one row
+per jump with `date,category,name,amount,at` — ready to filter to an
+invoice month and hand to a customer or accountant.
 
 ## Running it locally
 
@@ -32,10 +67,12 @@ wifi) to use it from the packing floor.
 Locally, data is stored in the `data/` folder next to the project — no
 account or setup needed:
 
-- `data/state.json` — today's running counts.
+- `data/state.json` — today's running pack-job counts.
 - `data/packing-log.csv` — one row per day, kept up to date on every tap.
+- `data/tandem-jumps.csv` — one row per tandem jump (date, role, customer
+  name), the source both the Tandems tab and its CSV export read from.
 
-Both are excluded from git (see `.gitignore`), since they're your personal
+All are excluded from git (see `.gitignore`), since they're your personal
 work records, not source code.
 
 ## Deploying to Vercel
@@ -58,7 +95,7 @@ To deploy:
 3. Deploy with `vercel --prod`, or just push to the connected GitHub repo.
 
 You can always download the full CSV log from the app itself via the
-"Download full log (.csv)" link at the bottom of the page — this works the
+"Download full log (.csv)" link at the bottom of each tab — this works the
 same way whether the log lives in `data/` or in Blob storage.
 
 ## Locking it down with a password

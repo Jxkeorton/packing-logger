@@ -1,7 +1,7 @@
-// Groups daily pack-job history into weeks and invoice months. The
-// underlying invoice-period math lives in ./periods (shared with the
-// tandem log's ./tandem-invoice) — see that file for how cutoffs work.
-import { CATEGORIES, totalEarnings, totalPacks, type Counts, type HistoryRow } from './packing';
+// Groups daily tandem-jump history into weeks and invoice months — same
+// period math as the pack-job log (see ./periods), just bucketing tandem's
+// own counts/rates instead.
+import { CATEGORIES, totalEarnings, totalJumps, type Counts, type HistoryRow } from './tandem';
 import {
   addDays,
   formatDateKey,
@@ -18,12 +18,12 @@ export interface AggregateRow {
   isCurrent: boolean;
   rangeLabel: string;
   counts: Counts;
-  totalPacks: number;
+  totalJumps: number;
   totalEarnings: number;
 }
 
 function emptyCounts(): Counts {
-  return { tandem: 0, instructor: 0, student: 0, sport: 0 };
+  return { instructor: 0, videographer: 0 };
 }
 
 function addCounts(a: Counts, b: Counts): Counts {
@@ -55,7 +55,7 @@ function toBuckets<K extends string>(
         isCurrent: today.getTime() >= start.getTime() && today.getTime() <= end.getTime(),
         rangeLabel: rangeLabel(start, end),
         counts,
-        totalPacks: totalPacks(counts),
+        totalJumps: totalJumps(counts),
         totalEarnings: totalEarnings(counts),
       };
     });
