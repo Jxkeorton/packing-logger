@@ -73,6 +73,17 @@ export function groupByWeek(rows: HistoryRow[]): AggregateRow[] {
   );
 }
 
+/** The cutoff-to-cutoff date range for an invoice-month bucket key (e.g. "2026-04"). */
+export function invoiceMonthDateRange(key: string): { start: Date; end: Date } {
+  const [yearStr, monthStr] = key.split('-');
+  const year = Number(yearStr);
+  const month = Number(monthStr) - 1;
+  const end = invoiceCutoff(year, month);
+  const prev = month === 0 ? { year: year - 1, month: 11 } : { year, month: month - 1 };
+  const start = addDays(invoiceCutoff(prev.year, prev.month), 1);
+  return { start, end };
+}
+
 /** Group daily rows into invoice months (cutoff-to-cutoff), most recent first. */
 export function groupByInvoiceMonth(rows: HistoryRow[]): AggregateRow[] {
   return toBuckets(
@@ -81,14 +92,6 @@ export function groupByInvoiceMonth(rows: HistoryRow[]): AggregateRow[] {
       const { year, month } = invoiceMonthOf(d);
       return `${year}-${String(month + 1).padStart(2, '0')}` as `${string}`;
     },
-    (key) => {
-      const [yearStr, monthStr] = key.split('-');
-      const year = Number(yearStr);
-      const month = Number(monthStr) - 1;
-      const end = invoiceCutoff(year, month);
-      const prev = month === 0 ? { year: year - 1, month: 11 } : { year, month: month - 1 };
-      const start = addDays(invoiceCutoff(prev.year, prev.month), 1);
-      return { start, end };
-    },
+    invoiceMonthDateRange,
   );
 }

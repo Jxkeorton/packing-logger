@@ -235,3 +235,20 @@ export async function readHistory(limit = 14): Promise<HistoryRow[]> {
     };
   });
 }
+
+/**
+ * Every jump within `startDate`..`endDate` (both YYYY-MM-DD, inclusive),
+ * grouped by category and sorted chronologically — the invoice PDF's data
+ * source.
+ */
+export async function jumpsInRange(startDate: string, endDate: string): Promise<Record<Category, Jump[]>> {
+  const jumps = await readJumps();
+  const out: Record<Category, Jump[]> = { instructor: [], videographer: [] };
+  for (const j of jumps) {
+    if (j.date >= startDate && j.date <= endDate) out[j.category].push(j);
+  }
+  for (const category of CATEGORIES) {
+    out[category].sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0));
+  }
+  return out;
+}

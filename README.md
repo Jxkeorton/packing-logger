@@ -52,6 +52,22 @@ as one row per jump rather than a daily tally, so the name is never lost.
 per jump with `date,category,name,amount,at` — ready to filter to an
 invoice month and hand to a customer or accountant.
 
+### PDF invoices
+
+Each row in the Tandems tab's History → Month table has an "Export PDF"
+link, which generates a formal invoice for that invoice month: your
+letterhead, a "Bill To" address, and every jump that period listed with its
+date and customer name, split into Instructor and Videographer sections
+with subtotals and a total (packing jobs are never included).
+
+The letterhead — your name/address, the VAT note, the client's billing
+address, and the next invoice number — is set in the "Invoice details"
+panel underneath the Tandems tab's History section. It's saved once and
+reused on every export; the invoice number auto-increments each time you
+export a PDF, so update it there if you ever need to skip or rewind it.
+See [`src/lib/invoice-pdf.ts`](src/lib/invoice-pdf.ts) and
+[`src/lib/invoice-settings.ts`](src/lib/invoice-settings.ts).
+
 ## Running it locally
 
 ```bash
@@ -71,6 +87,7 @@ account or setup needed:
 - `data/packing-log.csv` — one row per day, kept up to date on every tap.
 - `data/tandem-jumps.csv` — one row per tandem jump (date, role, customer
   name), the source both the Tandems tab and its CSV export read from.
+- `data/invoice-settings.json` — the PDF invoice letterhead (see below).
 
 All are excluded from git (see `.gitignore`), since they're your personal
 work records, not source code.

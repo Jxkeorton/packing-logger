@@ -21,6 +21,7 @@ import {
   totalJumps,
 } from '../lib/tandem';
 import { groupByInvoiceMonth as groupTandemByInvoiceMonth, groupByWeek as groupTandemByWeek } from '../lib/tandem-invoice';
+import { readInvoiceSettings } from '../lib/invoice-settings';
 import { formatDuration, formatWhen } from '../lib/format';
 import { readFastestFive } from '../lib/times';
 import { authEnabled } from '../lib/auth';
@@ -49,6 +50,8 @@ const tandemDayRows = tandemFullHistory.slice(0, 14);
 const tandemCombined = [...tandemFullHistory, toTandemHistoryRow(tandemState)];
 const tandemWeekRows = groupTandemByWeek(tandemCombined).slice(0, 12);
 const tandemMonthRows = groupTandemByInvoiceMonth(tandemCombined).slice(0, 12);
+
+const invoiceSettings = await readInvoiceSettings();
 
 const dateObj = new Date(`${state.date}T00:00:00`);
 const dateDisplay = dateObj.toLocaleDateString('en-GB', {
@@ -361,6 +364,50 @@ const money = (n: number) => `£${n.toFixed(2)}`;
             <div class="history-view" data-view="month" hidden>
               <TandemAggregateTable rows={tandemMonthRows} currentLabel="This invoice month" prefix="tmonth" />
             </div>
+          </div>
+        </section>
+
+        <section class="history">
+          <button
+            class="history-toggle"
+            id="invoiceSettingsToggle"
+            type="button"
+            aria-expanded="false"
+            aria-controls="invoiceSettingsPanel"
+          >
+            <span>Invoice details</span>
+            <span class="history-toggle-icon" id="invoiceSettingsToggleIcon">&rsaquo;</span>
+          </button>
+          <div class="history-panel invoice-settings-panel" id="invoiceSettingsPanel" hidden>
+            <p class="invoice-settings-hint">
+              Used on the "Export PDF" invoices below — your details, who it's billed to, and the next invoice number.
+            </p>
+            <form id="invoiceSettingsForm">
+              <label class="invoice-field">
+                <span>Your name</span>
+                <input type="text" id="invoiceFromName" value={invoiceSettings.fromName} required />
+              </label>
+              <label class="invoice-field">
+                <span>Your address (one line each)</span>
+                <textarea id="invoiceFromAddress" rows="4">{invoiceSettings.fromAddress.join('\n')}</textarea>
+              </label>
+              <label class="invoice-field">
+                <span>VAT note</span>
+                <input type="text" id="invoiceVatNote" value={invoiceSettings.vatNote} />
+              </label>
+              <label class="invoice-field">
+                <span>Bill to (one line each)</span>
+                <textarea id="invoiceBillTo" rows="4">{invoiceSettings.billTo.join('\n')}</textarea>
+              </label>
+              <label class="invoice-field invoice-field--narrow">
+                <span>Next invoice ref</span>
+                <input type="number" id="invoiceNextRef" min="1" step="1" value={invoiceSettings.nextInvoiceRef} required />
+              </label>
+              <div class="invoice-settings-actions">
+                <button type="submit" class="invoice-settings-save">Save details</button>
+                <span class="invoice-settings-status" id="invoiceSettingsStatus" role="status"></span>
+              </div>
+            </form>
           </div>
         </section>
 
@@ -1005,6 +1052,92 @@ const money = (n: number) => `£${n.toFixed(2)}`;
         cursor: default;
       }
 
+      /* ---- Invoice settings ---- */
+
+      .invoice-settings-panel {
+        padding: 14px 16px 16px;
+      }
+
+      .invoice-settings-hint {
+        margin: 0 0 14px;
+        font-size: 12.5px;
+        color: var(--ink-soft);
+      }
+
+      .invoice-field {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        margin-bottom: 12px;
+        font-size: 12.5px;
+        font-weight: 600;
+        color: var(--ink-soft);
+      }
+
+      .invoice-field--narrow {
+        max-width: 160px;
+      }
+
+      .invoice-field input,
+      .invoice-field textarea {
+        width: 100%;
+        padding: 9px 12px;
+        border-radius: 10px;
+        border: 1px solid var(--line-strong);
+        background: var(--canvas);
+        color: var(--ink);
+        font-family: 'Inter', sans-serif;
+        font-size: 14px;
+        font-weight: 400;
+        resize: vertical;
+      }
+
+      .invoice-field input:focus-visible,
+      .invoice-field textarea:focus-visible {
+        outline: 3px solid var(--gold);
+        outline-offset: 1px;
+      }
+
+      .invoice-settings-actions {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-top: 4px;
+      }
+
+      .invoice-settings-save {
+        appearance: none;
+        border: none;
+        border-radius: 10px;
+        height: 42px;
+        padding: 0 20px;
+        font-family: 'Space Grotesk', sans-serif;
+        font-weight: 700;
+        font-size: 14px;
+        color: #fff;
+        background: var(--gold);
+        cursor: pointer;
+        touch-action: manipulation;
+      }
+
+      .invoice-settings-save:disabled {
+        opacity: 0.6;
+        cursor: default;
+      }
+
+      .invoice-settings-status {
+        font-size: 12.5px;
+        color: var(--ink-soft);
+      }
+
+      .invoice-settings-status[data-state='ok'] {
+        color: var(--student);
+      }
+
+      .invoice-settings-status[data-state='error'] {
+        color: var(--danger);
+      }
+
       /* ---- Footer ---- */
 
       .foot {
@@ -1304,6 +1437,8 @@ const money = (n: number) => `£${n.toFixed(2)}`;
       if (tandemHistoryPanel) wireTabGroup(tandemHistoryPanel, '.history-tab', '.history-view', 'tab', 'view');
       wireToggle('tandemHistoryToggle', 'tandemHistoryPanel');
 
+      wireToggle('invoiceSettingsToggle', 'invoiceSettingsPanel');
+
       function bump(el: Element | null) {
         if (!el) return;
         el.classList.remove('bump');
@@ -1533,6 +1668,53 @@ const money = (n: number) => `£${n.toFixed(2)}`;
           .finally(() => {
             if (submitButton) submitButton.disabled = false;
           });
+      });
+
+      // ---- Invoice settings ----
+
+      const invoiceSettingsForm = document.getElementById('invoiceSettingsForm') as HTMLFormElement | null;
+      const invoiceSettingsStatus = document.getElementById('invoiceSettingsStatus');
+
+      invoiceSettingsForm?.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const fromName = (document.getElementById('invoiceFromName') as HTMLInputElement | null)?.value ?? '';
+        const fromAddress = (document.getElementById('invoiceFromAddress') as HTMLTextAreaElement | null)?.value ?? '';
+        const vatNote = (document.getElementById('invoiceVatNote') as HTMLInputElement | null)?.value ?? '';
+        const billTo = (document.getElementById('invoiceBillTo') as HTMLTextAreaElement | null)?.value ?? '';
+        const nextInvoiceRef = Number(
+          (document.getElementById('invoiceNextRef') as HTMLInputElement | null)?.value ?? '',
+        );
+
+        const submitButton = invoiceSettingsForm.querySelector<HTMLButtonElement>('button[type="submit"]');
+        if (submitButton) submitButton.disabled = true;
+        if (invoiceSettingsStatus) {
+          invoiceSettingsStatus.textContent = 'Saving…';
+          invoiceSettingsStatus.removeAttribute('data-state');
+        }
+
+        try {
+          const res = await fetch('/api/invoice-settings', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ fromName, fromAddress, vatNote, billTo, nextInvoiceRef }),
+          });
+          if (!res.ok) {
+            const data = await res.json().catch(() => null);
+            throw new Error(data?.error ?? 'Failed to save');
+          }
+          if (invoiceSettingsStatus) {
+            invoiceSettingsStatus.textContent = 'Saved';
+            invoiceSettingsStatus.dataset.state = 'ok';
+          }
+        } catch (err) {
+          console.error('Failed to save invoice settings', err);
+          if (invoiceSettingsStatus) {
+            invoiceSettingsStatus.textContent = err instanceof Error ? err.message : 'Failed to save';
+            invoiceSettingsStatus.dataset.state = 'error';
+          }
+        } finally {
+          if (submitButton) submitButton.disabled = false;
+        }
       });
 
       // ---- Stopwatch ----

@@ -14,11 +14,13 @@
   "dependencies": {
     "@astrojs/vercel": "^11.0.7",
     "@vercel/blob": "^2.8.0",
-    "astro": "^7.2.4"
+    "astro": "^7.2.4",
+    "pdfkit": "^0.20.1"
   },
   "devDependencies": {
     "@astrojs/check": "^0.9.10",
     "@types/node": "^26.2.0",
+    "@types/pdfkit": "^0.17.6",
     "typescript": "^6.0.3"
   },
   "overrides": {
