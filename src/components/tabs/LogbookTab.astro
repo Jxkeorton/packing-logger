@@ -1,0 +1,1032 @@
+---
+// The "Logbook" app tab: the personal jump ledger (add/edit/delete, with
+// an expandable detail row per jump) plus the saved Places / Equipment /
+// Aircraft / Jump types profiles its form's dropdowns pick from, and the
+// "jumps logged before this app" starting-number setting.
+import type { NumberedEntry } from '../../lib/logbook';
+import type { LogbookSettings } from '../../lib/logbook-settings';
+import type { DayState } from '../../lib/packing';
+
+interface Props {
+  state: DayState;
+  dateDisplay: string;
+  nextLogbookNumber: number;
+  logbookEntries: NumberedEntry[];
+  logbookSettings: LogbookSettings;
+}
+
+const { state, dateDisplay, nextLogbookNumber, logbookEntries, logbookSettings } = Astro.props;
+---
+
+<div class="app-view" data-app-view="logbook" id="logbookView" hidden>
+  <header class="masthead">
+    <div class="stamp" aria-hidden="false">
+      <span class="stamp-label">Logbook</span>
+      <span class="stamp-date">{dateDisplay}</span>
+    </div>
+    <div class="totals">
+      <div class="totals-block totals-block--packs">
+        <span class="totals-value totals-value--packs" id="logbookTotalJumps">{nextLogbookNumber - 1}</span>
+        <span class="totals-label">jumps logged</span>
+      </div>
+    </div>
+  </header>
+
+  <section class="logbook-form-card">
+    <div class="logbook-form-top">
+      <h2 class="logbook-form-title" id="logbookFormTitle">Log a jump</h2>
+      <span class="logbook-form-number" id="logbookNextNumber">#{nextLogbookNumber}</span>
+    </div>
+    <form id="logbookForm">
+      <input type="hidden" id="logbookEditingAt" value="" />
+      <div class="logbook-form-grid">
+        <label class="invoice-field">
+          <span>Date *</span>
+          <input type="date" id="logbookDate" required value={state.date} />
+        </label>
+        <label class="invoice-field">
+          <span>Place</span>
+          <select id="logbookPlace">
+            <option value="" selected={!logbookSettings.defaultPlaceId || undefined}>
+              No place selected
+            </option>
+            {
+              logbookSettings.places.map((p) => (
+                <option value={p.id} selected={p.id === logbookSettings.defaultPlaceId || undefined}>
+                  {p.name}
+                </option>
+              ))
+            }
+          </select>
+        </label>
+        <label class="invoice-field">
+          <span>Exit altitude</span>
+          <input type="text" id="logbookAltitude" placeholder="e.g. 13,000 ft" autocomplete="off" maxlength="120" />
+        </label>
+        <label class="invoice-field">
+          <span>Equipment</span>
+          <select id="logbookEquipment">
+            <option value="" data-canopy="" data-container="" data-aad="" selected={!logbookSettings.defaultEquipmentId || undefined}>
+              No equipment selected
+            </option>
+            {
+              logbookSettings.equipment.map((eq) => (
+                <option
+                  value={eq.id}
+                  data-canopy={eq.canopy}
+                  data-container={eq.container}
+                  data-aad={eq.aad}
+                  selected={eq.id === logbookSettings.defaultEquipmentId || undefined}
+                >
+                  {eq.name}
+                </option>
+              ))
+            }
+          </select>
+        </label>
+        <label class="invoice-field">
+          <span>Aircraft</span>
+          <select id="logbookAircraft">
+            <option value="" selected={!logbookSettings.defaultAircraftId || undefined}>
+              No aircraft selected
+            </option>
+            {
+              logbookSettings.aircraft.map((ac) => (
+                <option value={ac.id} selected={ac.id === logbookSettings.defaultAircraftId || undefined}>
+                  {ac.plate}
+                </option>
+              ))
+            }
+          </select>
+        </label>
+        <label class="invoice-field">
+          <span>Jump type</span>
+          <select id="logbookJumpType">
+            <option value="" selected={!logbookSettings.defaultJumpTypeId || undefined}>
+              No jump type selected
+            </option>
+            {
+              logbookSettings.jumpTypes.map((jt) => (
+                <option value={jt.id} selected={jt.id === logbookSettings.defaultJumpTypeId || undefined}>
+                  {jt.name}
+                </option>
+              ))
+            }
+          </select>
+        </label>
+      </div>
+      <label class="invoice-field">
+        <span>Description</span>
+        <textarea id="logbookDescription" rows="3" placeholder="Freefall, exercises, canopy notes…"></textarea>
+      </label>
+      <div class="invoice-settings-actions">
+        <button type="submit" class="invoice-settings-save" id="logbookSubmit">Log jump</button>
+        <button type="button" class="logbook-cancel-edit" id="logbookCancelEdit" hidden>Cancel edit</button>
+        <span class="invoice-settings-status" id="logbookFormStatus" role="status"></span>
+      </div>
+    </form>
+  </section>
+
+  <section class="logbook-list-card">
+    <ul class="logbook-list" id="logbookList">
+      {
+        logbookEntries.length === 0 ? (
+          <li class="logbook-empty">No jumps logged yet.</li>
+        ) : (
+          logbookEntries.map((e) => {
+            const shortDate = new Date(`${e.date}T00:00:00`).toLocaleDateString('en-GB', {
+              day: 'numeric',
+              month: 'short',
+              year: 'numeric',
+            });
+            return (
+              <li
+                class="logbook-entry"
+                data-at={e.at}
+                data-date={e.date}
+                data-place={e.place}
+                data-altitude={e.exitAltitude}
+                data-aircraft={e.aircraft}
+                data-canopy={e.canopy}
+                data-container={e.container}
+                data-aad={e.aad}
+                data-jump-type={e.jumpType}
+                data-description={e.description}
+              >
+                <button type="button" class="logbook-row" data-toggle={e.at} aria-expanded="false">
+                  <span class="logbook-row-number">#{e.number}</span>
+                  <span class="logbook-row-date">{shortDate}</span>
+                  <span class="logbook-row-place">{e.place || '—'}</span>
+                  <span class="logbook-row-chevron">&rsaquo;</span>
+                </button>
+                <div class="logbook-details" id={`logbookDetails-${e.at}`} hidden>
+                  <dl class="logbook-details-grid">
+                    <div>
+                      <dt>Jump type</dt>
+                      <dd>{e.jumpType || '—'}</dd>
+                    </div>
+                    <div>
+                      <dt>Exit altitude</dt>
+                      <dd>{e.exitAltitude || '—'}</dd>
+                    </div>
+                    <div>
+                      <dt>Aircraft</dt>
+                      <dd>{e.aircraft || '—'}</dd>
+                    </div>
+                    <div>
+                      <dt>Canopy</dt>
+                      <dd>{e.canopy || '—'}</dd>
+                    </div>
+                    <div>
+                      <dt>Container</dt>
+                      <dd>{e.container || '—'}</dd>
+                    </div>
+                    <div>
+                      <dt>AAD</dt>
+                      <dd>{e.aad || '—'}</dd>
+                    </div>
+                  </dl>
+                  {e.description && <p class="logbook-details-description">{e.description}</p>}
+                  <div class="logbook-details-actions">
+                    <button type="button" class="logbook-edit" data-edit={e.at}>
+                      Edit
+                    </button>
+                    <button type="button" class="logbook-delete" data-delete={e.at}>
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              </li>
+            );
+          })
+        )
+      }
+    </ul>
+  </section>
+
+  <section class="history">
+    <button class="history-toggle" id="placesToggle" type="button" aria-expanded="false" aria-controls="placesPanel">
+      <span>Places</span>
+      <span class="history-toggle-icon" id="placesToggleIcon">&rsaquo;</span>
+    </button>
+    <div class="history-panel invoice-settings-panel" id="placesPanel" hidden>
+      <p class="invoice-settings-hint">The starred one is pre-selected whenever you start a new jump.</p>
+      <ul class="equipment-list" id="placesList">
+        {
+          logbookSettings.places.length === 0 ? (
+            <li class="equipment-empty">No places saved yet.</li>
+          ) : (
+            logbookSettings.places.map((p) => (
+              <li class="equipment-row" data-id={p.id}>
+                <div class="equipment-row-text">
+                  <span class="equipment-row-name">{p.name}</span>
+                </div>
+                <button
+                  type="button"
+                  class="default-star"
+                  data-default-category="place"
+                  data-default-id={p.id}
+                  aria-pressed={p.id === logbookSettings.defaultPlaceId ? 'true' : 'false'}
+                  aria-label={`Set ${p.name} as the default place`}
+                >
+                  &#9733;
+                </button>
+                <button type="button" class="equipment-delete" data-ref-delete={p.id} aria-label={`Remove ${p.name}`}>
+                  &times;
+                </button>
+              </li>
+            ))
+          )
+        }
+      </ul>
+      <form id="placesForm" class="equipment-form">
+        <label class="invoice-field">
+          <span>Name</span>
+          <input type="text" id="placeName" placeholder="e.g. Langar" autocomplete="off" maxlength="80" required />
+        </label>
+        <div class="invoice-settings-actions">
+          <button type="submit" class="invoice-settings-save">Save place</button>
+          <span class="invoice-settings-status" id="placesStatus" role="status"></span>
+        </div>
+      </form>
+    </div>
+  </section>
+
+  <section class="history">
+    <button class="history-toggle" id="equipmentToggle" type="button" aria-expanded="false" aria-controls="equipmentPanel">
+      <span>Equipment</span>
+      <span class="history-toggle-icon" id="equipmentToggleIcon">&rsaquo;</span>
+    </button>
+    <div class="history-panel invoice-settings-panel" id="equipmentPanel" hidden>
+      <p class="invoice-settings-hint">The starred one is pre-selected whenever you start a new jump.</p>
+      <ul class="equipment-list" id="equipmentList">
+        {
+          logbookSettings.equipment.length === 0 ? (
+            <li class="equipment-empty">No equipment saved yet.</li>
+          ) : (
+            logbookSettings.equipment.map((eq) => (
+              <li class="equipment-row" data-id={eq.id}>
+                <div class="equipment-row-text">
+                  <span class="equipment-row-name">{eq.name}</span>
+                  <span class="equipment-row-detail">
+                    {[eq.canopy, eq.container, eq.aad].filter(Boolean).join(' · ') || 'No details saved'}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  class="default-star"
+                  data-default-category="equipment"
+                  data-default-id={eq.id}
+                  aria-pressed={eq.id === logbookSettings.defaultEquipmentId ? 'true' : 'false'}
+                  aria-label={`Set ${eq.name} as the default equipment`}
+                >
+                  &#9733;
+                </button>
+                <button type="button" class="equipment-delete" data-ref-delete={eq.id} aria-label={`Remove ${eq.name}`}>
+                  &times;
+                </button>
+              </li>
+            ))
+          )
+        }
+      </ul>
+      <form id="equipmentForm" class="equipment-form">
+        <label class="invoice-field">
+          <span>Name</span>
+          <input type="text" id="equipmentName" placeholder="e.g. Main rig" autocomplete="off" maxlength="80" required />
+        </label>
+        <div class="logbook-form-grid">
+          <label class="invoice-field">
+            <span>Canopy</span>
+            <input type="text" id="equipmentCanopy" placeholder="e.g. Sabre2 190" autocomplete="off" maxlength="80" />
+          </label>
+          <label class="invoice-field">
+            <span>Container</span>
+            <input type="text" id="equipmentContainer" placeholder="e.g. Wings X 190" autocomplete="off" maxlength="80" />
+          </label>
+          <label class="invoice-field">
+            <span>AAD</span>
+            <input type="text" id="equipmentAad" placeholder="e.g. Cypres 2" autocomplete="off" maxlength="80" />
+          </label>
+        </div>
+        <div class="invoice-settings-actions">
+          <button type="submit" class="invoice-settings-save">Save equipment</button>
+          <span class="invoice-settings-status" id="equipmentStatus" role="status"></span>
+        </div>
+      </form>
+    </div>
+  </section>
+
+  <section class="history">
+    <button class="history-toggle" id="aircraftToggle" type="button" aria-expanded="false" aria-controls="aircraftPanel">
+      <span>Aircraft</span>
+      <span class="history-toggle-icon" id="aircraftToggleIcon">&rsaquo;</span>
+    </button>
+    <div class="history-panel invoice-settings-panel" id="aircraftPanel" hidden>
+      <p class="invoice-settings-hint">The starred one is pre-selected whenever you start a new jump.</p>
+      <ul class="equipment-list" id="aircraftList">
+        {
+          logbookSettings.aircraft.length === 0 ? (
+            <li class="equipment-empty">No aircraft saved yet.</li>
+          ) : (
+            logbookSettings.aircraft.map((ac) => (
+              <li class="equipment-row" data-id={ac.id}>
+                <div class="equipment-row-text">
+                  <span class="equipment-row-name">{ac.plate}</span>
+                </div>
+                <button
+                  type="button"
+                  class="default-star"
+                  data-default-category="aircraft"
+                  data-default-id={ac.id}
+                  aria-pressed={ac.id === logbookSettings.defaultAircraftId ? 'true' : 'false'}
+                  aria-label={`Set ${ac.plate} as the default aircraft`}
+                >
+                  &#9733;
+                </button>
+                <button type="button" class="equipment-delete" data-ref-delete={ac.id} aria-label={`Remove ${ac.plate}`}>
+                  &times;
+                </button>
+              </li>
+            ))
+          )
+        }
+      </ul>
+      <form id="aircraftForm" class="equipment-form">
+        <label class="invoice-field invoice-field--narrow">
+          <span>Registration</span>
+          <input type="text" id="aircraftPlate" placeholder="e.g. G-SDSK" autocomplete="off" maxlength="20" required />
+        </label>
+        <div class="invoice-settings-actions">
+          <button type="submit" class="invoice-settings-save">Save aircraft</button>
+          <span class="invoice-settings-status" id="aircraftStatus" role="status"></span>
+        </div>
+      </form>
+    </div>
+  </section>
+
+  <section class="history">
+    <button class="history-toggle" id="jumpTypesToggle" type="button" aria-expanded="false" aria-controls="jumpTypesPanel">
+      <span>Jump types</span>
+      <span class="history-toggle-icon" id="jumpTypesToggleIcon">&rsaquo;</span>
+    </button>
+    <div class="history-panel invoice-settings-panel" id="jumpTypesPanel" hidden>
+      <p class="invoice-settings-hint">
+        The starred one is pre-selected whenever you start a new jump. "Tandem Instructor" and "Tandem Camera" are
+        added here automatically the first time you log one from the Tandems tab.
+      </p>
+      <ul class="equipment-list" id="jumpTypesList">
+        {
+          logbookSettings.jumpTypes.length === 0 ? (
+            <li class="equipment-empty">No jump types saved yet.</li>
+          ) : (
+            logbookSettings.jumpTypes.map((jt) => (
+              <li class="equipment-row" data-id={jt.id}>
+                <div class="equipment-row-text">
+                  <span class="equipment-row-name">{jt.name}</span>
+                </div>
+                <button
+                  type="button"
+                  class="default-star"
+                  data-default-category="jumpType"
+                  data-default-id={jt.id}
+                  aria-pressed={jt.id === logbookSettings.defaultJumpTypeId ? 'true' : 'false'}
+                  aria-label={`Set ${jt.name} as the default jump type`}
+                >
+                  &#9733;
+                </button>
+                <button type="button" class="equipment-delete" data-ref-delete={jt.id} aria-label={`Remove ${jt.name}`}>
+                  &times;
+                </button>
+              </li>
+            ))
+          )
+        }
+      </ul>
+      <form id="jumpTypesForm" class="equipment-form">
+        <label class="invoice-field">
+          <span>Name</span>
+          <input type="text" id="jumpTypeName" placeholder="e.g. Sport" autocomplete="off" maxlength="40" required />
+        </label>
+        <div class="invoice-settings-actions">
+          <button type="submit" class="invoice-settings-save">Save jump type</button>
+          <span class="invoice-settings-status" id="jumpTypesStatus" role="status"></span>
+        </div>
+      </form>
+    </div>
+  </section>
+
+  <section class="history">
+    <button
+      class="history-toggle"
+      id="logbookSettingsToggle"
+      type="button"
+      aria-expanded="false"
+      aria-controls="logbookSettingsPanel"
+    >
+      <span>Settings</span>
+      <span class="history-toggle-icon" id="logbookSettingsToggleIcon">&rsaquo;</span>
+    </button>
+    <div class="history-panel invoice-settings-panel" id="logbookSettingsPanel" hidden>
+      <p class="invoice-settings-hint">
+        Jumps you logged before using this app — added to the count above so numbering carries on correctly.
+      </p>
+      <form id="logbookSettingsForm">
+        <label class="invoice-field invoice-field--narrow">
+          <span>Jumps logged before this app</span>
+          <input type="number" id="logbookBaseJumps" min="0" step="1" value={logbookSettings.baseJumps} required />
+        </label>
+        <div class="invoice-settings-actions">
+          <button type="submit" class="invoice-settings-save">Save</button>
+          <span class="invoice-settings-status" id="logbookSettingsStatus" role="status"></span>
+        </div>
+      </form>
+    </div>
+  </section>
+
+  <footer class="foot">
+    <button
+      type="button"
+      class="foot-download"
+      data-download="/api/logbook-export.csv"
+      data-download-name="logbook.csv"
+    >
+      Download full logbook (.csv)
+    </button>
+  </footer>
+</div>
+
+<script>
+  import { wireToggle, wireDownloadButtons, escapeHtml } from '../../lib/client/dom';
+  import { wireReferenceList, defaultStarHtml, type ReferenceItem } from '../../lib/client/reference-list';
+
+  const logbookView = document.getElementById('logbookView');
+  if (!logbookView) throw new Error('#logbookView not found');
+
+  wireDownloadButtons(logbookView);
+
+  // ---- Log-a-jump form + entry list ----
+
+  interface LogbookEntryData {
+    date: string;
+    place: string;
+    exitAltitude: string;
+    canopy: string;
+    container: string;
+    aad: string;
+    aircraft: string;
+    jumpType: string;
+    description: string;
+    at: string;
+    number: number;
+  }
+
+  function formatShortDate(dateStr: string): string {
+    const d = new Date(`${dateStr}T00:00:00`);
+    return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+  }
+
+  function dash(value: string): string {
+    return value ? escapeHtml(value) : '—';
+  }
+
+  function logbookRowHtml(e: LogbookEntryData): string {
+    const description = e.description
+      ? `<p class="logbook-details-description">${escapeHtml(e.description)}</p>`
+      : '';
+    return `
+      <li class="logbook-entry" data-at="${e.at}" data-date="${e.date}" data-place="${escapeHtml(e.place)}" data-altitude="${escapeHtml(e.exitAltitude)}" data-aircraft="${escapeHtml(e.aircraft)}" data-canopy="${escapeHtml(e.canopy)}" data-container="${escapeHtml(e.container)}" data-aad="${escapeHtml(e.aad)}" data-jump-type="${escapeHtml(e.jumpType)}" data-description="${escapeHtml(e.description)}">
+        <button type="button" class="logbook-row" data-toggle="${e.at}" aria-expanded="false">
+          <span class="logbook-row-number">#${e.number}</span>
+          <span class="logbook-row-date">${formatShortDate(e.date)}</span>
+          <span class="logbook-row-place">${dash(e.place)}</span>
+          <span class="logbook-row-chevron">&rsaquo;</span>
+        </button>
+        <div class="logbook-details" id="logbookDetails-${e.at}" hidden>
+          <dl class="logbook-details-grid">
+            <div><dt>Jump type</dt><dd>${dash(e.jumpType)}</dd></div>
+            <div><dt>Exit altitude</dt><dd>${dash(e.exitAltitude)}</dd></div>
+            <div><dt>Aircraft</dt><dd>${dash(e.aircraft)}</dd></div>
+            <div><dt>Canopy</dt><dd>${dash(e.canopy)}</dd></div>
+            <div><dt>Container</dt><dd>${dash(e.container)}</dd></div>
+            <div><dt>AAD</dt><dd>${dash(e.aad)}</dd></div>
+          </dl>
+          ${description}
+          <div class="logbook-details-actions">
+            <button type="button" class="logbook-edit" data-edit="${e.at}">Edit</button>
+            <button type="button" class="logbook-delete" data-delete="${e.at}">Delete</button>
+          </div>
+        </div>
+      </li>`;
+  }
+
+  function renderLogbookList(entries: LogbookEntryData[]) {
+    const list = document.getElementById('logbookList');
+    if (!list) return;
+    list.innerHTML =
+      entries.length === 0
+        ? '<li class="logbook-empty">No jumps logged yet.</li>'
+        : entries.map(logbookRowHtml).join('');
+  }
+
+  function applyLogbookState(entries: LogbookEntryData[], nextNumber: number) {
+    renderLogbookList(entries);
+    const totalEl = document.getElementById('logbookTotalJumps');
+    if (totalEl) totalEl.textContent = String(nextNumber - 1);
+    const nextEl = document.getElementById('logbookNextNumber');
+    if (nextEl && logbookForm?.dataset.editing !== 'true') nextEl.textContent = `#${nextNumber}`;
+  }
+
+  const logbookForm = document.getElementById('logbookForm') as HTMLFormElement | null;
+  const logbookList = document.getElementById('logbookList');
+  const logbookFormTitle = document.getElementById('logbookFormTitle');
+  const logbookNextNumberEl = document.getElementById('logbookNextNumber');
+  const logbookEditingAt = document.getElementById('logbookEditingAt') as HTMLInputElement | null;
+  const logbookDate = document.getElementById('logbookDate') as HTMLInputElement | null;
+  const logbookPlace = document.getElementById('logbookPlace') as HTMLSelectElement | null;
+  const logbookAltitude = document.getElementById('logbookAltitude') as HTMLInputElement | null;
+  const logbookEquipment = document.getElementById('logbookEquipment') as HTMLSelectElement | null;
+  const logbookAircraft = document.getElementById('logbookAircraft') as HTMLSelectElement | null;
+  const logbookJumpType = document.getElementById('logbookJumpType') as HTMLSelectElement | null;
+  const logbookDescription = document.getElementById('logbookDescription') as HTMLTextAreaElement | null;
+  const logbookSubmit = document.getElementById('logbookSubmit') as HTMLButtonElement | null;
+  const logbookCancelEdit = document.getElementById('logbookCancelEdit') as HTMLButtonElement | null;
+  const logbookFormStatus = document.getElementById('logbookFormStatus');
+  const todayDateValue = logbookDate?.value ?? '';
+
+  // Place/Equipment/Aircraft dropdowns get rebuilt (via innerHTML) whenever
+  // their saved-profile list or default changes — e.g. from starring a
+  // different default while this form is sitting open. A rebuild should
+  // snap back to the live default *unless* something already deliberately
+  // chose a value in the meantime (typing through the dropdown, or
+  // entering edit mode), which is what this flag distinguishes: it's set
+  // on user interaction and on entering edit mode, and cleared whenever
+  // the form returns to "log a new jump" — see enterAddMode below.
+  function markTouched(select: HTMLSelectElement | null) {
+    select?.setAttribute('data-user-touched', 'true');
+  }
+  logbookPlace?.addEventListener('change', () => markTouched(logbookPlace));
+  logbookEquipment?.addEventListener('change', () => markTouched(logbookEquipment));
+  logbookAircraft?.addEventListener('change', () => markTouched(logbookAircraft));
+  logbookJumpType?.addEventListener('change', () => markTouched(logbookJumpType));
+
+  // Reads the picked option's label — but only when a real place is
+  // selected. The placeholder option (value="") still has its own
+  // textContent ("No place selected"), which must NOT be sent as the
+  // place itself.
+  function selectedPlaceText(): string {
+    if (!logbookPlace?.value) return '';
+    return logbookPlace.selectedOptions[0]?.textContent ?? '';
+  }
+
+  // Same idea as selectEquipmentMatching, but a place only has one field,
+  // so it's a plain text match against the option's label.
+  function selectPlaceMatching(name: string) {
+    if (!logbookPlace) return;
+    markTouched(logbookPlace);
+    for (const option of Array.from(logbookPlace.options)) {
+      if (option.textContent === name) {
+        logbookPlace.value = option.value;
+        return;
+      }
+    }
+    logbookPlace.value = '';
+  }
+
+  function selectedEquipment(): { canopy: string; container: string; aad: string } {
+    const option = logbookEquipment?.selectedOptions[0];
+    return {
+      canopy: option?.dataset.canopy ?? '',
+      container: option?.dataset.container ?? '',
+      aad: option?.dataset.aad ?? '',
+    };
+  }
+
+  // Picks the dropdown option whose saved values match a jump's snapshot
+  // exactly, so re-opening a jump for editing shows the right equipment
+  // pre-selected when it still matches a saved profile. If the profile was
+  // since edited or deleted, this just leaves "No equipment selected"
+  // chosen — the entry's own canopy/container/AAD text stays untouched
+  // unless the field is changed.
+  function selectEquipmentMatching(canopy: string, container: string, aad: string) {
+    if (!logbookEquipment) return;
+    markTouched(logbookEquipment);
+    for (const option of Array.from(logbookEquipment.options)) {
+      if ((option.dataset.canopy ?? '') === canopy && (option.dataset.container ?? '') === container && (option.dataset.aad ?? '') === aad) {
+        logbookEquipment.value = option.value;
+        return;
+      }
+    }
+    logbookEquipment.value = '';
+  }
+
+  // See selectedPlaceText for why this checks `.value` first rather than
+  // just reading the selected option's label.
+  function selectedAircraftText(): string {
+    if (!logbookAircraft?.value) return '';
+    return logbookAircraft.selectedOptions[0]?.textContent ?? '';
+  }
+
+  // Same idea as selectEquipmentMatching, but aircraft only has one field,
+  // so it's a plain text match against the option's label.
+  function selectAircraftMatching(plate: string) {
+    if (!logbookAircraft) return;
+    markTouched(logbookAircraft);
+    for (const option of Array.from(logbookAircraft.options)) {
+      if (option.textContent === plate) {
+        logbookAircraft.value = option.value;
+        return;
+      }
+    }
+    logbookAircraft.value = '';
+  }
+
+  // See selectedPlaceText for why this checks `.value` first rather than
+  // just reading the selected option's label.
+  function selectedJumpTypeText(): string {
+    if (!logbookJumpType?.value) return '';
+    return logbookJumpType.selectedOptions[0]?.textContent ?? '';
+  }
+
+  // Same idea as selectEquipmentMatching, but a jump type only has one
+  // field, so it's a plain text match against the option's label.
+  function selectJumpTypeMatching(name: string) {
+    if (!logbookJumpType) return;
+    markTouched(logbookJumpType);
+    for (const option of Array.from(logbookJumpType.options)) {
+      if (option.textContent === name) {
+        logbookJumpType.value = option.value;
+        return;
+      }
+    }
+    logbookJumpType.value = '';
+  }
+
+  function enterAddMode() {
+    if (!logbookForm) return;
+    logbookForm.dataset.editing = 'false';
+    if (logbookEditingAt) logbookEditingAt.value = '';
+    if (logbookFormTitle) logbookFormTitle.textContent = 'Log a jump';
+    if (logbookSubmit) logbookSubmit.textContent = 'Log jump';
+    if (logbookCancelEdit) logbookCancelEdit.hidden = true;
+    logbookForm.reset();
+    if (logbookDate) logbookDate.value = todayDateValue;
+    logbookPlace?.removeAttribute('data-user-touched');
+    logbookEquipment?.removeAttribute('data-user-touched');
+    logbookAircraft?.removeAttribute('data-user-touched');
+    logbookJumpType?.removeAttribute('data-user-touched');
+    const totalEl = document.getElementById('logbookTotalJumps');
+    if (logbookNextNumberEl && totalEl) {
+      logbookNextNumberEl.textContent = `#${Number(totalEl.textContent) + 1}`;
+    }
+  }
+
+  function enterEditMode(entry: HTMLElement) {
+    if (!logbookForm) return;
+    const { at, date, place, altitude, aircraft, canopy, container, aad, jumpType, description } = entry.dataset;
+    logbookForm.dataset.editing = 'true';
+    if (logbookEditingAt) logbookEditingAt.value = at ?? '';
+    if (logbookDate) logbookDate.value = date ?? '';
+    if (logbookAltitude) logbookAltitude.value = altitude ?? '';
+    if (logbookDescription) logbookDescription.value = description ?? '';
+    selectPlaceMatching(place ?? '');
+    selectEquipmentMatching(canopy ?? '', container ?? '', aad ?? '');
+    selectAircraftMatching(aircraft ?? '');
+    selectJumpTypeMatching(jumpType ?? '');
+    if (logbookFormTitle) logbookFormTitle.textContent = 'Edit jump';
+    if (logbookSubmit) logbookSubmit.textContent = 'Save changes';
+    if (logbookCancelEdit) logbookCancelEdit.hidden = false;
+    if (logbookNextNumberEl) {
+      const row = document.querySelector(`.logbook-row[data-toggle="${at}"] .logbook-row-number`);
+      logbookNextNumberEl.textContent = row?.textContent ?? '';
+    }
+    logbookForm.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  logbookCancelEdit?.addEventListener('click', enterAddMode);
+
+  logbookForm?.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const equipment = selectedEquipment();
+    const editingAt = logbookEditingAt?.value || '';
+    const payload = {
+      at: editingAt || undefined,
+      date: logbookDate?.value ?? '',
+      place: selectedPlaceText(),
+      exitAltitude: logbookAltitude?.value ?? '',
+      aircraft: selectedAircraftText(),
+      jumpType: selectedJumpTypeText(),
+      description: logbookDescription?.value ?? '',
+      ...equipment,
+    };
+
+    if (logbookSubmit) logbookSubmit.disabled = true;
+    if (logbookFormStatus) {
+      logbookFormStatus.textContent = 'Saving…';
+      logbookFormStatus.removeAttribute('data-state');
+    }
+
+    try {
+      const res = await fetch('/api/logbook', {
+        method: editingAt ? 'PUT' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        throw new Error(data?.error ?? 'Failed to save');
+      }
+      const data = await res.json();
+      applyLogbookState(data.entries, data.nextNumber);
+      if (logbookFormStatus) {
+        logbookFormStatus.textContent = editingAt ? 'Saved' : 'Logged';
+        logbookFormStatus.dataset.state = 'ok';
+      }
+      enterAddMode();
+      window.setTimeout(() => {
+        if (logbookFormStatus) logbookFormStatus.textContent = '';
+      }, 2000);
+    } catch (err) {
+      console.error('Failed to save jump', err);
+      if (logbookFormStatus) {
+        logbookFormStatus.textContent = err instanceof Error ? err.message : 'Failed to save';
+        logbookFormStatus.dataset.state = 'error';
+      }
+    } finally {
+      if (logbookSubmit) logbookSubmit.disabled = false;
+    }
+  });
+
+  logbookList?.addEventListener('click', async (event) => {
+    const target = event.target as HTMLElement;
+
+    const toggleButton = target.closest<HTMLButtonElement>('.logbook-row');
+    if (toggleButton?.dataset.toggle) {
+      const details = document.getElementById(`logbookDetails-${toggleButton.dataset.toggle}`);
+      const expanded = toggleButton.getAttribute('aria-expanded') === 'true';
+      toggleButton.setAttribute('aria-expanded', String(!expanded));
+      if (details) details.hidden = expanded;
+      return;
+    }
+
+    const editButton = target.closest<HTMLButtonElement>('.logbook-edit');
+    if (editButton?.dataset.edit) {
+      const entry = editButton.closest<HTMLElement>('.logbook-entry');
+      if (entry) enterEditMode(entry);
+      return;
+    }
+
+    const deleteButton = target.closest<HTMLButtonElement>('.logbook-delete');
+    if (deleteButton?.dataset.delete) {
+      const at = deleteButton.dataset.delete;
+      deleteButton.disabled = true;
+      try {
+        const res = await fetch('/api/logbook', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ at }),
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        applyLogbookState(data.entries, data.nextNumber);
+        // If the jump being deleted was the one open in the edit form,
+        // drop back to add mode rather than leaving a stale edit target.
+        if (logbookEditingAt?.value === at) enterAddMode();
+      } catch (err) {
+        console.error('Failed to delete jump', err);
+      } finally {
+        deleteButton.disabled = false;
+      }
+    }
+  });
+
+  // ---- Places / Equipment / Aircraft / Jump types ----
+  //
+  // Four near-identical "saved profile" lists, each wired through the
+  // shared factory in lib/client/reference-list.ts. Equipment carries a
+  // few extra fields the others don't; everything else is config.
+
+  interface PlaceData extends ReferenceItem {
+    name: string;
+  }
+  interface EquipmentData extends ReferenceItem {
+    name: string;
+    canopy: string;
+    container: string;
+    aad: string;
+  }
+  interface AircraftData extends ReferenceItem {
+    plate: string;
+  }
+  interface JumpTypeData extends ReferenceItem {
+    name: string;
+  }
+
+  const placesList = wireReferenceList<PlaceData>({
+    category: 'place',
+    apiPath: '/api/places',
+    listElId: 'placesList',
+    formElId: 'placesForm',
+    statusElId: 'placesStatus',
+    selectEl: logbookPlace,
+    emptyListHtml: '<li class="equipment-empty">No places saved yet.</li>',
+    optionsHtml: (places, defaultId) => {
+      const saved = places
+        .map((p) => `<option value="${p.id}"${p.id === defaultId ? ' selected' : ''}>${escapeHtml(p.name)}</option>`)
+        .join('');
+      return `<option value=""${!defaultId ? ' selected' : ''}>No place selected</option>${saved}`;
+    },
+    rowHtml: (p, isDefault) => `
+      <li class="equipment-row" data-id="${p.id}">
+        <div class="equipment-row-text">
+          <span class="equipment-row-name">${escapeHtml(p.name)}</span>
+        </div>
+        ${defaultStarHtml('place', 'place', p.id, isDefault, p.name)}
+        <button type="button" class="equipment-delete" data-ref-delete="${p.id}" aria-label="Remove ${escapeHtml(p.name)}">&times;</button>
+      </li>`,
+    readForm: () => ({ name: (document.getElementById('placeName') as HTMLInputElement | null)?.value ?? '' }),
+    getItems: (settings) => settings.places,
+    getDefaultId: (settings) => settings.defaultPlaceId,
+    onStarClick: (star) => toggleDefault(star),
+  });
+
+  const equipmentList = wireReferenceList<EquipmentData>({
+    category: 'equipment',
+    apiPath: '/api/equipment',
+    listElId: 'equipmentList',
+    formElId: 'equipmentForm',
+    statusElId: 'equipmentStatus',
+    selectEl: logbookEquipment,
+    emptyListHtml: '<li class="equipment-empty">No equipment saved yet.</li>',
+    optionsHtml: (equipment, defaultId) => {
+      const saved = equipment
+        .map(
+          (eq) =>
+            `<option value="${eq.id}" data-canopy="${escapeHtml(eq.canopy)}" data-container="${escapeHtml(eq.container)}" data-aad="${escapeHtml(eq.aad)}"${eq.id === defaultId ? ' selected' : ''}>${escapeHtml(eq.name)}</option>`,
+        )
+        .join('');
+      return `<option value="" data-canopy="" data-container="" data-aad=""${!defaultId ? ' selected' : ''}>No equipment selected</option>${saved}`;
+    },
+    rowHtml: (eq, isDefault) => {
+      const detail = [eq.canopy, eq.container, eq.aad].filter(Boolean).map(escapeHtml).join(' · ') || 'No details saved';
+      return `
+        <li class="equipment-row" data-id="${eq.id}">
+          <div class="equipment-row-text">
+            <span class="equipment-row-name">${escapeHtml(eq.name)}</span>
+            <span class="equipment-row-detail">${detail}</span>
+          </div>
+          ${defaultStarHtml('equipment', 'equipment', eq.id, isDefault, eq.name)}
+          <button type="button" class="equipment-delete" data-ref-delete="${eq.id}" aria-label="Remove ${escapeHtml(eq.name)}">&times;</button>
+        </li>`;
+    },
+    readForm: () => ({
+      name: (document.getElementById('equipmentName') as HTMLInputElement | null)?.value ?? '',
+      canopy: (document.getElementById('equipmentCanopy') as HTMLInputElement | null)?.value ?? '',
+      container: (document.getElementById('equipmentContainer') as HTMLInputElement | null)?.value ?? '',
+      aad: (document.getElementById('equipmentAad') as HTMLInputElement | null)?.value ?? '',
+    }),
+    getItems: (settings) => settings.equipment,
+    getDefaultId: (settings) => settings.defaultEquipmentId,
+    onStarClick: (star) => toggleDefault(star),
+  });
+
+  const aircraftList = wireReferenceList<AircraftData>({
+    category: 'aircraft',
+    apiPath: '/api/aircraft',
+    listElId: 'aircraftList',
+    formElId: 'aircraftForm',
+    statusElId: 'aircraftStatus',
+    selectEl: logbookAircraft,
+    emptyListHtml: '<li class="equipment-empty">No aircraft saved yet.</li>',
+    optionsHtml: (aircraft, defaultId) => {
+      const saved = aircraft
+        .map((ac) => `<option value="${ac.id}"${ac.id === defaultId ? ' selected' : ''}>${escapeHtml(ac.plate)}</option>`)
+        .join('');
+      return `<option value=""${!defaultId ? ' selected' : ''}>No aircraft selected</option>${saved}`;
+    },
+    rowHtml: (ac, isDefault) => `
+      <li class="equipment-row" data-id="${ac.id}">
+        <div class="equipment-row-text">
+          <span class="equipment-row-name">${escapeHtml(ac.plate)}</span>
+        </div>
+        ${defaultStarHtml('aircraft', 'aircraft', ac.id, isDefault, ac.plate)}
+        <button type="button" class="equipment-delete" data-ref-delete="${ac.id}" aria-label="Remove ${escapeHtml(ac.plate)}">&times;</button>
+      </li>`,
+    readForm: () => ({ plate: (document.getElementById('aircraftPlate') as HTMLInputElement | null)?.value ?? '' }),
+    getItems: (settings) => settings.aircraft,
+    getDefaultId: (settings) => settings.defaultAircraftId,
+    onStarClick: (star) => toggleDefault(star),
+  });
+
+  const jumpTypesList = wireReferenceList<JumpTypeData>({
+    category: 'jumpType',
+    apiPath: '/api/jump-types',
+    listElId: 'jumpTypesList',
+    formElId: 'jumpTypesForm',
+    statusElId: 'jumpTypesStatus',
+    selectEl: logbookJumpType,
+    emptyListHtml: '<li class="equipment-empty">No jump types saved yet.</li>',
+    optionsHtml: (jumpTypes, defaultId) => {
+      const saved = jumpTypes
+        .map((jt) => `<option value="${jt.id}"${jt.id === defaultId ? ' selected' : ''}>${escapeHtml(jt.name)}</option>`)
+        .join('');
+      return `<option value=""${!defaultId ? ' selected' : ''}>No jump type selected</option>${saved}`;
+    },
+    rowHtml: (jt, isDefault) => `
+      <li class="equipment-row" data-id="${jt.id}">
+        <div class="equipment-row-text">
+          <span class="equipment-row-name">${escapeHtml(jt.name)}</span>
+        </div>
+        ${defaultStarHtml('jumpType', 'jump type', jt.id, isDefault, jt.name)}
+        <button type="button" class="equipment-delete" data-ref-delete="${jt.id}" aria-label="Remove ${escapeHtml(jt.name)}">&times;</button>
+      </li>`,
+    readForm: () => ({ name: (document.getElementById('jumpTypeName') as HTMLInputElement | null)?.value ?? '' }),
+    getItems: (settings) => settings.jumpTypes,
+    getDefaultId: (settings) => settings.defaultJumpTypeId,
+    onStarClick: (star) => toggleDefault(star),
+  });
+
+  // Toggles one item as the default for its category (only one default
+  // per category — starring another replaces it, starring the current one
+  // clears it) and refreshes all four panels + dropdowns from the single
+  // settings object the endpoint returns.
+  async function toggleDefault(star: HTMLButtonElement) {
+    const category = star.dataset.defaultCategory;
+    const id = star.dataset.defaultId;
+    if (!category || !id) return;
+    const isActive = star.getAttribute('aria-pressed') === 'true';
+    star.disabled = true;
+    try {
+      const res = await fetch('/api/logbook-defaults', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ category, id: isActive ? null : id }),
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      placesList.apply(data.settings.places, data.settings.defaultPlaceId);
+      equipmentList.apply(data.settings.equipment, data.settings.defaultEquipmentId);
+      aircraftList.apply(data.settings.aircraft, data.settings.defaultAircraftId);
+      jumpTypesList.apply(data.settings.jumpTypes, data.settings.defaultJumpTypeId);
+    } catch (err) {
+      console.error('Failed to set default', err);
+    } finally {
+      star.disabled = false;
+    }
+  }
+
+  // ---- Settings: starting jump number ----
+
+  const logbookSettingsForm = document.getElementById('logbookSettingsForm') as HTMLFormElement | null;
+  const logbookSettingsStatus = document.getElementById('logbookSettingsStatus');
+  const logbookBaseJumps = document.getElementById('logbookBaseJumps') as HTMLInputElement | null;
+
+  logbookSettingsForm?.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const submitButton = logbookSettingsForm.querySelector<HTMLButtonElement>('button[type="submit"]');
+    if (submitButton) submitButton.disabled = true;
+    if (logbookSettingsStatus) {
+      logbookSettingsStatus.textContent = 'Saving…';
+      logbookSettingsStatus.removeAttribute('data-state');
+    }
+
+    try {
+      const res = await fetch('/api/logbook-settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ baseJumps: Number(logbookBaseJumps?.value ?? 0) }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        throw new Error(data?.error ?? 'Failed to save');
+      }
+      // Every jump number downstream shifts with the base, so refetch the
+      // full list rather than patching numbers in place.
+      const listRes = await fetch('/api/logbook');
+      if (listRes.ok) {
+        const listData = await listRes.json();
+        applyLogbookState(listData.entries, listData.nextNumber);
+      }
+      if (logbookSettingsStatus) {
+        logbookSettingsStatus.textContent = 'Saved';
+        logbookSettingsStatus.dataset.state = 'ok';
+      }
+    } catch (err) {
+      console.error('Failed to save logbook settings', err);
+      if (logbookSettingsStatus) {
+        logbookSettingsStatus.textContent = err instanceof Error ? err.message : 'Failed to save';
+        logbookSettingsStatus.dataset.state = 'error';
+      }
+    } finally {
+      if (submitButton) submitButton.disabled = false;
+    }
+  });
+
+  // ---- Toggle panels ----
+
+  wireToggle('placesToggle', 'placesPanel');
+  wireToggle('equipmentToggle', 'equipmentPanel');
+  wireToggle('aircraftToggle', 'aircraftPanel');
+  wireToggle('jumpTypesToggle', 'jumpTypesPanel');
+  wireToggle('logbookSettingsToggle', 'logbookSettingsPanel');
+</script>

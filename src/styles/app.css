@@ -1,0 +1,1110 @@
+/*
+ * Global stylesheet for the whole app. Loaded once (see src/pages/index.astro)
+ * rather than scoped per-component, because the visual language — cards,
+ * the history/toggle-panel pattern, tabs, form fields — is shared across
+ * the Packing, Tandems and Logbook tabs and several bits of markup are
+ * (re)rendered client-side via innerHTML, which only plain global classes
+ * can reach.
+ *
+ * Tailwind is layered on top rather than replacing this file wholesale:
+ * new/rewritten markup can reach for utility classes (mapped to the same
+ * design tokens below via @theme), while every class still named directly
+ * in this file keeps working exactly as before for the components that
+ * haven't been migrated yet. See PackingTab.astro for the first component
+ * fully on utilities, and the note above .stepper below for how the two
+ * approaches split for client-rendered (innerHTML) markup specifically.
+ */
+@import 'tailwindcss';
+
+/*
+ * Palette lifted from a Dolomites lake photo: pale sky/water for the
+ * canvas, with the mountain, tree-line and deep-water tones from the
+ * shot doing the accenting — same relationship as the photo itself
+ * (light backdrop, dark forms in front of it).
+ */
+:root {
+  --canvas: #e9f3f6;
+  --panel: #f6fafb;
+  --ink: #14202b;
+  --ink-soft: #4c6575;
+  --line: #d3e1e8;
+  --line-strong: #a9c2ce;
+  --gold: #2185b6;
+
+  --tandem: #122c41;
+  --tandem-soft: #dbe3e9;
+  --instructor: #08445b;
+  --instructor-soft: #d3e3e8;
+  --student: #035042;
+  --student-soft: #d6e8e3;
+  --sport: #2e647a;
+  --sport-soft: #dee7eb;
+  --videographer: #6b4f8a;
+  --videographer-soft: #e3ddec;
+
+  /* Kept off the main palette on purpose — red still reads as "delete"
+     regardless of the rest of the theme. */
+  --danger: #b3423a;
+  --danger-soft: #f1dedc;
+
+  --radius: 14px;
+  --shadow: 0 1px 0 rgba(20, 32, 43, 0.05), 0 6px 16px -8px rgba(20, 32, 43, 0.22);
+
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --canvas: #0b1620;
+    --panel: #13232f;
+    --ink: #dceaf0;
+    --ink-soft: #8ca7b5;
+    --line: #223444;
+    --line-strong: #34495b;
+    --gold: #4fb6e0;
+
+    --tandem: #3c6e96;
+    --tandem-soft: #1b2c3a;
+    --instructor: #2e8caf;
+    --instructor-soft: #16303b;
+    --student: #1e9678;
+    --student-soft: #123328;
+    --sport: #6398b2;
+    --sport-soft: #22333d;
+    --videographer: #a186c9;
+    --videographer-soft: #2a2337;
+
+    --danger: #d6685f;
+    --danger-soft: #3a211f;
+
+    color-scheme: dark;
+  }
+}
+
+/*
+ * Maps the palette above into Tailwind's theme, so utilities like
+ * `bg-canvas` / `text-ink-soft` / `rounded-card` are available everywhere.
+ * `inline` keeps each token pointing at the live --canvas/--ink/etc.
+ * variable rather than baking in a value at build time — required for the
+ * light/dark swap above to keep working through a Tailwind utility.
+ */
+@theme inline {
+  --color-canvas: var(--canvas);
+  --color-panel: var(--panel);
+  --color-ink: var(--ink);
+  --color-ink-soft: var(--ink-soft);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-gold: var(--gold);
+
+  --color-tandem: var(--tandem);
+  --color-tandem-soft: var(--tandem-soft);
+  --color-instructor: var(--instructor);
+  --color-instructor-soft: var(--instructor-soft);
+  --color-student: var(--student);
+  --color-student-soft: var(--student-soft);
+  --color-sport: var(--sport);
+  --color-sport-soft: var(--sport-soft);
+  --color-videographer: var(--videographer);
+  --color-videographer-soft: var(--videographer-soft);
+
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+
+  --radius-card: var(--radius);
+  --shadow-card: var(--shadow);
+
+  --font-display: 'Space Grotesk', sans-serif;
+  --font-sans: 'Inter', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--canvas);
+  color: var(--ink);
+  font-family: 'Inter', system-ui, sans-serif;
+  min-height: 100dvh;
+  -webkit-font-smoothing: antialiased;
+}
+
+.page {
+  max-width: 560px;
+  margin: 0 auto;
+  padding: 20px 16px calc(40px + env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+/* ---- Masthead ---- */
+
+.masthead {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.stamp {
+  align-self: flex-start;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 16px;
+  border: 2px dashed var(--line-strong);
+  border-radius: 10px;
+  transform: rotate(-1.5deg);
+  color: var(--ink);
+}
+
+.stamp-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--gold);
+}
+
+.stamp-date {
+  font-family: 'Space Grotesk', sans-serif;
+  font-weight: 700;
+  font-size: 19px;
+  letter-spacing: -0.01em;
+}
+
+.totals {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 18px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+.totals-block {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.totals-value {
+  font-family: 'Space Grotesk', sans-serif;
+  font-weight: 700;
+  font-size: 34px;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  color: var(--gold);
+  font-variant-numeric: tabular-nums;
+}
+
+.totals-value--packs {
+  color: var(--ink);
+}
+
+.totals-label {
+  font-size: 12px;
+  color: var(--ink-soft);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.totals-divider {
+  width: 1px;
+  align-self: stretch;
+  background: var(--line);
+}
+
+.totals-block--packs {
+  flex: 1;
+}
+
+/* ---- Category cards ---- */
+
+.categories {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 14px 16px 16px;
+  box-shadow: var(--shadow);
+  border-left: 5px solid var(--accent, var(--line-strong));
+}
+
+.card[data-category='tandem'] {
+  --accent: var(--tandem);
+}
+.card[data-category='instructor'],
+.card[data-tandem-category='instructor'] {
+  --accent: var(--instructor);
+}
+.card[data-category='student'] {
+  --accent: var(--student);
+}
+.card[data-category='sport'] {
+  --accent: var(--sport);
+}
+.card[data-tandem-category='videographer'] {
+  --accent: var(--videographer);
+}
+
+.card-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.card-label {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.card-rate {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+
+/*
+ * .card-controls / .stepper* / .card-count are gone from here too — they
+ * were Packing-only (Tandems' cards use .tandem-add + a jump list instead
+ * of a stepper), so they moved into PackingTab.astro as Tailwind utilities.
+ */
+
+.card-subtotal {
+  margin-top: 8px;
+  text-align: right;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+
+/* ---- History ---- */
+
+.history {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.history-toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: transparent;
+  border: none;
+  padding: 14px 16px;
+  font-family: 'Inter', sans-serif;
+  font-weight: 600;
+  font-size: 15px;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.history-toggle-icon {
+  transition: transform 0.15s ease;
+  font-size: 20px;
+  color: var(--ink-soft);
+}
+
+.history-toggle[aria-expanded='true'] .history-toggle-icon {
+  transform: rotate(90deg);
+}
+
+.history-panel {
+  border-top: 1px solid var(--line);
+  padding: 4px 0 8px;
+}
+
+.history-tabs {
+  display: flex;
+  gap: 6px;
+  padding: 10px 16px 6px;
+}
+
+.history-tab {
+  appearance: none;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--ink-soft);
+  font-family: 'Inter', sans-serif;
+  font-weight: 600;
+  font-size: 12.5px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.history-tab[aria-selected='true'] {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--canvas);
+}
+
+/*
+ * This stylesheet is loaded globally (see src/styles/app.css), so plain
+ * class selectors here reach the Week/Month tables too, even though
+ * they're rendered by the separate AggregateTable.astro /
+ * TandemAggregateTable.astro components.
+ */
+.history-empty {
+  margin: 0;
+  padding: 14px 16px;
+  color: var(--ink-soft);
+  font-size: 14px;
+}
+
+.history-scroll {
+  overflow-x: auto;
+  padding: 0 8px;
+}
+
+.history-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12.5px;
+  white-space: nowrap;
+}
+
+.history-table th,
+.history-table td {
+  padding: 8px 8px;
+  text-align: right;
+}
+
+.history-table th:first-child,
+.history-table td:first-child {
+  text-align: left;
+}
+
+.history-table thead th {
+  color: var(--ink-soft);
+  font-weight: 600;
+  border-bottom: 1px solid var(--line);
+}
+
+.history-table tbody tr:not(:last-child td) {
+  border-bottom: 1px solid var(--line);
+}
+
+.th-tandem,
+.td-tandem {
+  color: var(--tandem);
+}
+.th-instructor,
+.td-instructor {
+  color: var(--instructor);
+}
+.th-student,
+.td-student {
+  color: var(--student);
+}
+.th-sport,
+.td-sport {
+  color: var(--sport);
+}
+.th-videographer,
+.td-videographer {
+  color: var(--videographer);
+}
+
+/* ---- Tandem jump list ---- */
+
+.tandem-add {
+  appearance: none;
+  border: none;
+  border-radius: 12px;
+  width: 100%;
+  height: 46px;
+  margin-top: 10px;
+  font-family: 'Space Grotesk', sans-serif;
+  font-weight: 700;
+  font-size: 14.5px;
+  color: #fff;
+  background: var(--accent);
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: transform 0.08s ease, filter 0.08s ease;
+}
+
+.tandem-add:active {
+  transform: scale(0.97);
+  filter: brightness(0.95);
+}
+
+.tandem-add:focus-visible {
+  outline: 3px solid var(--gold);
+  outline-offset: 2px;
+}
+
+.tandem-jump-list {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 0;
+}
+
+/*
+ * The list below (and the fastest-times/logbook lists further down) is
+ * re-rendered client-side via innerHTML after each add/delete/edit —
+ * these rules just need to be plain classes, not component-scoped ones,
+ * for that injected markup to pick them up, which is what this being a
+ * global stylesheet already gives us.
+ */
+.tandem-jump-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 9px 2px;
+  border-top: 1px solid var(--line);
+  font-size: 13.5px;
+}
+
+.tandem-jump-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tandem-jump-delete {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: var(--ink-soft);
+  font-family: 'Inter', sans-serif;
+  font-size: 18px;
+  line-height: 1;
+  width: 26px;
+  height: 26px;
+  flex: none;
+  border-radius: 8px;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.tandem-jump-delete:hover,
+.tandem-jump-delete:focus-visible {
+  background: var(--danger-soft);
+  color: var(--danger);
+  outline: none;
+}
+
+.tandem-jump-empty {
+  margin: 0;
+  padding: 9px 2px;
+  border-top: 1px solid var(--line);
+  color: var(--ink-soft);
+  font-size: 13px;
+}
+
+/* ---- Customer-name modal ---- */
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(11, 22, 32, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  z-index: 20;
+}
+
+.modal-overlay[hidden] {
+  display: none;
+}
+
+.modal {
+  width: 100%;
+  max-width: 400px;
+  background: var(--panel);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 20px;
+}
+
+.modal-title {
+  margin: 0 0 2px;
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.modal-subtitle {
+  margin: 0 0 14px;
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+
+.modal-input {
+  width: 100%;
+  height: 48px;
+  padding: 0 14px;
+  border-radius: 10px;
+  border: 1px solid var(--line-strong);
+  background: var(--canvas);
+  color: var(--ink);
+  font-family: 'Inter', sans-serif;
+  font-size: 16px;
+}
+
+.modal-input:focus-visible {
+  outline: 3px solid var(--gold);
+  outline-offset: 1px;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.modal-cancel,
+.modal-confirm {
+  flex: 1;
+  appearance: none;
+  border: none;
+  border-radius: 10px;
+  height: 46px;
+  font-family: 'Space Grotesk', sans-serif;
+  font-weight: 700;
+  font-size: 15px;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.modal-cancel {
+  background: transparent;
+  border: 1px solid var(--line-strong);
+  color: var(--ink-soft);
+}
+
+.modal-confirm {
+  background: var(--gold);
+  color: #fff;
+}
+
+.modal-confirm:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+/* ---- Invoice settings ---- */
+
+.invoice-settings-panel {
+  padding: 14px 16px 16px;
+}
+
+.invoice-settings-hint {
+  margin: 0 0 14px;
+  font-size: 12.5px;
+  color: var(--ink-soft);
+}
+
+.invoice-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 12px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink-soft);
+}
+
+.invoice-field--narrow {
+  max-width: 160px;
+}
+
+.invoice-field input,
+.invoice-field textarea,
+.invoice-field select {
+  width: 100%;
+  padding: 9px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--line-strong);
+  background: var(--canvas);
+  color: var(--ink);
+  font-family: 'Inter', sans-serif;
+  font-size: 14px;
+  font-weight: 400;
+  resize: vertical;
+}
+
+.invoice-field select {
+  height: 40px;
+}
+
+.invoice-field input:focus-visible,
+.invoice-field textarea:focus-visible,
+.invoice-field select:focus-visible {
+  outline: 3px solid var(--gold);
+  outline-offset: 1px;
+}
+
+.invoice-settings-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 4px;
+}
+
+.invoice-settings-save {
+  appearance: none;
+  border: none;
+  border-radius: 10px;
+  height: 42px;
+  padding: 0 20px;
+  font-family: 'Space Grotesk', sans-serif;
+  font-weight: 700;
+  font-size: 14px;
+  color: #fff;
+  background: var(--gold);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.invoice-settings-save:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.invoice-settings-status {
+  font-size: 12.5px;
+  color: var(--ink-soft);
+}
+
+.invoice-settings-status[data-state='ok'] {
+  color: var(--student);
+}
+
+.invoice-settings-status[data-state='error'] {
+  color: var(--danger);
+}
+
+/* ---- Footer ---- */
+
+.foot {
+  text-align: center;
+}
+
+.foot-download {
+  appearance: none;
+  display: inline-block;
+  border: none;
+  background: transparent;
+  padding: 0;
+  font-family: 'Inter', sans-serif;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--gold);
+  text-decoration: none;
+  border-bottom: 1px solid currentColor;
+  cursor: pointer;
+}
+
+.foot-download:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.foot-logout {
+  margin-top: 10px;
+}
+
+.foot-logout button {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: var(--ink-soft);
+  font-family: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+  padding: 0;
+}
+
+.foot-logout button:hover {
+  color: var(--danger);
+}
+
+@media (min-width: 480px) {
+  .categories {
+    gap: 14px;
+  }
+}
+
+/* ---- App-level tabs ---- */
+
+/*
+ * `.sub-tab`/`.sub-view` (the Pack/Timer switcher, Packing-only) are gone
+ * from here — PackingTab.astro is on Tailwind utilities now. `.app-tab`/
+ * `.app-view` stay, since AppTabs/TandemsTab/LogbookTab still use them.
+ */
+.app-tabs {
+  display: flex;
+  gap: 8px;
+}
+
+.app-tab {
+  flex: 1;
+  appearance: none;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--ink-soft);
+  font-family: 'Inter', sans-serif;
+  font-weight: 700;
+  font-size: 14px;
+  padding: 10px;
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.app-tab[aria-selected='true'] {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--canvas);
+}
+
+.app-view {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+.app-view[hidden] {
+  display: none;
+}
+
+/* ---- Logbook: add-jump form ---- */
+
+.logbook-form-card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 14px 16px 16px;
+}
+
+.logbook-form-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.logbook-form-title {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.logbook-form-number {
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--gold);
+}
+
+.logbook-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 10px;
+}
+
+.logbook-cancel-edit {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: var(--ink-soft);
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline;
+}
+
+@media (max-width: 420px) {
+  .logbook-form-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ---- Logbook: entry list ---- */
+
+.logbook-list-card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+.logbook-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.logbook-empty {
+  margin: 0;
+  padding: 16px;
+  color: var(--ink-soft);
+  font-size: 14px;
+}
+
+.logbook-entry {
+  border-top: 1px solid var(--line);
+}
+
+.logbook-entry:first-child {
+  border-top: none;
+}
+
+.logbook-row {
+  appearance: none;
+  border: none;
+  background: transparent;
+  width: 100%;
+  display: grid;
+  grid-template-columns: 44px 84px 1fr 16px;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  font-family: 'Inter', sans-serif;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.logbook-row-number {
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--gold);
+}
+
+.logbook-row-date {
+  font-size: 12.5px;
+  color: var(--ink-soft);
+  white-space: nowrap;
+}
+
+.logbook-row-place {
+  font-size: 14px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.logbook-row-chevron {
+  font-size: 18px;
+  color: var(--ink-soft);
+  transition: transform 0.15s ease;
+  justify-self: end;
+}
+
+.logbook-row[aria-expanded='true'] .logbook-row-chevron {
+  transform: rotate(90deg);
+}
+
+.logbook-details {
+  padding: 0 14px 14px;
+}
+
+.logbook-details-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 14px;
+  margin: 0;
+}
+
+.logbook-details-grid dt {
+  margin: 0;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-soft);
+}
+
+.logbook-details-grid dd {
+  margin: 2px 0 0;
+  font-size: 13.5px;
+}
+
+.logbook-details-description {
+  margin: 12px 0 0;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+  font-size: 13.5px;
+  white-space: pre-wrap;
+}
+
+.logbook-details-actions {
+  display: flex;
+  gap: 14px;
+  margin-top: 12px;
+}
+
+.logbook-edit,
+.logbook-delete {
+  appearance: none;
+  border: none;
+  background: transparent;
+  font-family: 'Inter', sans-serif;
+  font-weight: 600;
+  font-size: 12.5px;
+  padding: 4px 0;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.logbook-edit {
+  color: var(--gold);
+}
+
+.logbook-delete {
+  color: var(--ink-soft);
+}
+
+.logbook-delete:hover,
+.logbook-delete:focus-visible {
+  color: var(--danger);
+  outline: none;
+}
+
+/* ---- Logbook: equipment list ---- */
+
+.equipment-list {
+  list-style: none;
+  margin: 0 0 12px;
+  padding: 0;
+}
+
+.equipment-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 2px;
+  border-top: 1px solid var(--line);
+}
+
+.equipment-row:first-child {
+  border-top: none;
+}
+
+.equipment-row-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  overflow: hidden;
+  flex: 1;
+  min-width: 0;
+}
+
+.equipment-row-name {
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.equipment-row-detail {
+  font-size: 12px;
+  color: var(--ink-soft);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.equipment-delete {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: var(--ink-soft);
+  font-family: 'Inter', sans-serif;
+  font-size: 18px;
+  line-height: 1;
+  width: 26px;
+  height: 26px;
+  flex: none;
+  border-radius: 8px;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.equipment-delete:hover,
+.equipment-delete:focus-visible {
+  background: var(--danger-soft);
+  color: var(--danger);
+  outline: none;
+}
+
+.default-star {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: var(--line-strong);
+  font-size: 16px;
+  line-height: 1;
+  width: 26px;
+  height: 26px;
+  flex: none;
+  border-radius: 8px;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.default-star:hover,
+.default-star:focus-visible {
+  background: var(--panel);
+  color: var(--gold);
+  outline: none;
+}
+
+.default-star[aria-pressed='true'] {
+  color: var(--gold);
+}
+
+.default-star:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.equipment-empty {
+  margin: 0 0 12px;
+  padding: 9px 2px;
+  color: var(--ink-soft);
+  font-size: 13px;
+}
+
+.equipment-form {
+  padding-top: 4px;
+  border-top: 1px solid var(--line);
+}
+
+.equipment-form .invoice-field {
+  margin-top: 10px;
+  margin-bottom: 0;
+}

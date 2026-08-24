@@ -1,0 +1,430 @@
+---
+// The "Tandems" app tab: today's tandem jump log (credited per-customer,
+// unlike the plain pack-job counters), its history, the invoice letterhead
+// settings used when exporting a month's invoice PDF, and the "who's the
+// customer?" modal shown when adding a jump.
+import { CATEGORIES, CATEGORY_LABELS, RATES, totalEarnings, totalJumps, type DayState, type HistoryRow } from '../../lib/tandem';
+import type { AggregateRow } from '../../lib/tandem-invoice';
+import type { InvoiceSettings } from '../../lib/invoice-settings';
+import TandemAggregateTable from '../TandemAggregateTable.astro';
+import TandemNameModal from '../TandemNameModal.astro';
+
+interface Props {
+  tandemState: DayState;
+  dateDisplay: string;
+  dayRows: HistoryRow[];
+  weekRows: AggregateRow[];
+  monthRows: AggregateRow[];
+  invoiceSettings: InvoiceSettings;
+}
+
+const { tandemState, dateDisplay, dayRows, weekRows, monthRows, invoiceSettings } = Astro.props;
+
+const money = (n: number) => `£${n.toFixed(2)}`;
+---
+
+<div class="app-view" data-app-view="tandems" id="tandemsView" hidden>
+  <header class="masthead">
+    <div class="stamp" aria-hidden="false">
+      <span class="stamp-label">Tandem Log</span>
+      <span class="stamp-date">{dateDisplay}</span>
+    </div>
+    <div class="totals">
+      <div class="totals-block">
+        <span class="totals-value" id="tandemTotalEarnings">{money(totalEarnings(tandemState.counts))}</span>
+        <span class="totals-label">earned today</span>
+      </div>
+      <div class="totals-divider" aria-hidden="true"></div>
+      <div class="totals-block totals-block--packs">
+        <span class="totals-value totals-value--packs" id="tandemTotalJumps">{totalJumps(tandemState.counts)}</span>
+        <span class="totals-label">jumps today</span>
+      </div>
+    </div>
+  </header>
+
+  <section class="categories">
+    {
+      CATEGORIES.map((category) => (
+        <section class="card" data-tandem-category={category}>
+          <div class="card-top">
+            <h2 class="card-label">{CATEGORY_LABELS[category]}</h2>
+            <span class="card-rate">£{RATES[category].toFixed(2)} / jump</span>
+          </div>
+          <button type="button" class="tandem-add" data-tandem-add={category}>
+            &plus; Add {CATEGORY_LABELS[category].toLowerCase()} jump
+          </button>
+          <ul class="tandem-jump-list" data-tandem-list={category}>
+            {tandemState.entries[category].length === 0 ? (
+              <li class="tandem-jump-empty">No jumps logged yet today.</li>
+            ) : (
+              tandemState.entries[category].map((jump) => (
+                <li class="tandem-jump-row" data-at={jump.at}>
+                  <span class="tandem-jump-name">{jump.name}</span>
+                  <button
+                    type="button"
+                    class="tandem-jump-delete"
+                    data-at={jump.at}
+                    aria-label={`Remove ${jump.name}`}
+                  >
+                    &times;
+                  </button>
+                </li>
+              ))
+            )}
+          </ul>
+          <div class="card-subtotal" data-tandem-subtotal={category}>
+            £{(tandemState.counts[category] * RATES[category]).toFixed(2)}
+          </div>
+        </section>
+      ))
+    }
+  </section>
+
+  <section class="history">
+    <button class="history-toggle" id="tandemHistoryToggle" type="button" aria-expanded="false" aria-controls="tandemHistoryPanel">
+      <span>History</span>
+      <span class="history-toggle-icon" id="tandemHistoryToggleIcon">&rsaquo;</span>
+    </button>
+    <div class="history-panel" id="tandemHistoryPanel" hidden>
+      <div class="history-tabs" role="tablist" aria-label="Group tandem history by">
+        <button type="button" class="history-tab" data-tab="day" role="tab" aria-selected="true">Day</button>
+        <button type="button" class="history-tab" data-tab="week" role="tab" aria-selected="false">Week</button>
+        <button type="button" class="history-tab" data-tab="month" role="tab" aria-selected="false">Month</button>
+      </div>
+
+      <div class="history-view" data-view="day">
+        {
+          dayRows.length === 0 ? (
+            <p class="history-empty">Nothing logged yet before today.</p>
+          ) : (
+            <div class="history-scroll">
+              <table class="history-table">
+                <thead>
+                  <tr>
+                    <th scope="col">Date</th>
+                    {CATEGORIES.map((c) => (
+                      <th scope="col" class={`th-${c}`}>
+                        {CATEGORY_LABELS[c].slice(0, 3)}
+                      </th>
+                    ))}
+                    <th scope="col">Jumps</th>
+                    <th scope="col">Earned</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {dayRows.map((row) => (
+                    <tr>
+                      <td class="history-date">{row.date}</td>
+                      {CATEGORIES.map((c) => (
+                        <td class={`td-${c}`}>{row.counts[c]}</td>
+                      ))}
+                      <td>{row.totalJumps}</td>
+                      <td>{money(row.totalEarnings)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )
+        }
+      </div>
+
+      <div class="history-view" data-view="week" hidden>
+        <TandemAggregateTable rows={weekRows} currentLabel="This week" prefix="tweek" />
+      </div>
+
+      <div class="history-view" data-view="month" hidden>
+        <TandemAggregateTable rows={monthRows} currentLabel="This invoice month" prefix="tmonth" />
+      </div>
+    </div>
+  </section>
+
+  <section class="history">
+    <button
+      class="history-toggle"
+      id="invoiceSettingsToggle"
+      type="button"
+      aria-expanded="false"
+      aria-controls="invoiceSettingsPanel"
+    >
+      <span>Invoice details</span>
+      <span class="history-toggle-icon" id="invoiceSettingsToggleIcon">&rsaquo;</span>
+    </button>
+    <div class="history-panel invoice-settings-panel" id="invoiceSettingsPanel" hidden>
+      <p class="invoice-settings-hint">
+        Used on the "Export PDF" invoices below — your details, who it's billed to, and the next invoice number.
+      </p>
+      <form id="invoiceSettingsForm">
+        <label class="invoice-field">
+          <span>Your name</span>
+          <input type="text" id="invoiceFromName" value={invoiceSettings.fromName} required />
+        </label>
+        <label class="invoice-field">
+          <span>Your address (one line each)</span>
+          <textarea id="invoiceFromAddress" rows="4">{invoiceSettings.fromAddress.join('\n')}</textarea>
+        </label>
+        <label class="invoice-field">
+          <span>VAT note</span>
+          <input type="text" id="invoiceVatNote" value={invoiceSettings.vatNote} />
+        </label>
+        <label class="invoice-field">
+          <span>Bill to (one line each)</span>
+          <textarea id="invoiceBillTo" rows="4">{invoiceSettings.billTo.join('\n')}</textarea>
+        </label>
+        <label class="invoice-field invoice-field--narrow">
+          <span>Next invoice ref</span>
+          <input type="number" id="invoiceNextRef" min="1" step="1" value={invoiceSettings.nextInvoiceRef} required />
+        </label>
+        <div class="invoice-settings-actions">
+          <button type="submit" class="invoice-settings-save">Save details</button>
+          <span class="invoice-settings-status" id="invoiceSettingsStatus" role="status"></span>
+        </div>
+      </form>
+    </div>
+  </section>
+
+  <footer class="foot">
+    <button
+      type="button"
+      class="foot-download"
+      data-download="/api/tandem-export.csv"
+      data-download-name="tandem-log.csv"
+    >
+      Download full tandem log (.csv)
+    </button>
+  </footer>
+
+  <TandemNameModal />
+</div>
+
+<script>
+  import { wireTabGroup, wireToggle, wireDownloadButtons, escapeHtml, money, downloadFile } from '../../lib/client/dom';
+
+  const TANDEM_RATES: Record<string, number> = {
+    instructor: 42,
+    videographer: 42,
+  };
+
+  const TANDEM_CATEGORY_LABELS: Record<string, string> = {
+    instructor: 'Instructor',
+    videographer: 'Videographer',
+  };
+
+  const tandemsView = document.getElementById('tandemsView');
+  if (!tandemsView) throw new Error('#tandemsView not found');
+
+  const tandemHistoryPanel = document.getElementById('tandemHistoryPanel');
+  if (tandemHistoryPanel) wireTabGroup(tandemHistoryPanel, '.history-tab', '.history-view', 'tab', 'view');
+  wireToggle('tandemHistoryToggle', 'tandemHistoryPanel');
+  wireToggle('invoiceSettingsToggle', 'invoiceSettingsPanel');
+
+  wireDownloadButtons(tandemsView);
+
+  tandemsView.querySelectorAll<HTMLButtonElement>('[data-invoice-month]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const month = button.dataset.invoiceMonth!;
+      void downloadFile(`/api/tandem-invoice.pdf?month=${encodeURIComponent(month)}`, 'invoice.pdf', button);
+    });
+  });
+
+  // ---- Tandem jump log ----
+  //
+  // Every tandem jump is credited to a customer, so adding one prompts for
+  // a name via a small modal rather than just bumping a count.
+
+  interface Jump {
+    name: string;
+    at: string;
+  }
+
+  interface TandemState {
+    counts: Record<string, number>;
+    entries: Record<string, Jump[]>;
+  }
+
+  interface Aggregate {
+    counts: Record<string, number>;
+    totalJumps?: number;
+    totalEarnings: number;
+  }
+
+  function renderTandemList(category: string, entries: Jump[]) {
+    const list = document.querySelector(`[data-tandem-list="${category}"]`);
+    if (!list) return;
+    if (entries.length === 0) {
+      list.innerHTML = '<li class="tandem-jump-empty">No jumps logged yet today.</li>';
+      return;
+    }
+    list.innerHTML = entries
+      .map(
+        (j) => `
+          <li class="tandem-jump-row" data-at="${j.at}">
+            <span class="tandem-jump-name">${escapeHtml(j.name)}</span>
+            <button type="button" class="tandem-jump-delete" data-at="${j.at}" aria-label="Remove ${escapeHtml(j.name)}">&times;</button>
+          </li>`,
+      )
+      .join('');
+  }
+
+  function applyTandemState(state: TandemState, jumps: number, earnings: number) {
+    for (const category of Object.keys(state.counts)) {
+      renderTandemList(category, state.entries[category] ?? []);
+      const subtotalEl = document.querySelector(`[data-tandem-subtotal="${category}"]`);
+      if (subtotalEl) subtotalEl.textContent = money(state.counts[category] * TANDEM_RATES[category]);
+    }
+    const totalJumpsEl = document.getElementById('tandemTotalJumps');
+    const totalEarningsEl = document.getElementById('tandemTotalEarnings');
+    if (totalJumpsEl) totalJumpsEl.textContent = String(jumps);
+    if (totalEarningsEl) totalEarningsEl.textContent = money(earnings);
+  }
+
+  function applyTandemAggregate(prefix: 'tweek' | 'tmonth', agg: Aggregate) {
+    for (const category of Object.keys(agg.counts)) {
+      const cell = document.querySelector(`[data-agg-count="${prefix}:${category}"]`);
+      if (cell) cell.textContent = String(agg.counts[category]);
+    }
+    const jumpsCell = document.querySelector(`[data-agg-total="${prefix}:jumps"]`);
+    const earningsCell = document.querySelector(`[data-agg-total="${prefix}:earnings"]`);
+    if (jumpsCell) jumpsCell.textContent = String(agg.totalJumps);
+    if (earningsCell) earningsCell.textContent = money(agg.totalEarnings);
+  }
+
+  async function addTandemJump(category: string, name: string) {
+    const res = await fetch('/api/tandem-adjust', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ category, name }),
+    });
+    if (!res.ok) {
+      console.error('Failed to save tandem jump', await res.text());
+      return;
+    }
+    const data = await res.json();
+    applyTandemState(data.state, data.totalJumps, data.totalEarnings);
+    if (data.currentWeek) applyTandemAggregate('tweek', data.currentWeek);
+    if (data.currentMonth) applyTandemAggregate('tmonth', data.currentMonth);
+  }
+
+  async function deleteTandemJump(at: string) {
+    try {
+      const res = await fetch('/api/tandem-adjust', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ at }),
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      applyTandemState(data.state, data.totalJumps, data.totalEarnings);
+      if (data.currentWeek) applyTandemAggregate('tweek', data.currentWeek);
+      if (data.currentMonth) applyTandemAggregate('tmonth', data.currentMonth);
+    } catch (err) {
+      console.error('Failed to delete tandem jump', err);
+    }
+  }
+
+  tandemsView.querySelectorAll<HTMLElement>('[data-tandem-list]').forEach((list) => {
+    list.addEventListener('click', (event) => {
+      const button = (event.target as HTMLElement).closest<HTMLButtonElement>('.tandem-jump-delete');
+      if (!button?.dataset.at) return;
+      void deleteTandemJump(button.dataset.at);
+    });
+  });
+
+  // ---- Customer-name modal ----
+
+  let pendingCategory: string | null = null;
+
+  const nameModal = document.getElementById('tandemNameModal');
+  const nameModalSubtitle = document.getElementById('tandemNameModalSubtitle');
+  const nameForm = document.getElementById('tandemNameForm') as HTMLFormElement | null;
+  const nameInput = document.getElementById('tandemNameInput') as HTMLInputElement | null;
+  const nameCancel = document.getElementById('tandemNameCancel');
+
+  function openNameModal(category: string) {
+    pendingCategory = category;
+    if (nameModalSubtitle) {
+      nameModalSubtitle.textContent = `${TANDEM_CATEGORY_LABELS[category] ?? category} jump — ${money(TANDEM_RATES[category])}`;
+    }
+    if (nameInput) nameInput.value = '';
+    if (nameModal) nameModal.hidden = false;
+    nameInput?.focus();
+  }
+
+  function closeNameModal() {
+    pendingCategory = null;
+    if (nameModal) nameModal.hidden = true;
+  }
+
+  tandemsView.querySelectorAll<HTMLButtonElement>('[data-tandem-add]').forEach((button) => {
+    button.addEventListener('click', () => openNameModal(button.dataset.tandemAdd!));
+  });
+
+  nameCancel?.addEventListener('click', closeNameModal);
+  nameModal?.addEventListener('click', (event) => {
+    if (event.target === nameModal) closeNameModal();
+  });
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && nameModal && !nameModal.hidden) closeNameModal();
+  });
+
+  nameForm?.addEventListener('submit', (event) => {
+    event.preventDefault();
+    const name = nameInput?.value.trim();
+    const category = pendingCategory;
+    if (!name || !category) return;
+    const submitButton = nameForm.querySelector<HTMLButtonElement>('button[type="submit"]');
+    if (submitButton) submitButton.disabled = true;
+    addTandemJump(category, name)
+      .then(() => closeNameModal())
+      .finally(() => {
+        if (submitButton) submitButton.disabled = false;
+      });
+  });
+
+  // ---- Invoice settings ----
+
+  const invoiceSettingsForm = document.getElementById('invoiceSettingsForm') as HTMLFormElement | null;
+  const invoiceSettingsStatus = document.getElementById('invoiceSettingsStatus');
+
+  invoiceSettingsForm?.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const fromName = (document.getElementById('invoiceFromName') as HTMLInputElement | null)?.value ?? '';
+    const fromAddress = (document.getElementById('invoiceFromAddress') as HTMLTextAreaElement | null)?.value ?? '';
+    const vatNote = (document.getElementById('invoiceVatNote') as HTMLInputElement | null)?.value ?? '';
+    const billTo = (document.getElementById('invoiceBillTo') as HTMLTextAreaElement | null)?.value ?? '';
+    const nextInvoiceRef = Number(
+      (document.getElementById('invoiceNextRef') as HTMLInputElement | null)?.value ?? '',
+    );
+
+    const submitButton = invoiceSettingsForm.querySelector<HTMLButtonElement>('button[type="submit"]');
+    if (submitButton) submitButton.disabled = true;
+    if (invoiceSettingsStatus) {
+      invoiceSettingsStatus.textContent = 'Saving…';
+      invoiceSettingsStatus.removeAttribute('data-state');
+    }
+
+    try {
+      const res = await fetch('/api/invoice-settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fromName, fromAddress, vatNote, billTo, nextInvoiceRef }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        throw new Error(data?.error ?? 'Failed to save');
+      }
+      if (invoiceSettingsStatus) {
+        invoiceSettingsStatus.textContent = 'Saved';
+        invoiceSettingsStatus.dataset.state = 'ok';
+      }
+    } catch (err) {
+      console.error('Failed to save invoice settings', err);
+      if (invoiceSettingsStatus) {
+        invoiceSettingsStatus.textContent = err instanceof Error ? err.message : 'Failed to save';
+        invoiceSettingsStatus.dataset.state = 'error';
+      }
+    } finally {
+      if (submitButton) submitButton.disabled = false;
+    }
+  });
+</script>

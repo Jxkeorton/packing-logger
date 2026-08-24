@@ -1,0 +1,27 @@
+---
+// The "who's the customer?" prompt shown when adding a tandem jump. Pure
+// markup — its open/close/submit behaviour lives in TandemsTab.astro
+// alongside the rest of the add-jump flow it's part of.
+---
+
+<div class="modal-overlay" id="tandemNameModal" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="tandemNameModalTitle">
+    <h2 class="modal-title" id="tandemNameModalTitle">Customer name</h2>
+    <p class="modal-subtitle" id="tandemNameModalSubtitle">&nbsp;</p>
+    <form id="tandemNameForm">
+      <input
+        type="text"
+        id="tandemNameInput"
+        class="modal-input"
+        placeholder="e.g. Jane Smith"
+        autocomplete="off"
+        maxlength="80"
+        required
+      />
+      <div class="modal-actions">
+        <button type="button" class="modal-cancel" id="tandemNameCancel">Cancel</button>
+        <button type="submit" class="modal-confirm">Add jump</button>
+      </div>
+    </form>
+  </div>
+</div>
