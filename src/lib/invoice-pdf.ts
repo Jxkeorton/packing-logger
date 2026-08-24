@@ -10,8 +10,15 @@
 // locally. The fix used everywhere pdfkit meets a serverless bundler is to
 // skip the built-in fonts entirely and embed a real font file instead
 // (`font: false` below), which is what src/assets/fonts/ is for.
+//
+// Path resolution: `astro.config.mjs`'s `includeFiles` copies these into
+// the deployed function preserving their original repo-relative path
+// (`src/assets/fonts/…` under the function root) — it does NOT follow them
+// into wherever Vite happens to place the compiled chunk that imports them.
+// So the path has to be built from `process.cwd()` (the function root, and
+// the project root in local dev too), not from this file's own location.
 import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
+import path from 'node:path';
 import PDFDocument from 'pdfkit';
 import { CATEGORIES, CATEGORY_LABELS, RATES, type Category, type Jump } from './tandem';
 import type { InvoiceSettings } from './invoice-settings';
@@ -30,11 +37,9 @@ const BAR_BLUE = '#3e7cb1';
 const TOTAL_BG = '#d9d3ea';
 const MUTED = '#5c6b78';
 
-// Read once at module load via a plain fs call with a statically-resolvable
-// path — the one pattern Vercel's bundler traces reliably — rather than
-// leaving pdfkit to resolve these itself at request time.
-const FONT_REGULAR = readFileSync(fileURLToPath(new URL('../assets/fonts/Roboto-Regular.ttf', import.meta.url)));
-const FONT_BOLD = readFileSync(fileURLToPath(new URL('../assets/fonts/Roboto-Medium.ttf', import.meta.url)));
+const FONT_DIR = path.join(process.cwd(), 'src/assets/fonts');
+const FONT_REGULAR = readFileSync(path.join(FONT_DIR, 'Roboto-Regular.ttf'));
+const FONT_BOLD = readFileSync(path.join(FONT_DIR, 'Roboto-Medium.ttf'));
 
 function formatJumpDate(dateStr: string): string {
   const [y, m, d] = dateStr.split('-');
