@@ -6,6 +6,50 @@
 import { CATEGORIES, CATEGORY_LABELS, RATES, totalEarnings, totalJumps, type DayState, type HistoryRow } from '../../lib/tandem';
 import type { AggregateRow } from '../../lib/tandem-invoice';
 import type { InvoiceSettings } from '../../lib/invoice-settings';
+import { CATEGORY_TEXT_CLASS } from '../../lib/category-colors';
+import {
+  APP_VIEW,
+  MASTHEAD,
+  STAMP,
+  STAMP_LABEL,
+  STAMP_DATE,
+  TOTALS,
+  TOTALS_BLOCK,
+  TOTALS_BLOCK_FLEX,
+  TOTALS_VALUE_GOLD,
+  TOTALS_VALUE_INK,
+  TOTALS_LABEL,
+  TOTALS_DIVIDER,
+  CATEGORIES_LIST,
+  CARD,
+  CARD_TOP,
+  CARD_LABEL,
+  CARD_RATE,
+  CARD_SUBTOTAL,
+  TOGGLE_SECTION,
+  TOGGLE_BUTTON,
+  TOGGLE_ICON,
+  TOGGLE_PANEL,
+  TOGGLE_PANEL_PADDED,
+  HISTORY_TABS,
+  HISTORY_TAB,
+  HISTORY_EMPTY,
+  HISTORY_SCROLL,
+  HISTORY_TABLE,
+  HISTORY_THEAD_ROW,
+  HISTORY_TBODY_ROW,
+  HISTORY_CELL_LEFT,
+  HISTORY_CELL_RIGHT,
+  FIELD_LABEL,
+  FIELD_LABEL_NARROW,
+  FIELD_INPUT,
+  FORM_ACTIONS,
+  FORM_SAVE_BUTTON,
+  FORM_STATUS,
+  PANEL_HINT,
+  FOOT,
+  FOOT_DOWNLOAD,
+} from '../../lib/ui-classes';
 import TandemAggregateTable from '../TandemAggregateTable.astro';
 import TandemNameModal from '../TandemNameModal.astro';
 
@@ -23,37 +67,41 @@ const { tandemState, dateDisplay, dayRows, weekRows, monthRows, invoiceSettings 
 const money = (n: number) => `£${n.toFixed(2)}`;
 ---
 
-<div class="app-view" data-app-view="tandems" id="tandemsView" hidden>
-  <header class="masthead">
-    <div class="stamp" aria-hidden="false">
-      <span class="stamp-label">Tandem Log</span>
-      <span class="stamp-date">{dateDisplay}</span>
+<div class={APP_VIEW} data-app-view="tandems" id="tandemsView" hidden>
+  <header class={MASTHEAD}>
+    <div class={STAMP} aria-hidden="false">
+      <span class={STAMP_LABEL}>Tandem Log</span>
+      <span class={STAMP_DATE}>{dateDisplay}</span>
     </div>
-    <div class="totals">
-      <div class="totals-block">
-        <span class="totals-value" id="tandemTotalEarnings">{money(totalEarnings(tandemState.counts))}</span>
-        <span class="totals-label">earned today</span>
+    <div class={TOTALS}>
+      <div class={TOTALS_BLOCK}>
+        <span class={TOTALS_VALUE_GOLD} id="tandemTotalEarnings">{money(totalEarnings(tandemState.counts))}</span>
+        <span class={TOTALS_LABEL}>earned today</span>
       </div>
-      <div class="totals-divider" aria-hidden="true"></div>
-      <div class="totals-block totals-block--packs">
-        <span class="totals-value totals-value--packs" id="tandemTotalJumps">{totalJumps(tandemState.counts)}</span>
-        <span class="totals-label">jumps today</span>
+      <div class={TOTALS_DIVIDER} aria-hidden="true"></div>
+      <div class={TOTALS_BLOCK_FLEX}>
+        <span class={TOTALS_VALUE_INK} id="tandemTotalJumps">{totalJumps(tandemState.counts)}</span>
+        <span class={TOTALS_LABEL}>jumps today</span>
       </div>
     </div>
   </header>
 
-  <section class="categories">
+  <section class={CATEGORIES_LIST}>
     {
       CATEGORIES.map((category) => (
-        <section class="card" data-tandem-category={category}>
-          <div class="card-top">
-            <h2 class="card-label">{CATEGORY_LABELS[category]}</h2>
-            <span class="card-rate">£{RATES[category].toFixed(2)} / jump</span>
+        <section class={CARD} data-tandem-category={category} style={`--accent: var(--${category})`}>
+          <div class={CARD_TOP}>
+            <h2 class={CARD_LABEL}>{CATEGORY_LABELS[category]}</h2>
+            <span class={CARD_RATE}>£{RATES[category].toFixed(2)} / jump</span>
           </div>
-          <button type="button" class="tandem-add" data-tandem-add={category}>
+          <button
+            type="button"
+            class="appearance-none border-0 rounded-xl w-full h-[46px] mt-2.5 font-display font-bold text-[14.5px] text-white bg-[var(--accent)] cursor-pointer touch-manipulation transition-[transform,filter] duration-[80ms] ease-[ease] active:scale-[0.97] active:brightness-95 focus-visible:outline-[3px] focus-visible:outline-gold focus-visible:outline-offset-2"
+            data-tandem-add={category}
+          >
             &plus; Add {CATEGORY_LABELS[category].toLowerCase()} jump
           </button>
-          <ul class="tandem-jump-list" data-tandem-list={category}>
+          <ul class="list-none mt-1 mb-0 p-0" data-tandem-list={category}>
             {tandemState.entries[category].length === 0 ? (
               <li class="tandem-jump-empty">No jumps logged yet today.</li>
             ) : (
@@ -72,7 +120,7 @@ const money = (n: number) => `£${n.toFixed(2)}`;
               ))
             )}
           </ul>
-          <div class="card-subtotal" data-tandem-subtotal={category}>
+          <div class={CARD_SUBTOTAL} data-tandem-subtotal={category}>
             £{(tandemState.counts[category] * RATES[category]).toFixed(2)}
           </div>
         </section>
@@ -80,46 +128,58 @@ const money = (n: number) => `£${n.toFixed(2)}`;
     }
   </section>
 
-  <section class="history">
-    <button class="history-toggle" id="tandemHistoryToggle" type="button" aria-expanded="false" aria-controls="tandemHistoryPanel">
+  <section class={TOGGLE_SECTION}>
+    <button
+      class={TOGGLE_BUTTON}
+      id="tandemHistoryToggle"
+      type="button"
+      aria-expanded="false"
+      aria-controls="tandemHistoryPanel"
+    >
       <span>History</span>
-      <span class="history-toggle-icon" id="tandemHistoryToggleIcon">&rsaquo;</span>
+      <span class={TOGGLE_ICON} id="tandemHistoryToggleIcon">&rsaquo;</span>
     </button>
-    <div class="history-panel" id="tandemHistoryPanel" hidden>
-      <div class="history-tabs" role="tablist" aria-label="Group tandem history by">
-        <button type="button" class="history-tab" data-tab="day" role="tab" aria-selected="true">Day</button>
-        <button type="button" class="history-tab" data-tab="week" role="tab" aria-selected="false">Week</button>
-        <button type="button" class="history-tab" data-tab="month" role="tab" aria-selected="false">Month</button>
+    <div class={TOGGLE_PANEL} id="tandemHistoryPanel" hidden>
+      <div class={HISTORY_TABS} role="tablist" aria-label="Group tandem history by">
+        <button type="button" class={HISTORY_TAB} data-tab="day" role="tab" aria-selected="true">Day</button>
+        <button type="button" class={HISTORY_TAB} data-tab="week" role="tab" aria-selected="false">Week</button>
+        <button type="button" class={HISTORY_TAB} data-tab="month" role="tab" aria-selected="false">Month</button>
       </div>
 
-      <div class="history-view" data-view="day">
+      <div data-view="day">
         {
           dayRows.length === 0 ? (
-            <p class="history-empty">Nothing logged yet before today.</p>
+            <p class={HISTORY_EMPTY}>Nothing logged yet before today.</p>
           ) : (
-            <div class="history-scroll">
-              <table class="history-table">
+            <div class={HISTORY_SCROLL}>
+              <table class={HISTORY_TABLE}>
                 <thead>
-                  <tr>
-                    <th scope="col">Date</th>
+                  <tr class={HISTORY_THEAD_ROW}>
+                    <th scope="col" class={HISTORY_CELL_LEFT}>
+                      Date
+                    </th>
                     {CATEGORIES.map((c) => (
-                      <th scope="col" class={`th-${c}`}>
+                      <th scope="col" class={`${HISTORY_CELL_RIGHT} ${CATEGORY_TEXT_CLASS[c]}`}>
                         {CATEGORY_LABELS[c].slice(0, 3)}
                       </th>
                     ))}
-                    <th scope="col">Jumps</th>
-                    <th scope="col">Earned</th>
+                    <th scope="col" class={HISTORY_CELL_RIGHT}>
+                      Jumps
+                    </th>
+                    <th scope="col" class={HISTORY_CELL_RIGHT}>
+                      Earned
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
                   {dayRows.map((row) => (
-                    <tr>
-                      <td class="history-date">{row.date}</td>
+                    <tr class={HISTORY_TBODY_ROW}>
+                      <td class={HISTORY_CELL_LEFT}>{row.date}</td>
                       {CATEGORIES.map((c) => (
-                        <td class={`td-${c}`}>{row.counts[c]}</td>
+                        <td class={`${HISTORY_CELL_RIGHT} ${CATEGORY_TEXT_CLASS[c]}`}>{row.counts[c]}</td>
                       ))}
-                      <td>{row.totalJumps}</td>
-                      <td>{money(row.totalEarnings)}</td>
+                      <td class={HISTORY_CELL_RIGHT}>{row.totalJumps}</td>
+                      <td class={HISTORY_CELL_RIGHT}>{money(row.totalEarnings)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -129,64 +189,72 @@ const money = (n: number) => `£${n.toFixed(2)}`;
         }
       </div>
 
-      <div class="history-view" data-view="week" hidden>
+      <div data-view="week" hidden>
         <TandemAggregateTable rows={weekRows} currentLabel="This week" prefix="tweek" />
       </div>
 
-      <div class="history-view" data-view="month" hidden>
+      <div data-view="month" hidden>
         <TandemAggregateTable rows={monthRows} currentLabel="This invoice month" prefix="tmonth" />
       </div>
     </div>
   </section>
 
-  <section class="history">
+  <section class={TOGGLE_SECTION}>
     <button
-      class="history-toggle"
+      class={TOGGLE_BUTTON}
       id="invoiceSettingsToggle"
       type="button"
       aria-expanded="false"
       aria-controls="invoiceSettingsPanel"
     >
       <span>Invoice details</span>
-      <span class="history-toggle-icon" id="invoiceSettingsToggleIcon">&rsaquo;</span>
+      <span class={TOGGLE_ICON} id="invoiceSettingsToggleIcon">&rsaquo;</span>
     </button>
-    <div class="history-panel invoice-settings-panel" id="invoiceSettingsPanel" hidden>
-      <p class="invoice-settings-hint">
+    <div class={`${TOGGLE_PANEL} ${TOGGLE_PANEL_PADDED}`} id="invoiceSettingsPanel" hidden>
+      <p class={PANEL_HINT}>
         Used on the "Export PDF" invoices below — your details, who it's billed to, and the next invoice number.
       </p>
       <form id="invoiceSettingsForm">
-        <label class="invoice-field">
+        <label class={FIELD_LABEL}>
           <span>Your name</span>
-          <input type="text" id="invoiceFromName" value={invoiceSettings.fromName} required />
+          <input type="text" id="invoiceFromName" class={FIELD_INPUT} value={invoiceSettings.fromName} required />
         </label>
-        <label class="invoice-field">
+        <label class={FIELD_LABEL}>
           <span>Your address (one line each)</span>
-          <textarea id="invoiceFromAddress" rows="4">{invoiceSettings.fromAddress.join('\n')}</textarea>
+          <textarea id="invoiceFromAddress" class={FIELD_INPUT} rows="4">{invoiceSettings.fromAddress.join('\n')}</textarea>
         </label>
-        <label class="invoice-field">
+        <label class={FIELD_LABEL}>
           <span>VAT note</span>
-          <input type="text" id="invoiceVatNote" value={invoiceSettings.vatNote} />
+          <input type="text" id="invoiceVatNote" class={FIELD_INPUT} value={invoiceSettings.vatNote} />
         </label>
-        <label class="invoice-field">
+        <label class={FIELD_LABEL}>
           <span>Bill to (one line each)</span>
-          <textarea id="invoiceBillTo" rows="4">{invoiceSettings.billTo.join('\n')}</textarea>
+          <textarea id="invoiceBillTo" class={FIELD_INPUT} rows="4">{invoiceSettings.billTo.join('\n')}</textarea>
         </label>
-        <label class="invoice-field invoice-field--narrow">
+        <label class={FIELD_LABEL_NARROW}>
           <span>Next invoice ref</span>
-          <input type="number" id="invoiceNextRef" min="1" step="1" value={invoiceSettings.nextInvoiceRef} required />
+          <input
+            type="number"
+            id="invoiceNextRef"
+            class={FIELD_INPUT}
+            min="1"
+            step="1"
+            value={invoiceSettings.nextInvoiceRef}
+            required
+          />
         </label>
-        <div class="invoice-settings-actions">
-          <button type="submit" class="invoice-settings-save">Save details</button>
-          <span class="invoice-settings-status" id="invoiceSettingsStatus" role="status"></span>
+        <div class={FORM_ACTIONS}>
+          <button type="submit" class={FORM_SAVE_BUTTON}>Save details</button>
+          <span class={FORM_STATUS} id="invoiceSettingsStatus" role="status"></span>
         </div>
       </form>
     </div>
   </section>
 
-  <footer class="foot">
+  <footer class={FOOT}>
     <button
       type="button"
-      class="foot-download"
+      class={FOOT_DOWNLOAD}
       data-download="/api/tandem-export.csv"
       data-download-name="tandem-log.csv"
     >
@@ -196,6 +264,63 @@ const money = (n: number) => `£${n.toFixed(2)}`;
 
   <TandemNameModal />
 </div>
+
+<style>
+  /*
+   * The tandem-jump list is re-rendered client-side via innerHTML after
+   * each add/delete (renderTandemList() below), so — same reasoning as
+   * PackingTab.astro's fastest-board — these stay plain CSS with
+   * `:global()` rather than Tailwind utilities, so the injected markup
+   * keeps picking them up. `.tandem-jump-empty` is used both in the
+   * initial server-rendered markup above and by that same script.
+   */
+  :global(.tandem-jump-row) {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 9px 2px;
+    border-top: 1px solid var(--line);
+    font-size: 13.5px;
+  }
+
+  :global(.tandem-jump-name) {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  :global(.tandem-jump-delete) {
+    appearance: none;
+    border: none;
+    background: transparent;
+    color: var(--ink-soft);
+    font-family: 'Inter', sans-serif;
+    font-size: 18px;
+    line-height: 1;
+    width: 26px;
+    height: 26px;
+    flex: none;
+    border-radius: 8px;
+    cursor: pointer;
+    touch-action: manipulation;
+  }
+
+  :global(.tandem-jump-delete:hover),
+  :global(.tandem-jump-delete:focus-visible) {
+    background: var(--danger-soft);
+    color: var(--danger);
+    outline: none;
+  }
+
+  :global(.tandem-jump-empty) {
+    margin: 0;
+    padding: 9px 2px;
+    border-top: 1px solid var(--line);
+    color: var(--ink-soft);
+    font-size: 13px;
+  }
+</style>
 
 <script>
   import { wireTabGroup, wireToggle, wireDownloadButtons, escapeHtml, money, downloadFile } from '../../lib/client/dom';
@@ -214,7 +339,7 @@ const money = (n: number) => `£${n.toFixed(2)}`;
   if (!tandemsView) throw new Error('#tandemsView not found');
 
   const tandemHistoryPanel = document.getElementById('tandemHistoryPanel');
-  if (tandemHistoryPanel) wireTabGroup(tandemHistoryPanel, '.history-tab', '.history-view', 'tab', 'view');
+  if (tandemHistoryPanel) wireTabGroup(tandemHistoryPanel, '[data-tab]', '[data-view]', 'tab', 'view');
   wireToggle('tandemHistoryToggle', 'tandemHistoryPanel');
   wireToggle('invoiceSettingsToggle', 'invoiceSettingsPanel');
 

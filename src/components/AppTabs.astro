@@ -3,16 +3,18 @@
 // buttons — the views it controls are rendered by the three tab
 // components in src/components/tabs/, each identified by its
 // `data-app-view` attribute.
+const tabClass =
+  'flex-1 appearance-none border border-line bg-panel text-ink-soft font-sans font-bold text-sm p-2.5 rounded-[10px] cursor-pointer aria-selected:bg-ink aria-selected:border-ink aria-selected:text-canvas';
 ---
 
-<div class="app-tabs" role="tablist" aria-label="Section">
-  <button type="button" class="app-tab" data-app-tab="packing" role="tab" aria-selected="true">Packing</button>
-  <button type="button" class="app-tab" data-app-tab="tandems" role="tab" aria-selected="false">Tandems</button>
-  <button type="button" class="app-tab" data-app-tab="logbook" role="tab" aria-selected="false">Logbook</button>
+<div class="flex gap-2" role="tablist" aria-label="Section">
+  <button type="button" class={tabClass} data-app-tab="packing" role="tab" aria-selected="true">Packing</button>
+  <button type="button" class={tabClass} data-app-tab="tandems" role="tab" aria-selected="false">Tandems</button>
+  <button type="button" class={tabClass} data-app-tab="logbook" role="tab" aria-selected="false">Logbook</button>
 </div>
 
 <script>
   import { wireTabGroup } from '../lib/client/dom';
 
-  wireTabGroup(document, '.app-tab', '.app-view', 'appTab', 'appView');
+  wireTabGroup(document, '[data-app-tab]', '[data-app-view]', 'appTab', 'appView');
 </script>

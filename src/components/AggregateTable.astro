@@ -1,6 +1,8 @@
 ---
 import { CATEGORIES, CATEGORY_LABELS } from '../lib/packing';
 import type { AggregateRow } from '../lib/invoice';
+import { CATEGORY_TEXT_CLASS } from '../lib/category-colors';
+import { HISTORY_SCROLL, HISTORY_TABLE, HISTORY_THEAD_ROW, HISTORY_TBODY_ROW, HISTORY_CELL_LEFT, HISTORY_CELL_RIGHT } from '../lib/ui-classes';
 
 interface Props {
   rows: AggregateRow[];
@@ -13,66 +15,52 @@ const { rows, currentLabel, prefix } = Astro.props;
 const money = (n: number) => `£${n.toFixed(2)}`;
 ---
 
-<div class="history-scroll">
-  <table class="history-table">
+<div class={HISTORY_SCROLL}>
+  <table class={HISTORY_TABLE}>
     <thead>
-      <tr>
-        <th scope="col">Range</th>
+      <tr class={HISTORY_THEAD_ROW}>
+        <th scope="col" class={HISTORY_CELL_LEFT}>
+          Range
+        </th>
         {
           CATEGORIES.map((c) => (
-            <th scope="col" class={`th-${c}`}>
+            <th scope="col" class={`${HISTORY_CELL_RIGHT} ${CATEGORY_TEXT_CLASS[c]}`}>
               {CATEGORY_LABELS[c].slice(0, 3)}
             </th>
           ))
         }
-        <th scope="col">Packs</th>
-        <th scope="col">Earned</th>
+        <th scope="col" class={HISTORY_CELL_RIGHT}>
+          Packs
+        </th>
+        <th scope="col" class={HISTORY_CELL_RIGHT}>
+          Earned
+        </th>
       </tr>
     </thead>
     <tbody>
       {
         rows.map((row) => (
-          <tr class={row.isCurrent ? 'is-current' : undefined} data-current-row={row.isCurrent ? prefix : undefined}>
-            <td class="history-date">
+          <tr class={`${HISTORY_TBODY_ROW}${row.isCurrent ? ' bg-[rgba(184,134,46,0.08)]' : ''}`} data-current-row={row.isCurrent ? prefix : undefined}>
+            <td class={HISTORY_CELL_LEFT}>
               {row.isCurrent ? (
                 <>
-                  <span class="current-label">{currentLabel}</span>
-                  <span class="current-range">{row.rangeLabel}</span>
+                  <span class="block font-sans font-bold text-gold text-xs">{currentLabel}</span>
+                  <span class="block text-[11px] text-ink-soft">{row.rangeLabel}</span>
                 </>
               ) : (
                 row.rangeLabel
               )}
             </td>
             {CATEGORIES.map((c) => (
-              <td class={`td-${c}`} data-agg-count={row.isCurrent ? `${prefix}:${c}` : undefined}>
+              <td class={`${HISTORY_CELL_RIGHT} ${CATEGORY_TEXT_CLASS[c]}`} data-agg-count={row.isCurrent ? `${prefix}:${c}` : undefined}>
                 {row.counts[c]}
               </td>
             ))}
-            <td data-agg-total={row.isCurrent ? `${prefix}:packs` : undefined}>{row.totalPacks}</td>
-            <td data-agg-total={row.isCurrent ? `${prefix}:earnings` : undefined}>{money(row.totalEarnings)}</td>
+            <td class={HISTORY_CELL_RIGHT} data-agg-total={row.isCurrent ? `${prefix}:packs` : undefined}>{row.totalPacks}</td>
+            <td class={HISTORY_CELL_RIGHT} data-agg-total={row.isCurrent ? `${prefix}:earnings` : undefined}>{money(row.totalEarnings)}</td>
           </tr>
         ))
       }
     </tbody>
   </table>
 </div>
-
-<style>
-  .is-current {
-    background: var(--panel-strong, rgba(184, 134, 46, 0.08));
-  }
-
-  .current-label {
-    display: block;
-    font-family: 'Inter', sans-serif;
-    font-weight: 700;
-    color: var(--gold);
-    font-size: 12px;
-  }
-
-  .current-range {
-    display: block;
-    font-size: 11px;
-    color: var(--ink-soft);
-  }
-</style>

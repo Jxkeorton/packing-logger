@@ -6,6 +6,32 @@
 import type { NumberedEntry } from '../../lib/logbook';
 import type { LogbookSettings } from '../../lib/logbook-settings';
 import type { DayState } from '../../lib/packing';
+import {
+  APP_VIEW,
+  MASTHEAD,
+  STAMP,
+  STAMP_LABEL,
+  STAMP_DATE,
+  TOTALS,
+  TOTALS_BLOCK_FLEX,
+  TOTALS_VALUE_INK,
+  TOTALS_LABEL,
+  TOGGLE_SECTION,
+  TOGGLE_BUTTON,
+  TOGGLE_ICON,
+  TOGGLE_PANEL,
+  TOGGLE_PANEL_PADDED,
+  FIELD_LABEL,
+  FIELD_LABEL_NARROW,
+  FIELD_INPUT,
+  FIELD_SELECT,
+  FORM_ACTIONS,
+  FORM_SAVE_BUTTON,
+  FORM_STATUS,
+  PANEL_HINT,
+  FOOT,
+  FOOT_DOWNLOAD,
+} from '../../lib/ui-classes';
 
 interface Props {
   state: DayState;
@@ -16,37 +42,43 @@ interface Props {
 }
 
 const { state, dateDisplay, nextLogbookNumber, logbookEntries, logbookSettings } = Astro.props;
+
+// The four reference-list panels (Places/Equipment/Aircraft/Jump types)
+// below share one card/list/form shell; only their content differs.
+const referenceListClass = 'list-none mt-0 mb-3 p-0';
+const referenceFormClass = 'pt-1 border-t border-line';
+const referenceFieldOverride = 'mt-2.5 mb-0'; // .equipment-form's fields sit right under the list, not the usual mb-3 gap
 ---
 
-<div class="app-view" data-app-view="logbook" id="logbookView" hidden>
-  <header class="masthead">
-    <div class="stamp" aria-hidden="false">
-      <span class="stamp-label">Logbook</span>
-      <span class="stamp-date">{dateDisplay}</span>
+<div class={APP_VIEW} data-app-view="logbook" id="logbookView" hidden>
+  <header class={MASTHEAD}>
+    <div class={STAMP} aria-hidden="false">
+      <span class={STAMP_LABEL}>Logbook</span>
+      <span class={STAMP_DATE}>{dateDisplay}</span>
     </div>
-    <div class="totals">
-      <div class="totals-block totals-block--packs">
-        <span class="totals-value totals-value--packs" id="logbookTotalJumps">{nextLogbookNumber - 1}</span>
-        <span class="totals-label">jumps logged</span>
+    <div class={TOTALS}>
+      <div class={TOTALS_BLOCK_FLEX}>
+        <span class={TOTALS_VALUE_INK} id="logbookTotalJumps">{nextLogbookNumber - 1}</span>
+        <span class={TOTALS_LABEL}>jumps logged</span>
       </div>
     </div>
   </header>
 
-  <section class="logbook-form-card">
-    <div class="logbook-form-top">
-      <h2 class="logbook-form-title" id="logbookFormTitle">Log a jump</h2>
-      <span class="logbook-form-number" id="logbookNextNumber">#{nextLogbookNumber}</span>
+  <section class="bg-panel border border-line rounded-card shadow-card px-4 pt-3.5 pb-4">
+    <div class="flex items-baseline justify-between gap-2 mb-2.5">
+      <h2 class="m-0 text-[17px] font-bold tracking-[-0.01em]" id="logbookFormTitle">Log a jump</h2>
+      <span class="font-mono font-semibold text-sm text-gold" id="logbookNextNumber">#{nextLogbookNumber}</span>
     </div>
     <form id="logbookForm">
       <input type="hidden" id="logbookEditingAt" value="" />
-      <div class="logbook-form-grid">
-        <label class="invoice-field">
+      <div class="grid grid-cols-2 gap-x-2.5 gap-y-0 max-[420px]:grid-cols-1">
+        <label class={FIELD_LABEL}>
           <span>Date *</span>
-          <input type="date" id="logbookDate" required value={state.date} />
+          <input type="date" id="logbookDate" class={FIELD_INPUT} required value={state.date} />
         </label>
-        <label class="invoice-field">
+        <label class={FIELD_LABEL}>
           <span>Place</span>
-          <select id="logbookPlace">
+          <select id="logbookPlace" class={FIELD_SELECT}>
             <option value="" selected={!logbookSettings.defaultPlaceId || undefined}>
               No place selected
             </option>
@@ -59,13 +91,20 @@ const { state, dateDisplay, nextLogbookNumber, logbookEntries, logbookSettings }
             }
           </select>
         </label>
-        <label class="invoice-field">
+        <label class={FIELD_LABEL}>
           <span>Exit altitude</span>
-          <input type="text" id="logbookAltitude" placeholder="e.g. 13,000 ft" autocomplete="off" maxlength="120" />
+          <input
+            type="text"
+            id="logbookAltitude"
+            class={FIELD_INPUT}
+            placeholder="e.g. 13,000 ft"
+            autocomplete="off"
+            maxlength="120"
+          />
         </label>
-        <label class="invoice-field">
+        <label class={FIELD_LABEL}>
           <span>Equipment</span>
-          <select id="logbookEquipment">
+          <select id="logbookEquipment" class={FIELD_SELECT}>
             <option value="" data-canopy="" data-container="" data-aad="" selected={!logbookSettings.defaultEquipmentId || undefined}>
               No equipment selected
             </option>
@@ -84,9 +123,9 @@ const { state, dateDisplay, nextLogbookNumber, logbookEntries, logbookSettings }
             }
           </select>
         </label>
-        <label class="invoice-field">
+        <label class={FIELD_LABEL}>
           <span>Aircraft</span>
-          <select id="logbookAircraft">
+          <select id="logbookAircraft" class={FIELD_SELECT}>
             <option value="" selected={!logbookSettings.defaultAircraftId || undefined}>
               No aircraft selected
             </option>
@@ -99,9 +138,9 @@ const { state, dateDisplay, nextLogbookNumber, logbookEntries, logbookSettings }
             }
           </select>
         </label>
-        <label class="invoice-field">
+        <label class={FIELD_LABEL}>
           <span>Jump type</span>
-          <select id="logbookJumpType">
+          <select id="logbookJumpType" class={FIELD_SELECT}>
             <option value="" selected={!logbookSettings.defaultJumpTypeId || undefined}>
               No jump type selected
             </option>
@@ -115,20 +154,28 @@ const { state, dateDisplay, nextLogbookNumber, logbookEntries, logbookSettings }
           </select>
         </label>
       </div>
-      <label class="invoice-field">
+      <label class={FIELD_LABEL}>
         <span>Description</span>
-        <textarea id="logbookDescription" rows="3" placeholder="Freefall, exercises, canopy notes…"></textarea>
+        <textarea id="logbookDescription" class={FIELD_INPUT} rows="3" placeholder="Freefall, exercises, canopy notes…"
+        ></textarea>
       </label>
-      <div class="invoice-settings-actions">
-        <button type="submit" class="invoice-settings-save" id="logbookSubmit">Log jump</button>
-        <button type="button" class="logbook-cancel-edit" id="logbookCancelEdit" hidden>Cancel edit</button>
-        <span class="invoice-settings-status" id="logbookFormStatus" role="status"></span>
+      <div class={FORM_ACTIONS}>
+        <button type="submit" class={FORM_SAVE_BUTTON} id="logbookSubmit">Log jump</button>
+        <button
+          type="button"
+          class="appearance-none border-0 bg-transparent text-ink-soft font-sans text-[13px] font-semibold cursor-pointer p-0 underline"
+          id="logbookCancelEdit"
+          hidden
+        >
+          Cancel edit
+        </button>
+        <span class={FORM_STATUS} id="logbookFormStatus" role="status"></span>
       </div>
     </form>
   </section>
 
-  <section class="logbook-list-card">
-    <ul class="logbook-list" id="logbookList">
+  <section class="bg-panel border border-line rounded-card shadow-card overflow-hidden">
+    <ul class="list-none m-0 p-0" id="logbookList">
       {
         logbookEntries.length === 0 ? (
           <li class="logbook-empty">No jumps logged yet.</li>
@@ -204,14 +251,14 @@ const { state, dateDisplay, nextLogbookNumber, logbookEntries, logbookSettings }
     </ul>
   </section>
 
-  <section class="history">
-    <button class="history-toggle" id="placesToggle" type="button" aria-expanded="false" aria-controls="placesPanel">
+  <section class={TOGGLE_SECTION}>
+    <button class={TOGGLE_BUTTON} id="placesToggle" type="button" aria-expanded="false" aria-controls="placesPanel">
       <span>Places</span>
-      <span class="history-toggle-icon" id="placesToggleIcon">&rsaquo;</span>
+      <span class={TOGGLE_ICON} id="placesToggleIcon">&rsaquo;</span>
     </button>
-    <div class="history-panel invoice-settings-panel" id="placesPanel" hidden>
-      <p class="invoice-settings-hint">The starred one is pre-selected whenever you start a new jump.</p>
-      <ul class="equipment-list" id="placesList">
+    <div class={`${TOGGLE_PANEL} ${TOGGLE_PANEL_PADDED}`} id="placesPanel" hidden>
+      <p class={PANEL_HINT}>The starred one is pre-selected whenever you start a new jump.</p>
+      <ul class={referenceListClass} id="placesList">
         {
           logbookSettings.places.length === 0 ? (
             <li class="equipment-empty">No places saved yet.</li>
@@ -239,27 +286,27 @@ const { state, dateDisplay, nextLogbookNumber, logbookEntries, logbookSettings }
           )
         }
       </ul>
-      <form id="placesForm" class="equipment-form">
-        <label class="invoice-field">
+      <form id="placesForm" class={referenceFormClass}>
+        <label class={`${FIELD_LABEL} ${referenceFieldOverride}`}>
           <span>Name</span>
-          <input type="text" id="placeName" placeholder="e.g. Langar" autocomplete="off" maxlength="80" required />
+          <input type="text" id="placeName" class={FIELD_INPUT} placeholder="e.g. Langar" autocomplete="off" maxlength="80" required />
         </label>
-        <div class="invoice-settings-actions">
-          <button type="submit" class="invoice-settings-save">Save place</button>
-          <span class="invoice-settings-status" id="placesStatus" role="status"></span>
+        <div class={FORM_ACTIONS}>
+          <button type="submit" class={FORM_SAVE_BUTTON}>Save place</button>
+          <span class={FORM_STATUS} id="placesStatus" role="status"></span>
         </div>
       </form>
     </div>
   </section>
 
-  <section class="history">
-    <button class="history-toggle" id="equipmentToggle" type="button" aria-expanded="false" aria-controls="equipmentPanel">
+  <section class={TOGGLE_SECTION}>
+    <button class={TOGGLE_BUTTON} id="equipmentToggle" type="button" aria-expanded="false" aria-controls="equipmentPanel">
       <span>Equipment</span>
-      <span class="history-toggle-icon" id="equipmentToggleIcon">&rsaquo;</span>
+      <span class={TOGGLE_ICON} id="equipmentToggleIcon">&rsaquo;</span>
     </button>
-    <div class="history-panel invoice-settings-panel" id="equipmentPanel" hidden>
-      <p class="invoice-settings-hint">The starred one is pre-selected whenever you start a new jump.</p>
-      <ul class="equipment-list" id="equipmentList">
+    <div class={`${TOGGLE_PANEL} ${TOGGLE_PANEL_PADDED}`} id="equipmentPanel" hidden>
+      <p class={PANEL_HINT}>The starred one is pre-selected whenever you start a new jump.</p>
+      <ul class={referenceListClass} id="equipmentList">
         {
           logbookSettings.equipment.length === 0 ? (
             <li class="equipment-empty">No equipment saved yet.</li>
@@ -290,41 +337,41 @@ const { state, dateDisplay, nextLogbookNumber, logbookEntries, logbookSettings }
           )
         }
       </ul>
-      <form id="equipmentForm" class="equipment-form">
-        <label class="invoice-field">
+      <form id="equipmentForm" class={referenceFormClass}>
+        <label class={`${FIELD_LABEL} ${referenceFieldOverride}`}>
           <span>Name</span>
-          <input type="text" id="equipmentName" placeholder="e.g. Main rig" autocomplete="off" maxlength="80" required />
+          <input type="text" id="equipmentName" class={FIELD_INPUT} placeholder="e.g. Main rig" autocomplete="off" maxlength="80" required />
         </label>
-        <div class="logbook-form-grid">
-          <label class="invoice-field">
+        <div class="grid grid-cols-2 gap-x-2.5 gap-y-0 max-[420px]:grid-cols-1">
+          <label class={`${FIELD_LABEL} ${referenceFieldOverride}`}>
             <span>Canopy</span>
-            <input type="text" id="equipmentCanopy" placeholder="e.g. Sabre2 190" autocomplete="off" maxlength="80" />
+            <input type="text" id="equipmentCanopy" class={FIELD_INPUT} placeholder="e.g. Sabre2 190" autocomplete="off" maxlength="80" />
           </label>
-          <label class="invoice-field">
+          <label class={`${FIELD_LABEL} ${referenceFieldOverride}`}>
             <span>Container</span>
-            <input type="text" id="equipmentContainer" placeholder="e.g. Wings X 190" autocomplete="off" maxlength="80" />
+            <input type="text" id="equipmentContainer" class={FIELD_INPUT} placeholder="e.g. Wings X 190" autocomplete="off" maxlength="80" />
           </label>
-          <label class="invoice-field">
+          <label class={`${FIELD_LABEL} ${referenceFieldOverride}`}>
             <span>AAD</span>
-            <input type="text" id="equipmentAad" placeholder="e.g. Cypres 2" autocomplete="off" maxlength="80" />
+            <input type="text" id="equipmentAad" class={FIELD_INPUT} placeholder="e.g. Cypres 2" autocomplete="off" maxlength="80" />
           </label>
         </div>
-        <div class="invoice-settings-actions">
-          <button type="submit" class="invoice-settings-save">Save equipment</button>
-          <span class="invoice-settings-status" id="equipmentStatus" role="status"></span>
+        <div class={FORM_ACTIONS}>
+          <button type="submit" class={FORM_SAVE_BUTTON}>Save equipment</button>
+          <span class={FORM_STATUS} id="equipmentStatus" role="status"></span>
         </div>
       </form>
     </div>
   </section>
 
-  <section class="history">
-    <button class="history-toggle" id="aircraftToggle" type="button" aria-expanded="false" aria-controls="aircraftPanel">
+  <section class={TOGGLE_SECTION}>
+    <button class={TOGGLE_BUTTON} id="aircraftToggle" type="button" aria-expanded="false" aria-controls="aircraftPanel">
       <span>Aircraft</span>
-      <span class="history-toggle-icon" id="aircraftToggleIcon">&rsaquo;</span>
+      <span class={TOGGLE_ICON} id="aircraftToggleIcon">&rsaquo;</span>
     </button>
-    <div class="history-panel invoice-settings-panel" id="aircraftPanel" hidden>
-      <p class="invoice-settings-hint">The starred one is pre-selected whenever you start a new jump.</p>
-      <ul class="equipment-list" id="aircraftList">
+    <div class={`${TOGGLE_PANEL} ${TOGGLE_PANEL_PADDED}`} id="aircraftPanel" hidden>
+      <p class={PANEL_HINT}>The starred one is pre-selected whenever you start a new jump.</p>
+      <ul class={referenceListClass} id="aircraftList">
         {
           logbookSettings.aircraft.length === 0 ? (
             <li class="equipment-empty">No aircraft saved yet.</li>
@@ -352,30 +399,30 @@ const { state, dateDisplay, nextLogbookNumber, logbookEntries, logbookSettings }
           )
         }
       </ul>
-      <form id="aircraftForm" class="equipment-form">
-        <label class="invoice-field invoice-field--narrow">
+      <form id="aircraftForm" class={referenceFormClass}>
+        <label class={`${FIELD_LABEL_NARROW} ${referenceFieldOverride}`}>
           <span>Registration</span>
-          <input type="text" id="aircraftPlate" placeholder="e.g. G-SDSK" autocomplete="off" maxlength="20" required />
+          <input type="text" id="aircraftPlate" class={FIELD_INPUT} placeholder="e.g. G-SDSK" autocomplete="off" maxlength="20" required />
         </label>
-        <div class="invoice-settings-actions">
-          <button type="submit" class="invoice-settings-save">Save aircraft</button>
-          <span class="invoice-settings-status" id="aircraftStatus" role="status"></span>
+        <div class={FORM_ACTIONS}>
+          <button type="submit" class={FORM_SAVE_BUTTON}>Save aircraft</button>
+          <span class={FORM_STATUS} id="aircraftStatus" role="status"></span>
         </div>
       </form>
     </div>
   </section>
 
-  <section class="history">
-    <button class="history-toggle" id="jumpTypesToggle" type="button" aria-expanded="false" aria-controls="jumpTypesPanel">
+  <section class={TOGGLE_SECTION}>
+    <button class={TOGGLE_BUTTON} id="jumpTypesToggle" type="button" aria-expanded="false" aria-controls="jumpTypesPanel">
       <span>Jump types</span>
-      <span class="history-toggle-icon" id="jumpTypesToggleIcon">&rsaquo;</span>
+      <span class={TOGGLE_ICON} id="jumpTypesToggleIcon">&rsaquo;</span>
     </button>
-    <div class="history-panel invoice-settings-panel" id="jumpTypesPanel" hidden>
-      <p class="invoice-settings-hint">
+    <div class={`${TOGGLE_PANEL} ${TOGGLE_PANEL_PADDED}`} id="jumpTypesPanel" hidden>
+      <p class={PANEL_HINT}>
         The starred one is pre-selected whenever you start a new jump. "Tandem Instructor" and "Tandem Camera" are
         added here automatically the first time you log one from the Tandems tab.
       </p>
-      <ul class="equipment-list" id="jumpTypesList">
+      <ul class={referenceListClass} id="jumpTypesList">
         {
           logbookSettings.jumpTypes.length === 0 ? (
             <li class="equipment-empty">No jump types saved yet.</li>
@@ -403,58 +450,287 @@ const { state, dateDisplay, nextLogbookNumber, logbookEntries, logbookSettings }
           )
         }
       </ul>
-      <form id="jumpTypesForm" class="equipment-form">
-        <label class="invoice-field">
+      <form id="jumpTypesForm" class={referenceFormClass}>
+        <label class={`${FIELD_LABEL} ${referenceFieldOverride}`}>
           <span>Name</span>
-          <input type="text" id="jumpTypeName" placeholder="e.g. Sport" autocomplete="off" maxlength="40" required />
+          <input type="text" id="jumpTypeName" class={FIELD_INPUT} placeholder="e.g. Sport" autocomplete="off" maxlength="40" required />
         </label>
-        <div class="invoice-settings-actions">
-          <button type="submit" class="invoice-settings-save">Save jump type</button>
-          <span class="invoice-settings-status" id="jumpTypesStatus" role="status"></span>
+        <div class={FORM_ACTIONS}>
+          <button type="submit" class={FORM_SAVE_BUTTON}>Save jump type</button>
+          <span class={FORM_STATUS} id="jumpTypesStatus" role="status"></span>
         </div>
       </form>
     </div>
   </section>
 
-  <section class="history">
+  <section class={TOGGLE_SECTION}>
     <button
-      class="history-toggle"
+      class={TOGGLE_BUTTON}
       id="logbookSettingsToggle"
       type="button"
       aria-expanded="false"
       aria-controls="logbookSettingsPanel"
     >
       <span>Settings</span>
-      <span class="history-toggle-icon" id="logbookSettingsToggleIcon">&rsaquo;</span>
+      <span class={TOGGLE_ICON} id="logbookSettingsToggleIcon">&rsaquo;</span>
     </button>
-    <div class="history-panel invoice-settings-panel" id="logbookSettingsPanel" hidden>
-      <p class="invoice-settings-hint">
+    <div class={`${TOGGLE_PANEL} ${TOGGLE_PANEL_PADDED}`} id="logbookSettingsPanel" hidden>
+      <p class={PANEL_HINT}>
         Jumps you logged before using this app — added to the count above so numbering carries on correctly.
       </p>
       <form id="logbookSettingsForm">
-        <label class="invoice-field invoice-field--narrow">
+        <label class={FIELD_LABEL_NARROW}>
           <span>Jumps logged before this app</span>
-          <input type="number" id="logbookBaseJumps" min="0" step="1" value={logbookSettings.baseJumps} required />
+          <input type="number" id="logbookBaseJumps" class={FIELD_INPUT} min="0" step="1" value={logbookSettings.baseJumps} required />
         </label>
-        <div class="invoice-settings-actions">
-          <button type="submit" class="invoice-settings-save">Save</button>
-          <span class="invoice-settings-status" id="logbookSettingsStatus" role="status"></span>
+        <div class={FORM_ACTIONS}>
+          <button type="submit" class={FORM_SAVE_BUTTON}>Save</button>
+          <span class={FORM_STATUS} id="logbookSettingsStatus" role="status"></span>
         </div>
       </form>
     </div>
   </section>
 
-  <footer class="foot">
-    <button
-      type="button"
-      class="foot-download"
-      data-download="/api/logbook-export.csv"
-      data-download-name="logbook.csv"
-    >
+  <footer class={FOOT}>
+    <button type="button" class={FOOT_DOWNLOAD} data-download="/api/logbook-export.csv" data-download-name="logbook.csv">
       Download full logbook (.csv)
     </button>
   </footer>
 </div>
+
+<style>
+  /*
+   * Everything below is plain CSS with `:global()` rather than Tailwind
+   * utilities, because all of it is rendered — and re-rendered — by the
+   * client script: logbookRowHtml() (the jump list) and the four
+   * wireReferenceList() calls (Places/Equipment/Aircraft/Jump types) all
+   * build this markup from template strings. See PackingTab.astro's
+   * <style> block for the full reasoning.
+   */
+  :global(.logbook-empty) {
+    margin: 0;
+    padding: 16px;
+    color: var(--ink-soft);
+    font-size: 14px;
+  }
+
+  :global(.logbook-entry) {
+    border-top: 1px solid var(--line);
+  }
+
+  :global(.logbook-entry:first-child) {
+    border-top: none;
+  }
+
+  :global(.logbook-row) {
+    appearance: none;
+    border: none;
+    background: transparent;
+    width: 100%;
+    display: grid;
+    grid-template-columns: 44px 84px 1fr 16px;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 14px;
+    font-family: 'Inter', sans-serif;
+    color: var(--ink);
+    text-align: left;
+    cursor: pointer;
+    touch-action: manipulation;
+  }
+
+  :global(.logbook-row-number) {
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 600;
+    font-size: 13px;
+    color: var(--gold);
+  }
+
+  :global(.logbook-row-date) {
+    font-size: 12.5px;
+    color: var(--ink-soft);
+    white-space: nowrap;
+  }
+
+  :global(.logbook-row-place) {
+    font-size: 14px;
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  :global(.logbook-row-chevron) {
+    font-size: 18px;
+    color: var(--ink-soft);
+    transition: transform 0.15s ease;
+    justify-self: end;
+  }
+
+  :global(.logbook-row[aria-expanded='true'] .logbook-row-chevron) {
+    transform: rotate(90deg);
+  }
+
+  :global(.logbook-details) {
+    padding: 0 14px 14px;
+  }
+
+  :global(.logbook-details-grid) {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px 14px;
+    margin: 0;
+  }
+
+  :global(.logbook-details-grid dt) {
+    margin: 0;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--ink-soft);
+  }
+
+  :global(.logbook-details-grid dd) {
+    margin: 2px 0 0;
+    font-size: 13.5px;
+  }
+
+  :global(.logbook-details-description) {
+    margin: 12px 0 0;
+    padding-top: 10px;
+    border-top: 1px solid var(--line);
+    font-size: 13.5px;
+    white-space: pre-wrap;
+  }
+
+  :global(.logbook-details-actions) {
+    display: flex;
+    gap: 14px;
+    margin-top: 12px;
+  }
+
+  :global(.logbook-edit),
+  :global(.logbook-delete) {
+    appearance: none;
+    border: none;
+    background: transparent;
+    font-family: 'Inter', sans-serif;
+    font-weight: 600;
+    font-size: 12.5px;
+    padding: 4px 0;
+    cursor: pointer;
+    touch-action: manipulation;
+  }
+
+  :global(.logbook-edit) {
+    color: var(--gold);
+  }
+
+  :global(.logbook-delete) {
+    color: var(--ink-soft);
+  }
+
+  :global(.logbook-delete:hover),
+  :global(.logbook-delete:focus-visible) {
+    color: var(--danger);
+    outline: none;
+  }
+
+  :global(.equipment-row) {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 2px;
+    border-top: 1px solid var(--line);
+  }
+
+  :global(.equipment-row:first-child) {
+    border-top: none;
+  }
+
+  :global(.equipment-row-text) {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    overflow: hidden;
+    flex: 1;
+    min-width: 0;
+  }
+
+  :global(.equipment-row-name) {
+    font-size: 13.5px;
+    font-weight: 600;
+  }
+
+  :global(.equipment-row-detail) {
+    font-size: 12px;
+    color: var(--ink-soft);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  :global(.equipment-delete) {
+    appearance: none;
+    border: none;
+    background: transparent;
+    color: var(--ink-soft);
+    font-family: 'Inter', sans-serif;
+    font-size: 18px;
+    line-height: 1;
+    width: 26px;
+    height: 26px;
+    flex: none;
+    border-radius: 8px;
+    cursor: pointer;
+    touch-action: manipulation;
+  }
+
+  :global(.equipment-delete:hover),
+  :global(.equipment-delete:focus-visible) {
+    background: var(--danger-soft);
+    color: var(--danger);
+    outline: none;
+  }
+
+  :global(.default-star) {
+    appearance: none;
+    border: none;
+    background: transparent;
+    color: var(--line-strong);
+    font-size: 16px;
+    line-height: 1;
+    width: 26px;
+    height: 26px;
+    flex: none;
+    border-radius: 8px;
+    cursor: pointer;
+    touch-action: manipulation;
+  }
+
+  :global(.default-star:hover),
+  :global(.default-star:focus-visible) {
+    background: var(--panel);
+    color: var(--gold);
+    outline: none;
+  }
+
+  :global(.default-star[aria-pressed='true']) {
+    color: var(--gold);
+  }
+
+  :global(.default-star:disabled) {
+    opacity: 0.5;
+    cursor: default;
+  }
+
+  :global(.equipment-empty) {
+    margin: 0 0 12px;
+    padding: 9px 2px;
+    color: var(--ink-soft);
+    font-size: 13px;
+  }
+</style>
 
 <script>
   import { wireToggle, wireDownloadButtons, escapeHtml } from '../../lib/client/dom';
