@@ -11,8 +11,47 @@ import {
   type DayState,
 } from '../../lib/tandem';
 import { groupByInvoiceMonth, groupByWeek } from '../../lib/tandem-invoice';
+import { addEntry as addLogbookEntry, removeEntry as removeLogbookEntry } from '../../lib/logbook';
+import { ensureJumpType, readLogbookSettings } from '../../lib/logbook-settings';
 
 const MAX_NAME_LENGTH = 80;
+
+// A tandem instructor/camera jump is also a jump in its own right, so
+// logging one here auto-adds a matching entry to the personal logbook —
+// sharing the same `at` id so undoing the tandem jump (see DELETE below)
+// cleanly removes its logbook entry too, without a separate link table.
+// Best-effort: the tandem jump itself is the record that matters for
+// invoicing, so a logbook-side failure is logged, not surfaced as an error.
+async function autoLogTandemJump(category: Category, name: string, date: string, at: string): Promise<void> {
+  try {
+    const jumpTypeName = category === 'instructor' ? 'Tandem Instructor' : 'Tandem Camera';
+    await ensureJumpType(jumpTypeName);
+    const settings = await readLogbookSettings();
+    // Camera jumps use whatever's currently starred as the default
+    // Equipment profile (the videographer's own camera rig) — blank if
+    // none is set. Instructor jumps use a generic placeholder instead: a
+    // tandem instructor rig isn't one of the videographer's own saved
+    // profiles, so there's nothing meaningful to default it to.
+    const defaultEquipment = settings.equipment.find((eq) => eq.id === settings.defaultEquipmentId);
+    await addLogbookEntry(
+      {
+        date,
+        place: '',
+        exitAltitude: '',
+        canopy: category === 'instructor' ? 'Tandem Rig' : defaultEquipment?.canopy ?? '',
+        container: category === 'instructor' ? '' : defaultEquipment?.container ?? '',
+        aad: category === 'instructor' ? '' : defaultEquipment?.aad ?? '',
+        aircraft: '',
+        jumpType: jumpTypeName,
+        description: `Auto-logged from the Tandems tab — ${category} jump for ${name}.`,
+      },
+      settings.baseJumps,
+      at,
+    );
+  } catch (err) {
+    console.error('Failed to auto-log tandem jump to the logbook', err);
+  }
+}
 
 async function respond(state: DayState): Promise<Response> {
   // The daily history (used for the "Day" table) doesn't include today, but
@@ -74,7 +113,9 @@ export const POST: APIRoute = async ({ request }) => {
     });
   }
 
-  const state = await addJump(category as Category, cleanName);
+  const at = new Date().toISOString();
+  const state = await addJump(category as Category, cleanName, at);
+  await autoLogTandemJump(category as Category, cleanName, state.date, at);
   return respond(state);
 };
 
@@ -101,5 +142,14 @@ export const DELETE: APIRoute = async ({ request }) => {
   }
 
   const state = await removeJump(at);
+  // Same id as the auto-logged logbook entry (if any) — removeEntry is a
+  // harmless no-op when nothing matches, e.g. a jump logged before this
+  // feature existed.
+  try {
+    const settings = await readLogbookSettings();
+    await removeLogbookEntry(at, settings.baseJumps);
+  } catch (err) {
+    console.error('Failed to remove auto-logged logbook entry', err);
+  }
   return respond(state);
 };

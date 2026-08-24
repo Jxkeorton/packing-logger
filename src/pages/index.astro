@@ -515,6 +515,21 @@ const money = (n: number) => `£${n.toFixed(2)}`;
                   }
                 </select>
               </label>
+              <label class="invoice-field">
+                <span>Jump type</span>
+                <select id="logbookJumpType">
+                  <option value="" selected={!logbookSettings.defaultJumpTypeId || undefined}>
+                    No jump type selected
+                  </option>
+                  {
+                    logbookSettings.jumpTypes.map((jt) => (
+                      <option value={jt.id} selected={jt.id === logbookSettings.defaultJumpTypeId || undefined}>
+                        {jt.name}
+                      </option>
+                    ))
+                  }
+                </select>
+              </label>
             </div>
             <label class="invoice-field">
               <span>Description</span>
@@ -551,6 +566,7 @@ const money = (n: number) => `£${n.toFixed(2)}`;
                       data-canopy={e.canopy}
                       data-container={e.container}
                       data-aad={e.aad}
+                      data-jump-type={e.jumpType}
                       data-description={e.description}
                     >
                       <button type="button" class="logbook-row" data-toggle={e.at} aria-expanded="false">
@@ -561,6 +577,10 @@ const money = (n: number) => `£${n.toFixed(2)}`;
                       </button>
                       <div class="logbook-details" id={`logbookDetails-${e.at}`} hidden>
                         <dl class="logbook-details-grid">
+                          <div>
+                            <dt>Jump type</dt>
+                            <dd>{e.jumpType || '—'}</dd>
+                          </div>
                           <div>
                             <dt>Exit altitude</dt>
                             <dd>{e.exitAltitude || '—'}</dd>
@@ -756,6 +776,57 @@ const money = (n: number) => `£${n.toFixed(2)}`;
               <div class="invoice-settings-actions">
                 <button type="submit" class="invoice-settings-save">Save aircraft</button>
                 <span class="invoice-settings-status" id="aircraftStatus" role="status"></span>
+              </div>
+            </form>
+          </div>
+        </section>
+
+        <section class="history">
+          <button class="history-toggle" id="jumpTypesToggle" type="button" aria-expanded="false" aria-controls="jumpTypesPanel">
+            <span>Jump types</span>
+            <span class="history-toggle-icon" id="jumpTypesToggleIcon">&rsaquo;</span>
+          </button>
+          <div class="history-panel invoice-settings-panel" id="jumpTypesPanel" hidden>
+            <p class="invoice-settings-hint">
+              The starred one is pre-selected whenever you start a new jump. "Tandem Instructor" and "Tandem Camera" are
+              added here automatically the first time you log one from the Tandems tab.
+            </p>
+            <ul class="equipment-list" id="jumpTypesList">
+              {
+                logbookSettings.jumpTypes.length === 0 ? (
+                  <li class="equipment-empty">No jump types saved yet.</li>
+                ) : (
+                  logbookSettings.jumpTypes.map((jt) => (
+                    <li class="equipment-row" data-id={jt.id}>
+                      <div class="equipment-row-text">
+                        <span class="equipment-row-name">{jt.name}</span>
+                      </div>
+                      <button
+                        type="button"
+                        class="default-star"
+                        data-default-category="jumpType"
+                        data-default-id={jt.id}
+                        aria-pressed={jt.id === logbookSettings.defaultJumpTypeId ? 'true' : 'false'}
+                        aria-label={`Set ${jt.name} as the default jump type`}
+                      >
+                        &#9733;
+                      </button>
+                      <button type="button" class="equipment-delete" data-jump-type-delete={jt.id} aria-label={`Remove ${jt.name}`}>
+                        &times;
+                      </button>
+                    </li>
+                  ))
+                )
+              }
+            </ul>
+            <form id="jumpTypesForm" class="equipment-form">
+              <label class="invoice-field">
+                <span>Name</span>
+                <input type="text" id="jumpTypeName" placeholder="e.g. Sport" autocomplete="off" maxlength="40" required />
+              </label>
+              <div class="invoice-settings-actions">
+                <button type="submit" class="invoice-settings-save">Save jump type</button>
+                <span class="invoice-settings-status" id="jumpTypesStatus" role="status"></span>
               </div>
             </form>
           </div>
@@ -2595,6 +2666,7 @@ const money = (n: number) => `£${n.toFixed(2)}`;
         container: string;
         aad: string;
         aircraft: string;
+        jumpType: string;
         description: string;
         at: string;
         number: number;
@@ -2622,7 +2694,7 @@ const money = (n: number) => `£${n.toFixed(2)}`;
           ? `<p class="logbook-details-description">${escapeHtml(e.description)}</p>`
           : '';
         return `
-          <li class="logbook-entry" data-at="${e.at}" data-date="${e.date}" data-place="${escapeHtml(e.place)}" data-altitude="${escapeHtml(e.exitAltitude)}" data-aircraft="${escapeHtml(e.aircraft)}" data-canopy="${escapeHtml(e.canopy)}" data-container="${escapeHtml(e.container)}" data-aad="${escapeHtml(e.aad)}" data-description="${escapeHtml(e.description)}">
+          <li class="logbook-entry" data-at="${e.at}" data-date="${e.date}" data-place="${escapeHtml(e.place)}" data-altitude="${escapeHtml(e.exitAltitude)}" data-aircraft="${escapeHtml(e.aircraft)}" data-canopy="${escapeHtml(e.canopy)}" data-container="${escapeHtml(e.container)}" data-aad="${escapeHtml(e.aad)}" data-jump-type="${escapeHtml(e.jumpType)}" data-description="${escapeHtml(e.description)}">
             <button type="button" class="logbook-row" data-toggle="${e.at}" aria-expanded="false">
               <span class="logbook-row-number">#${e.number}</span>
               <span class="logbook-row-date">${formatShortDate(e.date)}</span>
@@ -2631,6 +2703,7 @@ const money = (n: number) => `£${n.toFixed(2)}`;
             </button>
             <div class="logbook-details" id="logbookDetails-${e.at}" hidden>
               <dl class="logbook-details-grid">
+                <div><dt>Jump type</dt><dd>${dash(e.jumpType)}</dd></div>
                 <div><dt>Exit altitude</dt><dd>${dash(e.exitAltitude)}</dd></div>
                 <div><dt>Aircraft</dt><dd>${dash(e.aircraft)}</dd></div>
                 <div><dt>Canopy</dt><dd>${dash(e.canopy)}</dd></div>
@@ -2673,6 +2746,7 @@ const money = (n: number) => `£${n.toFixed(2)}`;
       const logbookAltitude = document.getElementById('logbookAltitude') as HTMLInputElement | null;
       const logbookEquipment = document.getElementById('logbookEquipment') as HTMLSelectElement | null;
       const logbookAircraft = document.getElementById('logbookAircraft') as HTMLSelectElement | null;
+      const logbookJumpType = document.getElementById('logbookJumpType') as HTMLSelectElement | null;
       const logbookDescription = document.getElementById('logbookDescription') as HTMLTextAreaElement | null;
       const logbookSubmit = document.getElementById('logbookSubmit') as HTMLButtonElement | null;
       const logbookCancelEdit = document.getElementById('logbookCancelEdit') as HTMLButtonElement | null;
@@ -2694,9 +2768,15 @@ const money = (n: number) => `£${n.toFixed(2)}`;
       logbookPlace?.addEventListener('change', () => markTouched(logbookPlace));
       logbookEquipment?.addEventListener('change', () => markTouched(logbookEquipment));
       logbookAircraft?.addEventListener('change', () => markTouched(logbookAircraft));
+      logbookJumpType?.addEventListener('change', () => markTouched(logbookJumpType));
 
+      // Reads the picked option's label — but only when a real place is
+      // selected. The placeholder option (value="") still has its own
+      // textContent ("No place selected"), which must NOT be sent as the
+      // place itself.
       function selectedPlaceText(): string {
-        return logbookPlace?.selectedOptions[0]?.textContent ?? '';
+        if (!logbookPlace?.value) return '';
+        return logbookPlace.selectedOptions[0]?.textContent ?? '';
       }
 
       // Same idea as selectEquipmentMatching, but a place only has one
@@ -2740,8 +2820,11 @@ const money = (n: number) => `£${n.toFixed(2)}`;
         logbookEquipment.value = '';
       }
 
+      // See selectedPlaceText for why this checks `.value` first rather
+      // than just reading the selected option's label.
       function selectedAircraftText(): string {
-        return logbookAircraft?.selectedOptions[0]?.textContent ?? '';
+        if (!logbookAircraft?.value) return '';
+        return logbookAircraft.selectedOptions[0]?.textContent ?? '';
       }
 
       // Same idea as selectEquipmentMatching, but aircraft only has one
@@ -2758,6 +2841,27 @@ const money = (n: number) => `£${n.toFixed(2)}`;
         logbookAircraft.value = '';
       }
 
+      // See selectedPlaceText for why this checks `.value` first rather
+      // than just reading the selected option's label.
+      function selectedJumpTypeText(): string {
+        if (!logbookJumpType?.value) return '';
+        return logbookJumpType.selectedOptions[0]?.textContent ?? '';
+      }
+
+      // Same idea as selectEquipmentMatching, but a jump type only has one
+      // field, so it's a plain text match against the option's label.
+      function selectJumpTypeMatching(name: string) {
+        if (!logbookJumpType) return;
+        markTouched(logbookJumpType);
+        for (const option of Array.from(logbookJumpType.options)) {
+          if (option.textContent === name) {
+            logbookJumpType.value = option.value;
+            return;
+          }
+        }
+        logbookJumpType.value = '';
+      }
+
       function enterAddMode() {
         if (!logbookForm) return;
         logbookForm.dataset.editing = 'false';
@@ -2770,6 +2874,7 @@ const money = (n: number) => `£${n.toFixed(2)}`;
         logbookPlace?.removeAttribute('data-user-touched');
         logbookEquipment?.removeAttribute('data-user-touched');
         logbookAircraft?.removeAttribute('data-user-touched');
+        logbookJumpType?.removeAttribute('data-user-touched');
         const totalEl = document.getElementById('logbookTotalJumps');
         if (logbookNextNumberEl && totalEl) {
           logbookNextNumberEl.textContent = `#${Number(totalEl.textContent) + 1}`;
@@ -2778,7 +2883,7 @@ const money = (n: number) => `£${n.toFixed(2)}`;
 
       function enterEditMode(entry: HTMLElement) {
         if (!logbookForm) return;
-        const { at, date, place, altitude, aircraft, canopy, container, aad, description } = entry.dataset;
+        const { at, date, place, altitude, aircraft, canopy, container, aad, jumpType, description } = entry.dataset;
         logbookForm.dataset.editing = 'true';
         if (logbookEditingAt) logbookEditingAt.value = at ?? '';
         if (logbookDate) logbookDate.value = date ?? '';
@@ -2787,6 +2892,7 @@ const money = (n: number) => `£${n.toFixed(2)}`;
         selectPlaceMatching(place ?? '');
         selectEquipmentMatching(canopy ?? '', container ?? '', aad ?? '');
         selectAircraftMatching(aircraft ?? '');
+        selectJumpTypeMatching(jumpType ?? '');
         if (logbookFormTitle) logbookFormTitle.textContent = 'Edit jump';
         if (logbookSubmit) logbookSubmit.textContent = 'Save changes';
         if (logbookCancelEdit) logbookCancelEdit.hidden = false;
@@ -2809,6 +2915,7 @@ const money = (n: number) => `£${n.toFixed(2)}`;
           place: selectedPlaceText(),
           exitAltitude: logbookAltitude?.value ?? '',
           aircraft: selectedAircraftText(),
+          jumpType: selectedJumpTypeText(),
           description: logbookDescription?.value ?? '',
           ...equipment,
         };
@@ -2893,17 +3000,24 @@ const money = (n: number) => `£${n.toFixed(2)}`;
         }
       });
 
-      // ---- Logbook: default star (shared by places/equipment/aircraft) ----
+      // ---- Logbook: default star (shared by places/equipment/aircraft/jump types) ----
 
-      type DefaultCategory = 'place' | 'equipment' | 'aircraft';
+      type DefaultCategory = 'place' | 'equipment' | 'aircraft' | 'jumpType';
+
+      const DEFAULT_CATEGORY_LABELS: Record<DefaultCategory, string> = {
+        place: 'place',
+        equipment: 'equipment',
+        aircraft: 'aircraft',
+        jumpType: 'jump type',
+      };
 
       function defaultStarHtml(category: DefaultCategory, id: string, isDefault: boolean, label: string): string {
-        return `<button type="button" class="default-star" data-default-category="${category}" data-default-id="${id}" aria-pressed="${isDefault}" aria-label="Set ${escapeHtml(label)} as the default ${category}">&#9733;</button>`;
+        return `<button type="button" class="default-star" data-default-category="${category}" data-default-id="${id}" aria-pressed="${isDefault}" aria-label="Set ${escapeHtml(label)} as the default ${DEFAULT_CATEGORY_LABELS[category]}">&#9733;</button>`;
       }
 
       // Toggles one item as the default for its category (only one default
       // per category — starring another replaces it, starring the current
-      // one clears it) and refreshes all three panels + dropdowns from the
+      // one clears it) and refreshes all four panels + dropdowns from the
       // single settings object the endpoint returns.
       async function toggleDefault(star: HTMLButtonElement) {
         const category = star.dataset.defaultCategory as DefaultCategory | undefined;
@@ -2922,6 +3036,7 @@ const money = (n: number) => `£${n.toFixed(2)}`;
           applyPlaceState(data.settings.places, data.settings.defaultPlaceId);
           applyEquipmentState(data.settings.equipment, data.settings.defaultEquipmentId);
           applyAircraftState(data.settings.aircraft, data.settings.defaultAircraftId);
+          applyJumpTypeState(data.settings.jumpTypes, data.settings.defaultJumpTypeId);
         } catch (err) {
           console.error('Failed to set default', err);
         } finally {
@@ -3281,6 +3396,120 @@ const money = (n: number) => `£${n.toFixed(2)}`;
         }
       });
 
+      // ---- Logbook: jump types ----
+
+      interface JumpTypeData {
+        id: string;
+        name: string;
+      }
+
+      function jumpTypeOptionsHtml(jumpTypes: JumpTypeData[], defaultId: string | null): string {
+        const saved = jumpTypes
+          .map((jt) => `<option value="${jt.id}"${jt.id === defaultId ? ' selected' : ''}>${escapeHtml(jt.name)}</option>`)
+          .join('');
+        return `<option value=""${!defaultId ? ' selected' : ''}>No jump type selected</option>${saved}`;
+      }
+
+      function jumpTypeListHtml(jumpTypes: JumpTypeData[], defaultId: string | null): string {
+        if (jumpTypes.length === 0) return '<li class="equipment-empty">No jump types saved yet.</li>';
+        return jumpTypes
+          .map(
+            (jt) => `
+              <li class="equipment-row" data-id="${jt.id}">
+                <div class="equipment-row-text">
+                  <span class="equipment-row-name">${escapeHtml(jt.name)}</span>
+                </div>
+                ${defaultStarHtml('jumpType', jt.id, jt.id === defaultId, jt.name)}
+                <button type="button" class="equipment-delete" data-jump-type-delete="${jt.id}" aria-label="Remove ${escapeHtml(jt.name)}">&times;</button>
+              </li>`,
+          )
+          .join('');
+      }
+
+      function applyJumpTypeState(jumpTypes: JumpTypeData[], defaultId: string | null) {
+        const list = document.getElementById('jumpTypesList');
+        if (list) list.innerHTML = jumpTypeListHtml(jumpTypes, defaultId);
+        if (logbookJumpType) {
+          // See applyPlaceState for why this checks `touched` rather than
+          // just "was there a previous value".
+          const touched = logbookJumpType.dataset.userTouched === 'true';
+          const previous = logbookJumpType.value;
+          logbookJumpType.innerHTML = jumpTypeOptionsHtml(jumpTypes, defaultId);
+          if (touched && Array.from(logbookJumpType.options).some((o) => o.value === previous)) {
+            logbookJumpType.value = previous;
+          }
+        }
+      }
+
+      const jumpTypesForm = document.getElementById('jumpTypesForm') as HTMLFormElement | null;
+      const jumpTypesList = document.getElementById('jumpTypesList');
+      const jumpTypesStatus = document.getElementById('jumpTypesStatus');
+      const jumpTypeName = document.getElementById('jumpTypeName') as HTMLInputElement | null;
+
+      jumpTypesForm?.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const submitButton = jumpTypesForm.querySelector<HTMLButtonElement>('button[type="submit"]');
+        if (submitButton) submitButton.disabled = true;
+        if (jumpTypesStatus) {
+          jumpTypesStatus.textContent = 'Saving…';
+          jumpTypesStatus.removeAttribute('data-state');
+        }
+
+        try {
+          const res = await fetch('/api/jump-types', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: jumpTypeName?.value ?? '' }),
+          });
+          if (!res.ok) {
+            const data = await res.json().catch(() => null);
+            throw new Error(data?.error ?? 'Failed to save');
+          }
+          const data = await res.json();
+          applyJumpTypeState(data.settings.jumpTypes, data.settings.defaultJumpTypeId);
+          jumpTypesForm.reset();
+          if (jumpTypesStatus) {
+            jumpTypesStatus.textContent = 'Saved';
+            jumpTypesStatus.dataset.state = 'ok';
+          }
+        } catch (err) {
+          console.error('Failed to save jump type', err);
+          if (jumpTypesStatus) {
+            jumpTypesStatus.textContent = err instanceof Error ? err.message : 'Failed to save';
+            jumpTypesStatus.dataset.state = 'error';
+          }
+        } finally {
+          if (submitButton) submitButton.disabled = false;
+        }
+      });
+
+      jumpTypesList?.addEventListener('click', async (event) => {
+        const star = (event.target as HTMLElement).closest<HTMLButtonElement>('.default-star');
+        if (star) {
+          void toggleDefault(star);
+          return;
+        }
+
+        const button = (event.target as HTMLElement).closest<HTMLButtonElement>('.equipment-delete');
+        const id = button?.dataset.jumpTypeDelete;
+        if (!id) return;
+        button.disabled = true;
+        try {
+          const res = await fetch('/api/jump-types', {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id }),
+          });
+          if (!res.ok) return;
+          const data = await res.json();
+          applyJumpTypeState(data.settings.jumpTypes, data.settings.defaultJumpTypeId);
+        } catch (err) {
+          console.error('Failed to delete jump type', err);
+        } finally {
+          button.disabled = false;
+        }
+      });
+
       // ---- Logbook: settings (starting jump number) ----
 
       const logbookSettingsForm = document.getElementById('logbookSettingsForm') as HTMLFormElement | null;
@@ -3333,6 +3562,7 @@ const money = (n: number) => `£${n.toFixed(2)}`;
       wireToggle('placesToggle', 'placesPanel');
       wireToggle('equipmentToggle', 'equipmentPanel');
       wireToggle('aircraftToggle', 'aircraftPanel');
+      wireToggle('jumpTypesToggle', 'jumpTypesPanel');
       wireToggle('logbookSettingsToggle', 'logbookSettingsPanel');
     </script>
   </body>

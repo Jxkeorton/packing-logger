@@ -1,9 +1,10 @@
 // Settings for the logbook feature: the jump count to carry forward from
-// before this app existed, the saved place/equipment/aircraft profiles the
-// add-jump form's dropdowns pick from, and which one (if any) of each is
-// the default pre-selected on a fresh jump. Kept as one small JSON document
-// — same shape of concern as invoice-settings.ts — rather than a growing
-// ledger, since none of this changes anywhere near as often as the jumps do.
+// before this app existed, the saved place/equipment/aircraft/jump-type
+// profiles the add-jump form's dropdowns pick from, and which one (if any)
+// of each is the default pre-selected on a fresh jump. Kept as one small
+// JSON document — same shape of concern as invoice-settings.ts — rather
+// than a growing ledger, since none of this changes anywhere near as often
+// as the jumps do.
 import { randomUUID } from 'node:crypto';
 import { readText, writeText } from './storage';
 
@@ -25,16 +26,23 @@ export interface Aircraft {
   plate: string; // registration / call sign, e.g. "G-SDSK" — what shows in the dropdown
 }
 
-export type DefaultCategory = 'place' | 'equipment' | 'aircraft';
+export interface JumpType {
+  id: string;
+  name: string; // e.g. "Sport", "Tandem Instructor" — what shows in the dropdown
+}
+
+export type DefaultCategory = 'place' | 'equipment' | 'aircraft' | 'jumpType';
 
 export interface LogbookSettings {
   baseJumps: number; // jumps already logged on paper before this app started counting
   places: Place[];
   equipment: Equipment[];
   aircraft: Aircraft[];
+  jumpTypes: JumpType[];
   defaultPlaceId: string | null;
   defaultEquipmentId: string | null;
   defaultAircraftId: string | null;
+  defaultJumpTypeId: string | null;
 }
 
 const SETTINGS_KEY = 'logbook-settings.json';
@@ -44,14 +52,29 @@ const DEFAULTS: LogbookSettings = {
   places: [],
   equipment: [],
   aircraft: [],
+  jumpTypes: [],
   defaultPlaceId: null,
   defaultEquipmentId: null,
   defaultAircraftId: null,
+  defaultJumpTypeId: null,
 };
 
 function asPlaceList(value: unknown): Place[] {
   if (!Array.isArray(value)) return [];
   const out: Place[] = [];
+  for (const item of value) {
+    if (item && typeof item === 'object' && typeof (item as any).id === 'string' && typeof (item as any).name === 'string') {
+      out.push({ id: (item as any).id, name: (item as any).name });
+    }
+  }
+  return out;
+}
+
+// Jump types have the exact same {id, name} shape as places, but are kept
+// as a distinct type so callers can't mix the two lists up by accident.
+function asJumpTypeList(value: unknown): JumpType[] {
+  if (!Array.isArray(value)) return [];
+  const out: JumpType[] = [];
   for (const item of value) {
     if (item && typeof item === 'object' && typeof (item as any).id === 'string' && typeof (item as any).name === 'string') {
       out.push({ id: (item as any).id, name: (item as any).name });
@@ -111,9 +134,11 @@ export async function readLogbookSettings(): Promise<LogbookSettings> {
     const places = asPlaceList(parsed.places);
     const equipment = asEquipmentList(parsed.equipment);
     const aircraft = asAircraftList(parsed.aircraft);
+    const jumpTypes = asJumpTypeList(parsed.jumpTypes);
     const defaultPlaceId = asId(parsed.defaultPlaceId);
     const defaultEquipmentId = asId(parsed.defaultEquipmentId);
     const defaultAircraftId = asId(parsed.defaultAircraftId);
+    const defaultJumpTypeId = asId(parsed.defaultJumpTypeId);
     return {
       baseJumps:
         typeof parsed.baseJumps === 'number' && Number.isInteger(parsed.baseJumps) && parsed.baseJumps >= 0
@@ -122,12 +147,14 @@ export async function readLogbookSettings(): Promise<LogbookSettings> {
       places,
       equipment,
       aircraft,
+      jumpTypes,
       // Guard against a default pointing at an id that's since been deleted
       // (e.g. the settings file was edited by hand, or a delete raced a
       // default-set) — fall back to "no default" rather than dangle.
       defaultPlaceId: places.some((p) => p.id === defaultPlaceId) ? defaultPlaceId : null,
       defaultEquipmentId: equipment.some((e) => e.id === defaultEquipmentId) ? defaultEquipmentId : null,
       defaultAircraftId: aircraft.some((a) => a.id === defaultAircraftId) ? defaultAircraftId : null,
+      defaultJumpTypeId: jumpTypes.some((j) => j.id === defaultJumpTypeId) ? defaultJumpTypeId : null,
     };
   } catch {
     return DEFAULTS;
@@ -199,6 +226,40 @@ export async function removeAircraft(id: string): Promise<LogbookSettings> {
   return next;
 }
 
+export async function addJumpType(item: Omit<JumpType, 'id'>): Promise<LogbookSettings> {
+  const current = await readLogbookSettings();
+  const next: LogbookSettings = { ...current, jumpTypes: [...current.jumpTypes, { ...item, id: randomUUID() }] };
+  await writeLogbookSettings(next);
+  return next;
+}
+
+export async function removeJumpType(id: string): Promise<LogbookSettings> {
+  const current = await readLogbookSettings();
+  const next: LogbookSettings = {
+    ...current,
+    jumpTypes: current.jumpTypes.filter((j) => j.id !== id),
+    defaultJumpTypeId: current.defaultJumpTypeId === id ? null : current.defaultJumpTypeId,
+  };
+  await writeLogbookSettings(next);
+  return next;
+}
+
+/**
+ * Make sure a jump type with this exact name is in the saved list, adding
+ * it if not — used when auto-logging a tandem jump (see
+ * api/tandem-adjust.ts) so "Tandem Instructor"/"Tandem Camera" show up in
+ * the dropdown the same as any manually-added type, without creating
+ * duplicates on every tandem jump.
+ */
+export async function ensureJumpType(name: string): Promise<JumpType> {
+  const current = await readLogbookSettings();
+  const existing = current.jumpTypes.find((j) => j.name === name);
+  if (existing) return existing;
+  const created: JumpType = { id: randomUUID(), name };
+  await writeLogbookSettings({ ...current, jumpTypes: [...current.jumpTypes, created] });
+  return created;
+}
+
 /**
  * Set (or, passing `id: null`, clear) the default for one category — the
  * option the add-jump form pre-selects for a fresh jump. Only one default
@@ -206,9 +267,17 @@ export async function removeAircraft(id: string): Promise<LogbookSettings> {
  */
 export async function setDefault(category: DefaultCategory, id: string | null): Promise<LogbookSettings> {
   const current = await readLogbookSettings();
-  const list = category === 'place' ? current.places : category === 'equipment' ? current.equipment : current.aircraft;
+  const list =
+    category === 'place' ? current.places : category === 'equipment' ? current.equipment : category === 'aircraft' ? current.aircraft : current.jumpTypes;
   const resolvedId = id && list.some((item) => item.id === id) ? id : null;
-  const key = category === 'place' ? 'defaultPlaceId' : category === 'equipment' ? 'defaultEquipmentId' : 'defaultAircraftId';
+  const key =
+    category === 'place'
+      ? 'defaultPlaceId'
+      : category === 'equipment'
+        ? 'defaultEquipmentId'
+        : category === 'aircraft'
+          ? 'defaultAircraftId'
+          : 'defaultJumpTypeId';
   const next: LogbookSettings = { ...current, [key]: resolvedId };
   await writeLogbookSettings(next);
   return next;

@@ -17,6 +17,7 @@ export interface LogbookEntry {
   container: string;
   aad: string;
   aircraft: string;
+  jumpType: string; // e.g. "Sport", "Tandem Instructor" — see logbook-settings.ts's saved jump types
   description: string;
   at: string; // ISO timestamp this entry was logged — also its id, for edit/delete
 }
@@ -26,7 +27,11 @@ export interface NumberedEntry extends LogbookEntry {
 }
 
 const ENTRIES_KEY = 'logbook.csv';
-const ENTRIES_HEADER = 'date,place,exit_altitude,canopy,container,aad,aircraft,description,at';
+// jump_type is appended after `at` rather than inserted earlier in the row,
+// so older rows written before this field existed still parse correctly —
+// they simply come up one field short and jumpType defaults to ''.
+const ENTRIES_HEADER = 'date,place,exit_altitude,canopy,container,aad,aircraft,description,at,jump_type';
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 // Every free-text field here (place/aircraft/description especially) can
 // contain commas or line breaks, so — same approach as tandem.ts — quote
@@ -74,9 +79,13 @@ async function readEntries(): Promise<LogbookEntry[]> {
   const lines = raw.split('\n').filter((l) => l.trim().length > 0);
   const entries: LogbookEntry[] = [];
   for (const line of lines) {
-    if (line.trim() === ENTRIES_HEADER) continue;
-    const [date, place, exitAltitude, canopy, container, aad, aircraft, description, at] = parseCsvLine(line);
-    if (!date || !at) continue;
+    const [date, place, exitAltitude, canopy, container, aad, aircraft, description, at, jumpType] = parseCsvLine(line);
+    // Recognize a header row by shape (its first field isn't a real date),
+    // not by an exact string match against the current ENTRIES_HEADER —
+    // that string has changed as fields were added, and a file written
+    // under an older header would otherwise have its header line
+    // misparsed as one bogus data row (date="date", at="at", ...).
+    if (!DATE_RE.test(date ?? '') || !at) continue;
     entries.push({
       date,
       place: place ?? '',
@@ -87,6 +96,7 @@ async function readEntries(): Promise<LogbookEntry[]> {
       aircraft: aircraft ?? '',
       description: description ?? '',
       at,
+      jumpType: jumpType ?? '',
     });
   }
   return entries;
@@ -103,9 +113,18 @@ async function writeEntries(entries: LogbookEntry[]): Promise<void> {
   const sorted = sortAscending(entries);
   const body = sorted
     .map((e) =>
-      [e.date, csvEscape(e.place), csvEscape(e.exitAltitude), csvEscape(e.canopy), csvEscape(e.container), csvEscape(e.aad), csvEscape(e.aircraft), csvEscape(e.description), e.at].join(
-        ',',
-      ),
+      [
+        e.date,
+        csvEscape(e.place),
+        csvEscape(e.exitAltitude),
+        csvEscape(e.canopy),
+        csvEscape(e.container),
+        csvEscape(e.aad),
+        csvEscape(e.aircraft),
+        csvEscape(e.description),
+        e.at,
+        csvEscape(e.jumpType),
+      ].join(','),
     )
     .join('\n');
   await writeText(ENTRIES_KEY, `${ENTRIES_HEADER}\n${body}\n`);
@@ -129,10 +148,15 @@ export async function nextJumpNumber(baseJumps: number): Promise<number> {
 
 export type EntryInput = Omit<LogbookEntry, 'at'>;
 
-/** Record a new jump. Returns the newest-first, numbered list. */
-export async function addEntry(input: EntryInput, baseJumps: number): Promise<NumberedEntry[]> {
+/**
+ * Record a new jump. `at` defaults to now, but can be passed explicitly so
+ * a caller (see api/tandem-adjust.ts) can share the same id with a linked
+ * record in another ledger — a tandem jump auto-logged here too. Returns
+ * the newest-first, numbered list.
+ */
+export async function addEntry(input: EntryInput, baseJumps: number, at: string = new Date().toISOString()): Promise<NumberedEntry[]> {
   const entries = await readEntries();
-  entries.push({ ...input, at: new Date().toISOString() });
+  entries.push({ ...input, at });
   await writeEntries(entries);
   return withNumbers(entries, baseJumps).reverse();
 }
@@ -167,12 +191,21 @@ export async function removeEntry(at: string, baseJumps: number): Promise<Number
 export async function readCsvFile(baseJumps: number): Promise<string> {
   const entries = await readEntries();
   const numbered = withNumbers(entries, baseJumps);
-  const header = 'jump_number,date,place,exit_altitude,canopy,container,aad,aircraft,description';
+  const header = 'jump_number,date,jump_type,place,exit_altitude,canopy,container,aad,aircraft,description';
   const body = numbered
     .map((e) =>
-      [e.number, e.date, csvEscape(e.place), csvEscape(e.exitAltitude), csvEscape(e.canopy), csvEscape(e.container), csvEscape(e.aad), csvEscape(e.aircraft), csvEscape(e.description)].join(
-        ',',
-      ),
+      [
+        e.number,
+        e.date,
+        csvEscape(e.jumpType),
+        csvEscape(e.place),
+        csvEscape(e.exitAltitude),
+        csvEscape(e.canopy),
+        csvEscape(e.container),
+        csvEscape(e.aad),
+        csvEscape(e.aircraft),
+        csvEscape(e.description),
+      ].join(','),
     )
     .join('\n');
   return `${header}\n${body}\n`;

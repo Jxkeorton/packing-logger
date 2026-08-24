@@ -136,11 +136,16 @@ export async function loadTodayState(): Promise<DayState> {
   return stateFor(jumps, todayKey());
 }
 
-/** Record one jump for today under `category`, crediting `name`. */
-export async function addJump(category: Category, name: string): Promise<DayState> {
+/**
+ * Record one jump for today under `category`, crediting `name`. `at`
+ * defaults to now, but can be passed explicitly so a caller (see
+ * api/tandem-adjust.ts) can share the same id with a linked record in
+ * another ledger — the personal logbook's auto-logged tandem entries.
+ */
+export async function addJump(category: Category, name: string, at: string = new Date().toISOString()): Promise<DayState> {
   const jumps = await readJumps();
   const today = todayKey();
-  jumps.push({ date: today, category, name, at: new Date().toISOString() });
+  jumps.push({ date: today, category, name, at });
   await writeJumps(jumps);
   return stateFor(jumps, today);
 }

@@ -44,6 +44,7 @@ function parseEntryInput(body: any): { input: EntryInput } | { error: string } {
     container: oneLine(body?.container, MAX_LINE_LENGTH),
     aad: oneLine(body?.aad, MAX_LINE_LENGTH),
     aircraft: oneLine(body?.aircraft, MAX_LINE_LENGTH),
+    jumpType: oneLine(body?.jumpType, MAX_LINE_LENGTH),
     description: multiLine(body?.description, MAX_DESCRIPTION_LENGTH),
   };
   return { input };

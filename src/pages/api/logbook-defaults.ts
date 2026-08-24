@@ -1,7 +1,7 @@
 import type { APIRoute } from 'astro';
 import { setDefault, type DefaultCategory } from '../../lib/logbook-settings';
 
-const CATEGORIES: DefaultCategory[] = ['place', 'equipment', 'aircraft'];
+const CATEGORIES: DefaultCategory[] = ['place', 'equipment', 'aircraft', 'jumpType'];
 
 // Sets (or clears, with id: null) which saved place/equipment/aircraft the
 // add-jump form pre-selects for a fresh jump.
