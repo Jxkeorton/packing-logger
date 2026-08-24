@@ -462,7 +462,18 @@ const money = (n: number) => `£${n.toFixed(2)}`;
               </label>
               <label class="invoice-field">
                 <span>Place</span>
-                <input type="text" id="logbookPlace" placeholder="e.g. Langar" autocomplete="off" maxlength="120" />
+                <select id="logbookPlace">
+                  <option value="" selected={!logbookSettings.defaultPlaceId || undefined}>
+                    No place selected
+                  </option>
+                  {
+                    logbookSettings.places.map((p) => (
+                      <option value={p.id} selected={p.id === logbookSettings.defaultPlaceId || undefined}>
+                        {p.name}
+                      </option>
+                    ))
+                  }
+                </select>
               </label>
               <label class="invoice-field">
                 <span>Exit altitude</span>
@@ -471,12 +482,18 @@ const money = (n: number) => `£${n.toFixed(2)}`;
               <label class="invoice-field">
                 <span>Equipment</span>
                 <select id="logbookEquipment">
-                  <option value="" data-canopy="" data-container="" data-aad="">
+                  <option value="" data-canopy="" data-container="" data-aad="" selected={!logbookSettings.defaultEquipmentId || undefined}>
                     No equipment selected
                   </option>
                   {
                     logbookSettings.equipment.map((eq) => (
-                      <option value={eq.id} data-canopy={eq.canopy} data-container={eq.container} data-aad={eq.aad}>
+                      <option
+                        value={eq.id}
+                        data-canopy={eq.canopy}
+                        data-container={eq.container}
+                        data-aad={eq.aad}
+                        selected={eq.id === logbookSettings.defaultEquipmentId || undefined}
+                      >
                         {eq.name}
                       </option>
                     ))
@@ -486,10 +503,14 @@ const money = (n: number) => `£${n.toFixed(2)}`;
               <label class="invoice-field">
                 <span>Aircraft</span>
                 <select id="logbookAircraft">
-                  <option value="">No aircraft selected</option>
+                  <option value="" selected={!logbookSettings.defaultAircraftId || undefined}>
+                    No aircraft selected
+                  </option>
                   {
                     logbookSettings.aircraft.map((ac) => (
-                      <option value={ac.id}>{ac.plate}</option>
+                      <option value={ac.id} selected={ac.id === logbookSettings.defaultAircraftId || undefined}>
+                        {ac.plate}
+                      </option>
                     ))
                   }
                 </select>
@@ -580,11 +601,60 @@ const money = (n: number) => `£${n.toFixed(2)}`;
         </section>
 
         <section class="history">
+          <button class="history-toggle" id="placesToggle" type="button" aria-expanded="false" aria-controls="placesPanel">
+            <span>Places</span>
+            <span class="history-toggle-icon" id="placesToggleIcon">&rsaquo;</span>
+          </button>
+          <div class="history-panel invoice-settings-panel" id="placesPanel" hidden>
+            <p class="invoice-settings-hint">The starred one is pre-selected whenever you start a new jump.</p>
+            <ul class="equipment-list" id="placesList">
+              {
+                logbookSettings.places.length === 0 ? (
+                  <li class="equipment-empty">No places saved yet.</li>
+                ) : (
+                  logbookSettings.places.map((p) => (
+                    <li class="equipment-row" data-id={p.id}>
+                      <div class="equipment-row-text">
+                        <span class="equipment-row-name">{p.name}</span>
+                      </div>
+                      <button
+                        type="button"
+                        class="default-star"
+                        data-default-category="place"
+                        data-default-id={p.id}
+                        aria-pressed={p.id === logbookSettings.defaultPlaceId ? 'true' : 'false'}
+                        aria-label={`Set ${p.name} as the default place`}
+                      >
+                        &#9733;
+                      </button>
+                      <button type="button" class="equipment-delete" data-place-delete={p.id} aria-label={`Remove ${p.name}`}>
+                        &times;
+                      </button>
+                    </li>
+                  ))
+                )
+              }
+            </ul>
+            <form id="placesForm" class="equipment-form">
+              <label class="invoice-field">
+                <span>Name</span>
+                <input type="text" id="placeName" placeholder="e.g. Langar" autocomplete="off" maxlength="80" required />
+              </label>
+              <div class="invoice-settings-actions">
+                <button type="submit" class="invoice-settings-save">Save place</button>
+                <span class="invoice-settings-status" id="placesStatus" role="status"></span>
+              </div>
+            </form>
+          </div>
+        </section>
+
+        <section class="history">
           <button class="history-toggle" id="equipmentToggle" type="button" aria-expanded="false" aria-controls="equipmentPanel">
             <span>Equipment</span>
             <span class="history-toggle-icon" id="equipmentToggleIcon">&rsaquo;</span>
           </button>
           <div class="history-panel invoice-settings-panel" id="equipmentPanel" hidden>
+            <p class="invoice-settings-hint">The starred one is pre-selected whenever you start a new jump.</p>
             <ul class="equipment-list" id="equipmentList">
               {
                 logbookSettings.equipment.length === 0 ? (
@@ -598,6 +668,16 @@ const money = (n: number) => `£${n.toFixed(2)}`;
                           {[eq.canopy, eq.container, eq.aad].filter(Boolean).join(' · ') || 'No details saved'}
                         </span>
                       </div>
+                      <button
+                        type="button"
+                        class="default-star"
+                        data-default-category="equipment"
+                        data-default-id={eq.id}
+                        aria-pressed={eq.id === logbookSettings.defaultEquipmentId ? 'true' : 'false'}
+                        aria-label={`Set ${eq.name} as the default equipment`}
+                      >
+                        &#9733;
+                      </button>
                       <button type="button" class="equipment-delete" data-equipment-delete={eq.id} aria-label={`Remove ${eq.name}`}>
                         &times;
                       </button>
@@ -639,6 +719,7 @@ const money = (n: number) => `£${n.toFixed(2)}`;
             <span class="history-toggle-icon" id="aircraftToggleIcon">&rsaquo;</span>
           </button>
           <div class="history-panel invoice-settings-panel" id="aircraftPanel" hidden>
+            <p class="invoice-settings-hint">The starred one is pre-selected whenever you start a new jump.</p>
             <ul class="equipment-list" id="aircraftList">
               {
                 logbookSettings.aircraft.length === 0 ? (
@@ -649,6 +730,16 @@ const money = (n: number) => `£${n.toFixed(2)}`;
                       <div class="equipment-row-text">
                         <span class="equipment-row-name">{ac.plate}</span>
                       </div>
+                      <button
+                        type="button"
+                        class="default-star"
+                        data-default-category="aircraft"
+                        data-default-id={ac.id}
+                        aria-pressed={ac.id === logbookSettings.defaultAircraftId ? 'true' : 'false'}
+                        aria-label={`Set ${ac.plate} as the default aircraft`}
+                      >
+                        &#9733;
+                      </button>
                       <button type="button" class="equipment-delete" data-aircraft-delete={ac.id} aria-label={`Remove ${ac.plate}`}>
                         &times;
                       </button>
@@ -1900,7 +1991,6 @@ const money = (n: number) => `£${n.toFixed(2)}`;
       :global(.equipment-row) {
         display: flex;
         align-items: center;
-        justify-content: space-between;
         gap: 8px;
         padding: 9px 2px;
         border-top: 1px solid var(--line);
@@ -1915,6 +2005,8 @@ const money = (n: number) => `£${n.toFixed(2)}`;
         flex-direction: column;
         gap: 1px;
         overflow: hidden;
+        flex: 1;
+        min-width: 0;
       }
 
       :global(.equipment-row-name) {
@@ -1951,6 +2043,37 @@ const money = (n: number) => `£${n.toFixed(2)}`;
         background: var(--danger-soft);
         color: var(--danger);
         outline: none;
+      }
+
+      :global(.default-star) {
+        appearance: none;
+        border: none;
+        background: transparent;
+        color: var(--line-strong);
+        font-size: 16px;
+        line-height: 1;
+        width: 26px;
+        height: 26px;
+        flex: none;
+        border-radius: 8px;
+        cursor: pointer;
+        touch-action: manipulation;
+      }
+
+      :global(.default-star:hover),
+      :global(.default-star:focus-visible) {
+        background: var(--panel);
+        color: var(--gold);
+        outline: none;
+      }
+
+      :global(.default-star[aria-pressed='true']) {
+        color: var(--gold);
+      }
+
+      :global(.default-star:disabled) {
+        opacity: 0.5;
+        cursor: default;
       }
 
       :global(.equipment-empty) {
@@ -2546,7 +2669,7 @@ const money = (n: number) => `£${n.toFixed(2)}`;
       const logbookNextNumberEl = document.getElementById('logbookNextNumber');
       const logbookEditingAt = document.getElementById('logbookEditingAt') as HTMLInputElement | null;
       const logbookDate = document.getElementById('logbookDate') as HTMLInputElement | null;
-      const logbookPlace = document.getElementById('logbookPlace') as HTMLInputElement | null;
+      const logbookPlace = document.getElementById('logbookPlace') as HTMLSelectElement | null;
       const logbookAltitude = document.getElementById('logbookAltitude') as HTMLInputElement | null;
       const logbookEquipment = document.getElementById('logbookEquipment') as HTMLSelectElement | null;
       const logbookAircraft = document.getElementById('logbookAircraft') as HTMLSelectElement | null;
@@ -2555,6 +2678,40 @@ const money = (n: number) => `£${n.toFixed(2)}`;
       const logbookCancelEdit = document.getElementById('logbookCancelEdit') as HTMLButtonElement | null;
       const logbookFormStatus = document.getElementById('logbookFormStatus');
       const todayDateValue = logbookDate?.value ?? '';
+
+      // Place/Equipment/Aircraft dropdowns get rebuilt (via innerHTML)
+      // whenever their saved-profile list or default changes — e.g. from
+      // starring a different default while this form is sitting open. A
+      // rebuild should snap back to the live default *unless* something
+      // already deliberately chose a value in the meantime (typing through
+      // the dropdown, or opening a jump for editing), which is what this
+      // flag distinguishes: it's set on user interaction and on entering
+      // edit mode, and cleared whenever the form returns to "log a new
+      // jump" — see enterAddMode below.
+      function markTouched(select: HTMLSelectElement | null) {
+        select?.setAttribute('data-user-touched', 'true');
+      }
+      logbookPlace?.addEventListener('change', () => markTouched(logbookPlace));
+      logbookEquipment?.addEventListener('change', () => markTouched(logbookEquipment));
+      logbookAircraft?.addEventListener('change', () => markTouched(logbookAircraft));
+
+      function selectedPlaceText(): string {
+        return logbookPlace?.selectedOptions[0]?.textContent ?? '';
+      }
+
+      // Same idea as selectEquipmentMatching, but a place only has one
+      // field, so it's a plain text match against the option's label.
+      function selectPlaceMatching(name: string) {
+        if (!logbookPlace) return;
+        markTouched(logbookPlace);
+        for (const option of Array.from(logbookPlace.options)) {
+          if (option.textContent === name) {
+            logbookPlace.value = option.value;
+            return;
+          }
+        }
+        logbookPlace.value = '';
+      }
 
       function selectedEquipment(): { canopy: string; container: string; aad: string } {
         const option = logbookEquipment?.selectedOptions[0];
@@ -2573,6 +2730,7 @@ const money = (n: number) => `£${n.toFixed(2)}`;
       // untouched unless the field is changed.
       function selectEquipmentMatching(canopy: string, container: string, aad: string) {
         if (!logbookEquipment) return;
+        markTouched(logbookEquipment);
         for (const option of Array.from(logbookEquipment.options)) {
           if ((option.dataset.canopy ?? '') === canopy && (option.dataset.container ?? '') === container && (option.dataset.aad ?? '') === aad) {
             logbookEquipment.value = option.value;
@@ -2590,6 +2748,7 @@ const money = (n: number) => `£${n.toFixed(2)}`;
       // field, so it's a plain text match against the option's label.
       function selectAircraftMatching(plate: string) {
         if (!logbookAircraft) return;
+        markTouched(logbookAircraft);
         for (const option of Array.from(logbookAircraft.options)) {
           if (option.textContent === plate) {
             logbookAircraft.value = option.value;
@@ -2608,6 +2767,9 @@ const money = (n: number) => `£${n.toFixed(2)}`;
         if (logbookCancelEdit) logbookCancelEdit.hidden = true;
         logbookForm.reset();
         if (logbookDate) logbookDate.value = todayDateValue;
+        logbookPlace?.removeAttribute('data-user-touched');
+        logbookEquipment?.removeAttribute('data-user-touched');
+        logbookAircraft?.removeAttribute('data-user-touched');
         const totalEl = document.getElementById('logbookTotalJumps');
         if (logbookNextNumberEl && totalEl) {
           logbookNextNumberEl.textContent = `#${Number(totalEl.textContent) + 1}`;
@@ -2620,9 +2782,9 @@ const money = (n: number) => `£${n.toFixed(2)}`;
         logbookForm.dataset.editing = 'true';
         if (logbookEditingAt) logbookEditingAt.value = at ?? '';
         if (logbookDate) logbookDate.value = date ?? '';
-        if (logbookPlace) logbookPlace.value = place ?? '';
         if (logbookAltitude) logbookAltitude.value = altitude ?? '';
         if (logbookDescription) logbookDescription.value = description ?? '';
+        selectPlaceMatching(place ?? '');
         selectEquipmentMatching(canopy ?? '', container ?? '', aad ?? '');
         selectAircraftMatching(aircraft ?? '');
         if (logbookFormTitle) logbookFormTitle.textContent = 'Edit jump';
@@ -2644,7 +2806,7 @@ const money = (n: number) => `£${n.toFixed(2)}`;
         const payload = {
           at: editingAt || undefined,
           date: logbookDate?.value ?? '',
-          place: logbookPlace?.value ?? '',
+          place: selectedPlaceText(),
           exitAltitude: logbookAltitude?.value ?? '',
           aircraft: selectedAircraftText(),
           description: logbookDescription?.value ?? '',
@@ -2731,19 +2893,171 @@ const money = (n: number) => `£${n.toFixed(2)}`;
         }
       });
 
+      // ---- Logbook: default star (shared by places/equipment/aircraft) ----
+
+      type DefaultCategory = 'place' | 'equipment' | 'aircraft';
+
+      function defaultStarHtml(category: DefaultCategory, id: string, isDefault: boolean, label: string): string {
+        return `<button type="button" class="default-star" data-default-category="${category}" data-default-id="${id}" aria-pressed="${isDefault}" aria-label="Set ${escapeHtml(label)} as the default ${category}">&#9733;</button>`;
+      }
+
+      // Toggles one item as the default for its category (only one default
+      // per category — starring another replaces it, starring the current
+      // one clears it) and refreshes all three panels + dropdowns from the
+      // single settings object the endpoint returns.
+      async function toggleDefault(star: HTMLButtonElement) {
+        const category = star.dataset.defaultCategory as DefaultCategory | undefined;
+        const id = star.dataset.defaultId;
+        if (!category || !id) return;
+        const isActive = star.getAttribute('aria-pressed') === 'true';
+        star.disabled = true;
+        try {
+          const res = await fetch('/api/logbook-defaults', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ category, id: isActive ? null : id }),
+          });
+          if (!res.ok) return;
+          const data = await res.json();
+          applyPlaceState(data.settings.places, data.settings.defaultPlaceId);
+          applyEquipmentState(data.settings.equipment, data.settings.defaultEquipmentId);
+          applyAircraftState(data.settings.aircraft, data.settings.defaultAircraftId);
+        } catch (err) {
+          console.error('Failed to set default', err);
+        } finally {
+          star.disabled = false;
+        }
+      }
+
+      // ---- Logbook: places ----
+
+      interface PlaceData {
+        id: string;
+        name: string;
+      }
+
+      function placeOptionsHtml(places: PlaceData[], defaultId: string | null): string {
+        const saved = places
+          .map((p) => `<option value="${p.id}"${p.id === defaultId ? ' selected' : ''}>${escapeHtml(p.name)}</option>`)
+          .join('');
+        return `<option value=""${!defaultId ? ' selected' : ''}>No place selected</option>${saved}`;
+      }
+
+      function placeListHtml(places: PlaceData[], defaultId: string | null): string {
+        if (places.length === 0) return '<li class="equipment-empty">No places saved yet.</li>';
+        return places
+          .map(
+            (p) => `
+              <li class="equipment-row" data-id="${p.id}">
+                <div class="equipment-row-text">
+                  <span class="equipment-row-name">${escapeHtml(p.name)}</span>
+                </div>
+                ${defaultStarHtml('place', p.id, p.id === defaultId, p.name)}
+                <button type="button" class="equipment-delete" data-place-delete="${p.id}" aria-label="Remove ${escapeHtml(p.name)}">&times;</button>
+              </li>`,
+          )
+          .join('');
+      }
+
+      function applyPlaceState(places: PlaceData[], defaultId: string | null) {
+        const list = document.getElementById('placesList');
+        if (list) list.innerHTML = placeListHtml(places, defaultId);
+        if (logbookPlace) {
+          // Only re-apply a previous selection if the user (or edit mode)
+          // actually chose one — see markTouched above. Otherwise let the
+          // freshly rendered default (marked via the `selected` attribute)
+          // stand rather than forcing it back to "unselected".
+          const touched = logbookPlace.dataset.userTouched === 'true';
+          const previous = logbookPlace.value;
+          logbookPlace.innerHTML = placeOptionsHtml(places, defaultId);
+          if (touched && Array.from(logbookPlace.options).some((o) => o.value === previous)) {
+            logbookPlace.value = previous;
+          }
+        }
+      }
+
+      const placesForm = document.getElementById('placesForm') as HTMLFormElement | null;
+      const placesList = document.getElementById('placesList');
+      const placesStatus = document.getElementById('placesStatus');
+      const placeName = document.getElementById('placeName') as HTMLInputElement | null;
+
+      placesForm?.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const submitButton = placesForm.querySelector<HTMLButtonElement>('button[type="submit"]');
+        if (submitButton) submitButton.disabled = true;
+        if (placesStatus) {
+          placesStatus.textContent = 'Saving…';
+          placesStatus.removeAttribute('data-state');
+        }
+
+        try {
+          const res = await fetch('/api/places', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: placeName?.value ?? '' }),
+          });
+          if (!res.ok) {
+            const data = await res.json().catch(() => null);
+            throw new Error(data?.error ?? 'Failed to save');
+          }
+          const data = await res.json();
+          applyPlaceState(data.settings.places, data.settings.defaultPlaceId);
+          placesForm.reset();
+          if (placesStatus) {
+            placesStatus.textContent = 'Saved';
+            placesStatus.dataset.state = 'ok';
+          }
+        } catch (err) {
+          console.error('Failed to save place', err);
+          if (placesStatus) {
+            placesStatus.textContent = err instanceof Error ? err.message : 'Failed to save';
+            placesStatus.dataset.state = 'error';
+          }
+        } finally {
+          if (submitButton) submitButton.disabled = false;
+        }
+      });
+
+      placesList?.addEventListener('click', async (event) => {
+        const star = (event.target as HTMLElement).closest<HTMLButtonElement>('.default-star');
+        if (star) {
+          void toggleDefault(star);
+          return;
+        }
+
+        const button = (event.target as HTMLElement).closest<HTMLButtonElement>('.equipment-delete');
+        const id = button?.dataset.placeDelete;
+        if (!id) return;
+        button.disabled = true;
+        try {
+          const res = await fetch('/api/places', {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id }),
+          });
+          if (!res.ok) return;
+          const data = await res.json();
+          applyPlaceState(data.settings.places, data.settings.defaultPlaceId);
+        } catch (err) {
+          console.error('Failed to delete place', err);
+        } finally {
+          button.disabled = false;
+        }
+      });
+
       // ---- Logbook: equipment ----
 
-      function equipmentOptionsHtml(equipment: EquipmentData[]): string {
+      function equipmentOptionsHtml(equipment: EquipmentData[], defaultId: string | null): string {
         const saved = equipment
           .map(
             (eq) =>
-              `<option value="${eq.id}" data-canopy="${escapeHtml(eq.canopy)}" data-container="${escapeHtml(eq.container)}" data-aad="${escapeHtml(eq.aad)}">${escapeHtml(eq.name)}</option>`,
+              `<option value="${eq.id}" data-canopy="${escapeHtml(eq.canopy)}" data-container="${escapeHtml(eq.container)}" data-aad="${escapeHtml(eq.aad)}"${eq.id === defaultId ? ' selected' : ''}>${escapeHtml(eq.name)}</option>`,
           )
           .join('');
-        return `<option value="" data-canopy="" data-container="" data-aad="">No equipment selected</option>${saved}`;
+        return `<option value="" data-canopy="" data-container="" data-aad=""${!defaultId ? ' selected' : ''}>No equipment selected</option>${saved}`;
       }
 
-      function equipmentListHtml(equipment: EquipmentData[]): string {
+      function equipmentListHtml(equipment: EquipmentData[], defaultId: string | null): string {
         if (equipment.length === 0) return '<li class="equipment-empty">No equipment saved yet.</li>';
         return equipment
           .map((eq) => {
@@ -2754,19 +3068,23 @@ const money = (n: number) => `£${n.toFixed(2)}`;
                   <span class="equipment-row-name">${escapeHtml(eq.name)}</span>
                   <span class="equipment-row-detail">${detail}</span>
                 </div>
+                ${defaultStarHtml('equipment', eq.id, eq.id === defaultId, eq.name)}
                 <button type="button" class="equipment-delete" data-equipment-delete="${eq.id}" aria-label="Remove ${escapeHtml(eq.name)}">&times;</button>
               </li>`;
           })
           .join('');
       }
 
-      function applyEquipmentState(equipment: EquipmentData[]) {
+      function applyEquipmentState(equipment: EquipmentData[], defaultId: string | null) {
         const list = document.getElementById('equipmentList');
-        if (list) list.innerHTML = equipmentListHtml(equipment);
+        if (list) list.innerHTML = equipmentListHtml(equipment, defaultId);
         if (logbookEquipment) {
+          // See applyPlaceState for why this checks `touched` rather than
+          // just "was there a previous value".
+          const touched = logbookEquipment.dataset.userTouched === 'true';
           const previous = logbookEquipment.value;
-          logbookEquipment.innerHTML = equipmentOptionsHtml(equipment);
-          if (Array.from(logbookEquipment.options).some((o) => o.value === previous)) {
+          logbookEquipment.innerHTML = equipmentOptionsHtml(equipment, defaultId);
+          if (touched && Array.from(logbookEquipment.options).some((o) => o.value === previous)) {
             logbookEquipment.value = previous;
           }
         }
@@ -2805,7 +3123,7 @@ const money = (n: number) => `£${n.toFixed(2)}`;
             throw new Error(data?.error ?? 'Failed to save');
           }
           const data = await res.json();
-          applyEquipmentState(data.settings.equipment);
+          applyEquipmentState(data.settings.equipment, data.settings.defaultEquipmentId);
           equipmentForm.reset();
           if (equipmentStatus) {
             equipmentStatus.textContent = 'Saved';
@@ -2823,6 +3141,12 @@ const money = (n: number) => `£${n.toFixed(2)}`;
       });
 
       equipmentList?.addEventListener('click', async (event) => {
+        const star = (event.target as HTMLElement).closest<HTMLButtonElement>('.default-star');
+        if (star) {
+          void toggleDefault(star);
+          return;
+        }
+
         const button = (event.target as HTMLElement).closest<HTMLButtonElement>('.equipment-delete');
         const id = button?.dataset.equipmentDelete;
         if (!id) return;
@@ -2835,7 +3159,7 @@ const money = (n: number) => `£${n.toFixed(2)}`;
           });
           if (!res.ok) return;
           const data = await res.json();
-          applyEquipmentState(data.settings.equipment);
+          applyEquipmentState(data.settings.equipment, data.settings.defaultEquipmentId);
         } catch (err) {
           console.error('Failed to delete equipment', err);
         } finally {
@@ -2850,12 +3174,14 @@ const money = (n: number) => `£${n.toFixed(2)}`;
         plate: string;
       }
 
-      function aircraftOptionsHtml(aircraft: AircraftData[]): string {
-        const saved = aircraft.map((ac) => `<option value="${ac.id}">${escapeHtml(ac.plate)}</option>`).join('');
-        return `<option value="">No aircraft selected</option>${saved}`;
+      function aircraftOptionsHtml(aircraft: AircraftData[], defaultId: string | null): string {
+        const saved = aircraft
+          .map((ac) => `<option value="${ac.id}"${ac.id === defaultId ? ' selected' : ''}>${escapeHtml(ac.plate)}</option>`)
+          .join('');
+        return `<option value=""${!defaultId ? ' selected' : ''}>No aircraft selected</option>${saved}`;
       }
 
-      function aircraftListHtml(aircraft: AircraftData[]): string {
+      function aircraftListHtml(aircraft: AircraftData[], defaultId: string | null): string {
         if (aircraft.length === 0) return '<li class="equipment-empty">No aircraft saved yet.</li>';
         return aircraft
           .map(
@@ -2864,19 +3190,23 @@ const money = (n: number) => `£${n.toFixed(2)}`;
                 <div class="equipment-row-text">
                   <span class="equipment-row-name">${escapeHtml(ac.plate)}</span>
                 </div>
+                ${defaultStarHtml('aircraft', ac.id, ac.id === defaultId, ac.plate)}
                 <button type="button" class="equipment-delete" data-aircraft-delete="${ac.id}" aria-label="Remove ${escapeHtml(ac.plate)}">&times;</button>
               </li>`,
           )
           .join('');
       }
 
-      function applyAircraftState(aircraft: AircraftData[]) {
+      function applyAircraftState(aircraft: AircraftData[], defaultId: string | null) {
         const list = document.getElementById('aircraftList');
-        if (list) list.innerHTML = aircraftListHtml(aircraft);
+        if (list) list.innerHTML = aircraftListHtml(aircraft, defaultId);
         if (logbookAircraft) {
+          // See applyPlaceState for why this checks `touched` rather than
+          // just "was there a previous value".
+          const touched = logbookAircraft.dataset.userTouched === 'true';
           const previous = logbookAircraft.value;
-          logbookAircraft.innerHTML = aircraftOptionsHtml(aircraft);
-          if (Array.from(logbookAircraft.options).some((o) => o.value === previous)) {
+          logbookAircraft.innerHTML = aircraftOptionsHtml(aircraft, defaultId);
+          if (touched && Array.from(logbookAircraft.options).some((o) => o.value === previous)) {
             logbookAircraft.value = previous;
           }
         }
@@ -2907,7 +3237,7 @@ const money = (n: number) => `£${n.toFixed(2)}`;
             throw new Error(data?.error ?? 'Failed to save');
           }
           const data = await res.json();
-          applyAircraftState(data.settings.aircraft);
+          applyAircraftState(data.settings.aircraft, data.settings.defaultAircraftId);
           aircraftForm.reset();
           if (aircraftStatus) {
             aircraftStatus.textContent = 'Saved';
@@ -2925,6 +3255,12 @@ const money = (n: number) => `£${n.toFixed(2)}`;
       });
 
       aircraftList?.addEventListener('click', async (event) => {
+        const star = (event.target as HTMLElement).closest<HTMLButtonElement>('.default-star');
+        if (star) {
+          void toggleDefault(star);
+          return;
+        }
+
         const button = (event.target as HTMLElement).closest<HTMLButtonElement>('.equipment-delete');
         const id = button?.dataset.aircraftDelete;
         if (!id) return;
@@ -2937,7 +3273,7 @@ const money = (n: number) => `£${n.toFixed(2)}`;
           });
           if (!res.ok) return;
           const data = await res.json();
-          applyAircraftState(data.settings.aircraft);
+          applyAircraftState(data.settings.aircraft, data.settings.defaultAircraftId);
         } catch (err) {
           console.error('Failed to delete aircraft', err);
         } finally {
@@ -2994,6 +3330,7 @@ const money = (n: number) => `£${n.toFixed(2)}`;
 
       // ---- Logbook: toggle panels ----
 
+      wireToggle('placesToggle', 'placesPanel');
       wireToggle('equipmentToggle', 'equipmentPanel');
       wireToggle('aircraftToggle', 'aircraftPanel');
       wireToggle('logbookSettingsToggle', 'logbookSettingsPanel');
