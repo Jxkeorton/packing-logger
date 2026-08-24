@@ -1,0 +1,12 @@
+Roboto-Regular.ttf and Roboto-Medium.ttf are the Roboto typeface by Google,
+licensed under the Apache License, Version 2.0:
+
+  https://www.apache.org/licenses/LICENSE-2.0
+
+Sourced from pdfkit's own test fixtures (same files, same license):
+
+  https://github.com/foliojs/pdfkit/tree/master/tests/fonts
+
+Used here (see ../../lib/invoice-pdf.ts) to embed real glyph outlines in the
+tandem invoice PDF, bypassing pdfkit's built-in standard fonts — whose
+internal module resolution doesn't survive Vercel's serverless bundling.

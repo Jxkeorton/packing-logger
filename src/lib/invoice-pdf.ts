@@ -2,6 +2,16 @@
 // a PDF, in the same rough layout as the spreadsheet-style invoices this
 // replaces: a coloured header bar, a From/Bill To block, then a
 // description table and a total.
+//
+// Fonts: pdfkit's built-in standard fonts (Helvetica etc.) load via a
+// dynamic module-resolution trick that Vercel's serverless bundler doesn't
+// trace correctly — the function fails at runtime with "Cannot find module
+// '.../pdfkit/js/standard-fonts/Helvetica.cjs'" even though it works fine
+// locally. The fix used everywhere pdfkit meets a serverless bundler is to
+// skip the built-in fonts entirely and embed a real font file instead
+// (`font: false` below), which is what src/assets/fonts/ is for.
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import PDFDocument from 'pdfkit';
 import { CATEGORIES, CATEGORY_LABELS, RATES, type Category, type Jump } from './tandem';
 import type { InvoiceSettings } from './invoice-settings';
@@ -20,6 +30,12 @@ const BAR_BLUE = '#3e7cb1';
 const TOTAL_BG = '#d9d3ea';
 const MUTED = '#5c6b78';
 
+// Read once at module load via a plain fs call with a statically-resolvable
+// path — the one pattern Vercel's bundler traces reliably — rather than
+// leaving pdfkit to resolve these itself at request time.
+const FONT_REGULAR = readFileSync(fileURLToPath(new URL('../assets/fonts/Roboto-Regular.ttf', import.meta.url)));
+const FONT_BOLD = readFileSync(fileURLToPath(new URL('../assets/fonts/Roboto-Medium.ttf', import.meta.url)));
+
 function formatJumpDate(dateStr: string): string {
   const [y, m, d] = dateStr.split('-');
   return `${d}/${m}/${y}`;
@@ -30,7 +46,18 @@ function money(n: number): string {
 }
 
 export async function buildTandemInvoicePdf(opts: InvoicePdfOptions): Promise<Buffer> {
-  const doc = new PDFDocument({ size: 'A4', margin: MARGIN });
+  // `font: false` stops the constructor from eagerly loading a built-in
+  // standard font (the thing that crashes in production) — @types/pdfkit
+  // hasn't caught up with this option yet, hence the cast.
+  const doc = new PDFDocument({
+    size: 'A4',
+    margin: MARGIN,
+    font: false,
+  } as unknown as ConstructorParameters<typeof PDFDocument>[0]);
+  doc.registerFont('Body', FONT_REGULAR);
+  doc.registerFont('Body-Bold', FONT_BOLD);
+  doc.font('Body');
+
   const chunks: Buffer[] = [];
   doc.on('data', (chunk) => chunks.push(chunk as Buffer));
   const done = new Promise<Buffer>((resolve, reject) => {
@@ -49,10 +76,10 @@ export async function buildTandemInvoicePdf(opts: InvoicePdfOptions): Promise<Bu
     doc.rect(x, y, width, 20).fill(BAR_BLUE);
     doc
       .fillColor('#ffffff')
-      .font('Helvetica-Bold')
+      .font('Body-Bold')
       .fontSize(10)
       .text(label, x + 6, y + 5, { width: width - 12, lineBreak: false });
-    doc.fillColor(NAVY).font('Helvetica');
+    doc.fillColor(NAVY).font('Body');
   }
 
   // ---- Header: title / invoice ref / date ----
@@ -84,7 +111,7 @@ export async function buildTandemInvoicePdf(opts: InvoicePdfOptions): Promise<Bu
   bar(MARGIN, pageWidth, 'DESCRIPTION');
   y += 24;
 
-  doc.font('Helvetica').fontSize(9).fillColor(MUTED);
+  doc.font('Body').fontSize(9).fillColor(MUTED);
   doc.text(`Invoice period: ${opts.periodLabel}`, MARGIN, y, { lineBreak: false });
   doc.fillColor(NAVY);
   y += 20;
@@ -106,11 +133,11 @@ export async function buildTandemInvoicePdf(opts: InvoicePdfOptions): Promise<Bu
       y = MARGIN;
     }
 
-    doc.font('Helvetica-Bold').fontSize(10.5).fillColor(NAVY);
+    doc.font('Body-Bold').fontSize(10.5).fillColor(NAVY);
     doc.text(CATEGORY_LABELS[category], MARGIN, y, { lineBreak: false });
     y += 16;
 
-    doc.font('Helvetica').fontSize(9.5);
+    doc.font('Body').fontSize(9.5);
     for (const jump of jumps) {
       if (y > doc.page.height - MARGIN - 60) {
         doc.addPage();
@@ -126,14 +153,14 @@ export async function buildTandemInvoicePdf(opts: InvoicePdfOptions): Promise<Bu
     total += subtotal;
 
     y += 2;
-    doc.font('Helvetica-Bold');
+    doc.font('Body-Bold');
     doc.text(`${jumps.length} @ ${money(RATES[category])}`, MARGIN, y, {
       width: pageWidth - amountColW,
       align: 'right',
       lineBreak: false,
     });
     doc.text(money(subtotal), MARGIN + pageWidth - amountColW, y, { width: amountColW, align: 'right', lineBreak: false });
-    doc.font('Helvetica');
+    doc.font('Body');
     y += 24;
   }
 
@@ -145,7 +172,7 @@ export async function buildTandemInvoicePdf(opts: InvoicePdfOptions): Promise<Bu
 
   // ---- Total ----
   doc.rect(MARGIN, y, pageWidth, 24).fill(TOTAL_BG);
-  doc.fillColor(NAVY).font('Helvetica-Bold').fontSize(11);
+  doc.fillColor(NAVY).font('Body-Bold').fontSize(11);
   doc.text('TOTAL:', MARGIN + 6, y + 7, { width: pageWidth - amountColW - 6, align: 'right', lineBreak: false });
   doc.text(money(total), MARGIN + pageWidth - amountColW, y + 7, { width: amountColW - 6, align: 'right', lineBreak: false });
   y += 36;
@@ -153,7 +180,7 @@ export async function buildTandemInvoicePdf(opts: InvoicePdfOptions): Promise<Bu
   const instructing = opts.jumpsByCategory.instructor?.length ?? 0;
   const videoing = opts.jumpsByCategory.videographer?.length ?? 0;
   doc
-    .font('Helvetica')
+    .font('Body')
     .fontSize(8)
     .fillColor(MUTED)
     .text(`${instructing} tandem instructing jump(s) and ${videoing} videographer jump(s) this period.`, MARGIN, y, {
