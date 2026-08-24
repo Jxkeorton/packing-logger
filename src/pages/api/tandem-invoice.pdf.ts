@@ -53,6 +53,10 @@ export const GET: APIRoute = async ({ url }) => {
     headers: {
       'Content-Type': 'application/pdf',
       'Content-Disposition': `attachment; filename="${filename}"`,
+      // Without an explicit length, this streams as chunked transfer —
+      // which iOS Safari handles badly for `download`-attribute links,
+      // often saving a 0-byte file instead of the PDF.
+      'Content-Length': String(pdf.length),
     },
   });
 };

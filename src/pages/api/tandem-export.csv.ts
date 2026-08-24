@@ -10,6 +10,9 @@ export const GET: APIRoute = async () => {
     headers: {
       'Content-Type': 'text/csv',
       'Content-Disposition': 'attachment; filename="tandem-log.csv"',
+      // See tandem-invoice.pdf.ts — an explicit length avoids iOS Safari
+      // saving a 0-byte file for `download`-attribute links.
+      'Content-Length': String(Buffer.byteLength(csv)),
     },
   });
 };
