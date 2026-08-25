@@ -172,76 +172,72 @@ export async function setBaseJumps(baseJumps: number): Promise<LogbookSettings> 
   return next;
 }
 
-export async function addPlace(item: Omit<Place, 'id'>): Promise<LogbookSettings> {
+// Places/Equipment/Aircraft/Jump types are four instances of the same
+// shape of thing — a named list plus one "default" id pointing into it —
+// so add/remove and setDefault below go through this map instead of a
+// hand-written function per category. Adding a 5th reference-list category
+// would mean one new field here plus two one-line exports, not four more
+// copies of a 10-line read-modify-write function.
+type ListField = 'places' | 'equipment' | 'aircraft' | 'jumpTypes';
+type DefaultField = 'defaultPlaceId' | 'defaultEquipmentId' | 'defaultAircraftId' | 'defaultJumpTypeId';
+
+const CATEGORY_FIELDS: Record<DefaultCategory, { list: ListField; default: DefaultField }> = {
+  place: { list: 'places', default: 'defaultPlaceId' },
+  equipment: { list: 'equipment', default: 'defaultEquipmentId' },
+  aircraft: { list: 'aircraft', default: 'defaultAircraftId' },
+  jumpType: { list: 'jumpTypes', default: 'defaultJumpTypeId' },
+};
+
+async function addItem<T extends { id: string }>(list: ListField, item: Omit<T, 'id'>): Promise<LogbookSettings> {
   const current = await readLogbookSettings();
-  const next: LogbookSettings = { ...current, places: [...current.places, { ...item, id: randomUUID() }] };
+  const items = current[list] as unknown as T[];
+  const next: LogbookSettings = { ...current, [list]: [...items, { ...item, id: randomUUID() } as T] };
   await writeLogbookSettings(next);
   return next;
+}
+
+async function removeItem(list: ListField, defaultField: DefaultField, id: string): Promise<LogbookSettings> {
+  const current = await readLogbookSettings();
+  const items = current[list] as unknown as { id: string }[];
+  const next: LogbookSettings = {
+    ...current,
+    [list]: items.filter((item) => item.id !== id),
+    [defaultField]: current[defaultField] === id ? null : current[defaultField],
+  };
+  await writeLogbookSettings(next);
+  return next;
+}
+
+export async function addPlace(item: Omit<Place, 'id'>): Promise<LogbookSettings> {
+  return addItem<Place>('places', item);
 }
 
 export async function removePlace(id: string): Promise<LogbookSettings> {
-  const current = await readLogbookSettings();
-  const next: LogbookSettings = {
-    ...current,
-    places: current.places.filter((p) => p.id !== id),
-    defaultPlaceId: current.defaultPlaceId === id ? null : current.defaultPlaceId,
-  };
-  await writeLogbookSettings(next);
-  return next;
+  return removeItem('places', 'defaultPlaceId', id);
 }
 
 export async function addEquipment(item: Omit<Equipment, 'id'>): Promise<LogbookSettings> {
-  const current = await readLogbookSettings();
-  const next: LogbookSettings = { ...current, equipment: [...current.equipment, { ...item, id: randomUUID() }] };
-  await writeLogbookSettings(next);
-  return next;
+  return addItem<Equipment>('equipment', item);
 }
 
 export async function removeEquipment(id: string): Promise<LogbookSettings> {
-  const current = await readLogbookSettings();
-  const next: LogbookSettings = {
-    ...current,
-    equipment: current.equipment.filter((e) => e.id !== id),
-    defaultEquipmentId: current.defaultEquipmentId === id ? null : current.defaultEquipmentId,
-  };
-  await writeLogbookSettings(next);
-  return next;
+  return removeItem('equipment', 'defaultEquipmentId', id);
 }
 
 export async function addAircraft(item: Omit<Aircraft, 'id'>): Promise<LogbookSettings> {
-  const current = await readLogbookSettings();
-  const next: LogbookSettings = { ...current, aircraft: [...current.aircraft, { ...item, id: randomUUID() }] };
-  await writeLogbookSettings(next);
-  return next;
+  return addItem<Aircraft>('aircraft', item);
 }
 
 export async function removeAircraft(id: string): Promise<LogbookSettings> {
-  const current = await readLogbookSettings();
-  const next: LogbookSettings = {
-    ...current,
-    aircraft: current.aircraft.filter((a) => a.id !== id),
-    defaultAircraftId: current.defaultAircraftId === id ? null : current.defaultAircraftId,
-  };
-  await writeLogbookSettings(next);
-  return next;
+  return removeItem('aircraft', 'defaultAircraftId', id);
 }
 
 export async function addJumpType(item: Omit<JumpType, 'id'>): Promise<LogbookSettings> {
-  const current = await readLogbookSettings();
-  const next: LogbookSettings = { ...current, jumpTypes: [...current.jumpTypes, { ...item, id: randomUUID() }] };
-  await writeLogbookSettings(next);
-  return next;
+  return addItem<JumpType>('jumpTypes', item);
 }
 
 export async function removeJumpType(id: string): Promise<LogbookSettings> {
-  const current = await readLogbookSettings();
-  const next: LogbookSettings = {
-    ...current,
-    jumpTypes: current.jumpTypes.filter((j) => j.id !== id),
-    defaultJumpTypeId: current.defaultJumpTypeId === id ? null : current.defaultJumpTypeId,
-  };
-  await writeLogbookSettings(next);
-  return next;
+  return removeItem('jumpTypes', 'defaultJumpTypeId', id);
 }
 
 /**
@@ -267,18 +263,10 @@ export async function ensureJumpType(name: string): Promise<JumpType> {
  */
 export async function setDefault(category: DefaultCategory, id: string | null): Promise<LogbookSettings> {
   const current = await readLogbookSettings();
-  const list =
-    category === 'place' ? current.places : category === 'equipment' ? current.equipment : category === 'aircraft' ? current.aircraft : current.jumpTypes;
-  const resolvedId = id && list.some((item) => item.id === id) ? id : null;
-  const key =
-    category === 'place'
-      ? 'defaultPlaceId'
-      : category === 'equipment'
-        ? 'defaultEquipmentId'
-        : category === 'aircraft'
-          ? 'defaultAircraftId'
-          : 'defaultJumpTypeId';
-  const next: LogbookSettings = { ...current, [key]: resolvedId };
+  const { list, default: defaultField } = CATEGORY_FIELDS[category];
+  const items = current[list] as unknown as { id: string }[];
+  const resolvedId = id && items.some((item) => item.id === id) ? id : null;
+  const next: LogbookSettings = { ...current, [defaultField]: resolvedId };
   await writeLogbookSettings(next);
   return next;
 }

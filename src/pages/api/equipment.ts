@@ -1,5 +1,6 @@
 import type { APIRoute } from 'astro';
 import { addEquipment, removeEquipment } from '../../lib/logbook-settings';
+import { parseJsonBody, jsonOk, jsonError } from '../../lib/api-response';
 
 const MAX_LENGTH = 80;
 
@@ -11,56 +12,32 @@ function oneLine(value: unknown): string {
 // Saves a new equipment profile (Canopy/Container/AAD) for the add-jump
 // form's dropdown to pick from.
 export const POST: APIRoute = async ({ request }) => {
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return new Response(JSON.stringify({ error: 'Invalid JSON body' }), {
-      status: 400,
-      headers: { 'Content-Type': 'application/json' },
-    });
-  }
+  const parsed = await parseJsonBody(request);
+  if ('error' in parsed) return parsed.error;
 
-  const name = oneLine((body as any)?.name);
-  if (!name) {
-    return new Response(JSON.stringify({ error: 'name is required' }), {
-      status: 400,
-      headers: { 'Content-Type': 'application/json' },
-    });
-  }
+  const body = parsed.data as any;
+  const name = oneLine(body?.name);
+  if (!name) return jsonError('name is required');
 
   const settings = await addEquipment({
     name,
-    canopy: oneLine((body as any)?.canopy),
-    container: oneLine((body as any)?.container),
-    aad: oneLine((body as any)?.aad),
+    canopy: oneLine(body?.canopy),
+    container: oneLine(body?.container),
+    aad: oneLine(body?.aad),
   });
-
-  return new Response(JSON.stringify({ settings }), { headers: { 'Content-Type': 'application/json' } });
+  return jsonOk({ settings });
 };
 
 // Removes a saved equipment profile. Jumps already logged against it keep
 // their own snapshotted canopy/container/AAD text, so deleting a profile
 // never rewrites history — it just drops it from future jumps' dropdown.
 export const DELETE: APIRoute = async ({ request }) => {
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return new Response(JSON.stringify({ error: 'Invalid JSON body' }), {
-      status: 400,
-      headers: { 'Content-Type': 'application/json' },
-    });
-  }
+  const parsed = await parseJsonBody(request);
+  if ('error' in parsed) return parsed.error;
 
-  const id = typeof (body as any)?.id === 'string' ? (body as any).id : '';
-  if (!id) {
-    return new Response(JSON.stringify({ error: 'id is required' }), {
-      status: 400,
-      headers: { 'Content-Type': 'application/json' },
-    });
-  }
+  const id = typeof (parsed.data as any)?.id === 'string' ? (parsed.data as any).id : '';
+  if (!id) return jsonError('id is required');
 
   const settings = await removeEquipment(id);
-  return new Response(JSON.stringify({ settings }), { headers: { 'Content-Type': 'application/json' } });
+  return jsonOk({ settings });
 };

@@ -7,6 +7,7 @@
 // ever one source of truth.
 import { readText, writeText } from './storage';
 import { todayKey } from './packing';
+import { csvEscape, parseCsvLine } from './csv';
 
 // Both roles are paid the same flat rate per jump; they're kept as separate
 // categories purely so the log shows how many of each were flown.
@@ -45,46 +46,6 @@ export function totalJumps(counts: Counts): number {
 
 export function totalEarnings(counts: Counts): number {
   return CATEGORIES.reduce((sum, c) => sum + counts[c] * RATES[c], 0);
-}
-
-// Customer names are the one field in this app's CSVs that's free text, so
-// this is the one file that needs real CSV quoting (commas/quotes/newlines
-// in a name shouldn't corrupt the row layout).
-function csvEscape(value: string): string {
-  if (/[",\r\n]/.test(value)) {
-    return `"${value.replace(/"/g, '""')}"`;
-  }
-  return value;
-}
-
-function parseCsvLine(line: string): string[] {
-  const fields: string[] = [];
-  let current = '';
-  let inQuotes = false;
-  for (let i = 0; i < line.length; i++) {
-    const ch = line[i];
-    if (inQuotes) {
-      if (ch === '"') {
-        if (line[i + 1] === '"') {
-          current += '"';
-          i++;
-        } else {
-          inQuotes = false;
-        }
-      } else {
-        current += ch;
-      }
-    } else if (ch === '"') {
-      inQuotes = true;
-    } else if (ch === ',') {
-      fields.push(current);
-      current = '';
-    } else {
-      current += ch;
-    }
-  }
-  fields.push(current);
-  return fields;
 }
 
 async function readJumps(): Promise<Jump[]> {

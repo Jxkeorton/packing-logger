@@ -1,6 +1,7 @@
 import type { APIRoute } from 'astro';
 import { addEntry, nextJumpNumber, readLogbook, removeEntry, updateEntry, type EntryInput, type NumberedEntry } from '../../lib/logbook';
 import { readLogbookSettings } from '../../lib/logbook-settings';
+import { parseJsonBody, jsonOk, jsonError } from '../../lib/api-response';
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const MAX_LINE_LENGTH = 120;
@@ -18,10 +19,7 @@ function multiLine(value: unknown, maxLength: number): string {
 
 async function respond(entries: NumberedEntry[]): Promise<Response> {
   const settings = await readLogbookSettings();
-  return new Response(
-    JSON.stringify({ entries, nextNumber: await nextJumpNumber(settings.baseJumps) }),
-    { headers: { 'Content-Type': 'application/json' } },
-  );
+  return jsonOk({ entries, nextNumber: await nextJumpNumber(settings.baseJumps) });
 }
 
 // The client resolves the picked equipment profile to plain canopy/
@@ -60,23 +58,11 @@ export const GET: APIRoute = async () => {
 
 // Logs a new jump.
 export const POST: APIRoute = async ({ request }) => {
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return new Response(JSON.stringify({ error: 'Invalid JSON body' }), {
-      status: 400,
-      headers: { 'Content-Type': 'application/json' },
-    });
-  }
+  const parsedBody = await parseJsonBody(request);
+  if ('error' in parsedBody) return parsedBody.error;
 
-  const parsed = parseEntryInput(body);
-  if ('error' in parsed) {
-    return new Response(JSON.stringify({ error: parsed.error }), {
-      status: 400,
-      headers: { 'Content-Type': 'application/json' },
-    });
-  }
+  const parsed = parseEntryInput(parsedBody.data);
+  if ('error' in parsed) return jsonError(parsed.error);
 
   const settings = await readLogbookSettings();
   const entries = await addEntry(parsed.input, settings.baseJumps);
@@ -88,62 +74,28 @@ export const POST: APIRoute = async ({ request }) => {
 // (possibly now-different) date, so editing a jump's date can shift its
 // number and every number after it, same as it would in a paper logbook.
 export const PUT: APIRoute = async ({ request }) => {
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return new Response(JSON.stringify({ error: 'Invalid JSON body' }), {
-      status: 400,
-      headers: { 'Content-Type': 'application/json' },
-    });
-  }
+  const parsedBody = await parseJsonBody(request);
+  if ('error' in parsedBody) return parsedBody.error;
 
-  const at = typeof (body as any)?.at === 'string' ? (body as any).at : '';
-  if (!at) {
-    return new Response(JSON.stringify({ error: 'at is required' }), {
-      status: 400,
-      headers: { 'Content-Type': 'application/json' },
-    });
-  }
+  const at = typeof (parsedBody.data as any)?.at === 'string' ? (parsedBody.data as any).at : '';
+  if (!at) return jsonError('at is required');
 
-  const parsed = parseEntryInput(body);
-  if ('error' in parsed) {
-    return new Response(JSON.stringify({ error: parsed.error }), {
-      status: 400,
-      headers: { 'Content-Type': 'application/json' },
-    });
-  }
+  const parsed = parseEntryInput(parsedBody.data);
+  if ('error' in parsed) return jsonError(parsed.error);
 
   const settings = await readLogbookSettings();
   const entries = await updateEntry(at, parsed.input, settings.baseJumps);
-  if (!entries) {
-    return new Response(JSON.stringify({ error: 'No jump found with that id' }), {
-      status: 404,
-      headers: { 'Content-Type': 'application/json' },
-    });
-  }
+  if (!entries) return jsonError('No jump found with that id', 404);
   return respond(entries);
 };
 
 // Deletes a jump by id — used to undo a mis-entry rather than leaving a gap.
 export const DELETE: APIRoute = async ({ request }) => {
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return new Response(JSON.stringify({ error: 'Invalid JSON body' }), {
-      status: 400,
-      headers: { 'Content-Type': 'application/json' },
-    });
-  }
+  const parsedBody = await parseJsonBody(request);
+  if ('error' in parsedBody) return parsedBody.error;
 
-  const at = typeof (body as any)?.at === 'string' ? (body as any).at : '';
-  if (!at) {
-    return new Response(JSON.stringify({ error: 'at is required' }), {
-      status: 400,
-      headers: { 'Content-Type': 'application/json' },
-    });
-  }
+  const at = typeof (parsedBody.data as any)?.at === 'string' ? (parsedBody.data as any).at : '';
+  if (!at) return jsonError('at is required');
 
   const settings = await readLogbookSettings();
   const entries = await removeEntry(at, settings.baseJumps);

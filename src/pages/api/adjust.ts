@@ -1,31 +1,19 @@
 import type { APIRoute } from 'astro';
 import { CATEGORIES, adjustCount, readHistory, toHistoryRow, totalEarnings, totalPacks, type Category } from '../../lib/packing';
 import { groupByInvoiceMonth, groupByWeek } from '../../lib/invoice';
+import { parseJsonBody, jsonOk, jsonError } from '../../lib/api-response';
 
 export const POST: APIRoute = async ({ request }) => {
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return new Response(JSON.stringify({ error: 'Invalid JSON body' }), {
-      status: 400,
-      headers: { 'Content-Type': 'application/json' },
-    });
-  }
+  const parsed = await parseJsonBody(request);
+  if ('error' in parsed) return parsed.error;
 
-  const { category, delta } = (body ?? {}) as { category?: string; delta?: number };
+  const { category, delta } = (parsed.data ?? {}) as { category?: string; delta?: number };
 
   if (!category || !CATEGORIES.includes(category as Category)) {
-    return new Response(JSON.stringify({ error: 'Unknown category' }), {
-      status: 400,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return jsonError('Unknown category');
   }
   if (delta !== 1 && delta !== -1) {
-    return new Response(JSON.stringify({ error: 'delta must be 1 or -1' }), {
-      status: 400,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return jsonError('delta must be 1 or -1');
   }
 
   const state = await adjustCount(category as Category, delta);
@@ -38,14 +26,11 @@ export const POST: APIRoute = async ({ request }) => {
   const currentWeek = groupByWeek(combined)[0] ?? null;
   const currentMonth = groupByInvoiceMonth(combined)[0] ?? null;
 
-  return new Response(
-    JSON.stringify({
-      state,
-      totalPacks: totalPacks(state.counts),
-      totalEarnings: totalEarnings(state.counts),
-      currentWeek,
-      currentMonth,
-    }),
-    { headers: { 'Content-Type': 'application/json' } },
-  );
+  return jsonOk({
+    state,
+    totalPacks: totalPacks(state.counts),
+    totalEarnings: totalEarnings(state.counts),
+    currentWeek,
+    currentMonth,
+  });
 };

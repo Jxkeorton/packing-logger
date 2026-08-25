@@ -1,5 +1,6 @@
 import type { APIRoute } from 'astro';
 import { readInvoiceSettings, writeInvoiceSettings, type InvoiceSettings } from '../../lib/invoice-settings';
+import { parseJsonBody, jsonOk, jsonError } from '../../lib/api-response';
 
 function linesFrom(value: unknown): string[] {
   if (typeof value !== 'string') return [];
@@ -11,22 +12,15 @@ function linesFrom(value: unknown): string[] {
 
 export const GET: APIRoute = async () => {
   const settings = await readInvoiceSettings();
-  return new Response(JSON.stringify(settings), { headers: { 'Content-Type': 'application/json' } });
+  return jsonOk(settings);
 };
 
 // Updates the invoice letterhead details (your name/address, the client's
 // billing address) and/or the next invoice number. Textareas arrive as
 // newline-separated text and are split into address lines here.
 export const POST: APIRoute = async ({ request }) => {
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return new Response(JSON.stringify({ error: 'Invalid JSON body' }), {
-      status: 400,
-      headers: { 'Content-Type': 'application/json' },
-    });
-  }
+  const parsed = await parseJsonBody(request);
+  if ('error' in parsed) return parsed.error;
 
   const {
     fromName,
@@ -34,7 +28,7 @@ export const POST: APIRoute = async ({ request }) => {
     vatNote,
     billTo,
     nextInvoiceRef,
-  } = (body ?? {}) as {
+  } = (parsed.data ?? {}) as {
     fromName?: string;
     fromAddress?: string;
     vatNote?: string;
@@ -43,10 +37,7 @@ export const POST: APIRoute = async ({ request }) => {
   };
 
   if (typeof nextInvoiceRef !== 'number' || !Number.isInteger(nextInvoiceRef) || nextInvoiceRef <= 0) {
-    return new Response(JSON.stringify({ error: 'nextInvoiceRef must be a positive whole number' }), {
-      status: 400,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return jsonError('nextInvoiceRef must be a positive whole number');
   }
 
   const current = await readInvoiceSettings();
@@ -59,6 +50,5 @@ export const POST: APIRoute = async ({ request }) => {
   };
 
   await writeInvoiceSettings(settings);
-
-  return new Response(JSON.stringify(settings), { headers: { 'Content-Type': 'application/json' } });
+  return jsonOk(settings);
 };

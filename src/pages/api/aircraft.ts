@@ -1,5 +1,6 @@
 import type { APIRoute } from 'astro';
 import { addAircraft, removeAircraft } from '../../lib/logbook-settings';
+import { parseJsonBody, jsonOk, jsonError } from '../../lib/api-response';
 
 const MAX_LENGTH = 20;
 
@@ -11,50 +12,26 @@ function oneLine(value: unknown): string {
 // Saves a new aircraft registration for the add-jump form's dropdown to
 // pick from.
 export const POST: APIRoute = async ({ request }) => {
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return new Response(JSON.stringify({ error: 'Invalid JSON body' }), {
-      status: 400,
-      headers: { 'Content-Type': 'application/json' },
-    });
-  }
+  const parsed = await parseJsonBody(request);
+  if ('error' in parsed) return parsed.error;
 
-  const plate = oneLine((body as any)?.plate);
-  if (!plate) {
-    return new Response(JSON.stringify({ error: 'plate is required' }), {
-      status: 400,
-      headers: { 'Content-Type': 'application/json' },
-    });
-  }
+  const plate = oneLine((parsed.data as any)?.plate);
+  if (!plate) return jsonError('plate is required');
 
   const settings = await addAircraft({ plate });
-  return new Response(JSON.stringify({ settings }), { headers: { 'Content-Type': 'application/json' } });
+  return jsonOk({ settings });
 };
 
 // Removes a saved aircraft. Jumps already logged against it keep their own
 // snapshotted aircraft text, so deleting it never rewrites history — it
 // just drops it from future jumps' dropdown.
 export const DELETE: APIRoute = async ({ request }) => {
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return new Response(JSON.stringify({ error: 'Invalid JSON body' }), {
-      status: 400,
-      headers: { 'Content-Type': 'application/json' },
-    });
-  }
+  const parsed = await parseJsonBody(request);
+  if ('error' in parsed) return parsed.error;
 
-  const id = typeof (body as any)?.id === 'string' ? (body as any).id : '';
-  if (!id) {
-    return new Response(JSON.stringify({ error: 'id is required' }), {
-      status: 400,
-      headers: { 'Content-Type': 'application/json' },
-    });
-  }
+  const id = typeof (parsed.data as any)?.id === 'string' ? (parsed.data as any).id : '';
+  if (!id) return jsonError('id is required');
 
   const settings = await removeAircraft(id);
-  return new Response(JSON.stringify({ settings }), { headers: { 'Content-Type': 'application/json' } });
+  return jsonOk({ settings });
 };

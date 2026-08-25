@@ -1,5 +1,6 @@
 import type { APIRoute } from 'astro';
 import { addPlace, removePlace } from '../../lib/logbook-settings';
+import { parseJsonBody, jsonOk, jsonError } from '../../lib/api-response';
 
 const MAX_LENGTH = 80;
 
@@ -10,26 +11,14 @@ function oneLine(value: unknown): string {
 
 // Saves a new place for the add-jump form's dropdown to pick from.
 export const POST: APIRoute = async ({ request }) => {
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return new Response(JSON.stringify({ error: 'Invalid JSON body' }), {
-      status: 400,
-      headers: { 'Content-Type': 'application/json' },
-    });
-  }
+  const parsed = await parseJsonBody(request);
+  if ('error' in parsed) return parsed.error;
 
-  const name = oneLine((body as any)?.name);
-  if (!name) {
-    return new Response(JSON.stringify({ error: 'name is required' }), {
-      status: 400,
-      headers: { 'Content-Type': 'application/json' },
-    });
-  }
+  const name = oneLine((parsed.data as any)?.name);
+  if (!name) return jsonError('name is required');
 
   const settings = await addPlace({ name });
-  return new Response(JSON.stringify({ settings }), { headers: { 'Content-Type': 'application/json' } });
+  return jsonOk({ settings });
 };
 
 // Removes a saved place. Jumps already logged against it keep their own
@@ -37,24 +26,12 @@ export const POST: APIRoute = async ({ request }) => {
 // drops it from future jumps' dropdown (and clears it as the default, if
 // it was one).
 export const DELETE: APIRoute = async ({ request }) => {
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return new Response(JSON.stringify({ error: 'Invalid JSON body' }), {
-      status: 400,
-      headers: { 'Content-Type': 'application/json' },
-    });
-  }
+  const parsed = await parseJsonBody(request);
+  if ('error' in parsed) return parsed.error;
 
-  const id = typeof (body as any)?.id === 'string' ? (body as any).id : '';
-  if (!id) {
-    return new Response(JSON.stringify({ error: 'id is required' }), {
-      status: 400,
-      headers: { 'Content-Type': 'application/json' },
-    });
-  }
+  const id = typeof (parsed.data as any)?.id === 'string' ? (parsed.data as any).id : '';
+  if (!id) return jsonError('id is required');
 
   const settings = await removePlace(id);
-  return new Response(JSON.stringify({ settings }), { headers: { 'Content-Type': 'application/json' } });
+  return jsonOk({ settings });
 };

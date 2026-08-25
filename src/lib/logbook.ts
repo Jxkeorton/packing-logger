@@ -8,6 +8,7 @@
 // date, keeps every number after it gap-free — same as a paper logbook,
 // where you'd cross out and renumber rather than leave a hole.
 import { readText, writeText } from './storage';
+import { csvEscape, parseCsvLine } from './csv';
 
 export interface LogbookEntry {
   date: string; // YYYY-MM-DD, local time
@@ -32,46 +33,6 @@ const ENTRIES_KEY = 'logbook.csv';
 // they simply come up one field short and jumpType defaults to ''.
 const ENTRIES_HEADER = 'date,place,exit_altitude,canopy,container,aad,aircraft,description,at,jump_type';
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
-
-// Every free-text field here (place/aircraft/description especially) can
-// contain commas or line breaks, so — same approach as tandem.ts — quote
-// wholesale rather than trying to sanitize.
-function csvEscape(value: string): string {
-  if (/[",\r\n]/.test(value)) {
-    return `"${value.replace(/"/g, '""')}"`;
-  }
-  return value;
-}
-
-function parseCsvLine(line: string): string[] {
-  const fields: string[] = [];
-  let current = '';
-  let inQuotes = false;
-  for (let i = 0; i < line.length; i++) {
-    const ch = line[i];
-    if (inQuotes) {
-      if (ch === '"') {
-        if (line[i + 1] === '"') {
-          current += '"';
-          i++;
-        } else {
-          inQuotes = false;
-        }
-      } else {
-        current += ch;
-      }
-    } else if (ch === '"') {
-      inQuotes = true;
-    } else if (ch === ',') {
-      fields.push(current);
-      current = '';
-    } else {
-      current += ch;
-    }
-  }
-  fields.push(current);
-  return fields;
-}
 
 async function readEntries(): Promise<LogbookEntry[]> {
   const raw = await readText(ENTRIES_KEY);

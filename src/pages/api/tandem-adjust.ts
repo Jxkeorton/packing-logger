@@ -13,6 +13,7 @@ import {
 import { groupByInvoiceMonth, groupByWeek } from '../../lib/tandem-invoice';
 import { addEntry as addLogbookEntry, removeEntry as removeLogbookEntry } from '../../lib/logbook';
 import { ensureJumpType, readLogbookSettings } from '../../lib/logbook-settings';
+import { parseJsonBody, jsonOk, jsonError } from '../../lib/api-response';
 
 const MAX_NAME_LENGTH = 80;
 
@@ -62,38 +63,25 @@ async function respond(state: DayState): Promise<Response> {
   const currentWeek = groupByWeek(combined)[0] ?? null;
   const currentMonth = groupByInvoiceMonth(combined)[0] ?? null;
 
-  return new Response(
-    JSON.stringify({
-      state,
-      totalJumps: totalJumps(state.counts),
-      totalEarnings: totalEarnings(state.counts),
-      currentWeek,
-      currentMonth,
-    }),
-    { headers: { 'Content-Type': 'application/json' } },
-  );
+  return jsonOk({
+    state,
+    totalJumps: totalJumps(state.counts),
+    totalEarnings: totalEarnings(state.counts),
+    currentWeek,
+    currentMonth,
+  });
 }
 
 // Records one tandem jump for today, crediting a customer name — every jump
 // needs one, since that's what ends up on the invoice.
 export const POST: APIRoute = async ({ request }) => {
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return new Response(JSON.stringify({ error: 'Invalid JSON body' }), {
-      status: 400,
-      headers: { 'Content-Type': 'application/json' },
-    });
-  }
+  const parsed = await parseJsonBody(request);
+  if ('error' in parsed) return parsed.error;
 
-  const { category, name } = (body ?? {}) as { category?: string; name?: string };
+  const { category, name } = (parsed.data ?? {}) as { category?: string; name?: string };
 
   if (!category || !CATEGORIES.includes(category as Category)) {
-    return new Response(JSON.stringify({ error: 'Unknown category' }), {
-      status: 400,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return jsonError('Unknown category');
   }
 
   // Collapse any embedded newlines rather than rejecting them outright —
@@ -101,16 +89,10 @@ export const POST: APIRoute = async ({ request }) => {
   // stray line break into on a phone keyboard.
   const cleanName = typeof name === 'string' ? name.trim().replace(/[\r\n]+/g, ' ') : '';
   if (!cleanName) {
-    return new Response(JSON.stringify({ error: 'name is required' }), {
-      status: 400,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return jsonError('name is required');
   }
   if (cleanName.length > MAX_NAME_LENGTH) {
-    return new Response(JSON.stringify({ error: `name must be ${MAX_NAME_LENGTH} characters or fewer` }), {
-      status: 400,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return jsonError(`name must be ${MAX_NAME_LENGTH} characters or fewer`);
   }
 
   const at = new Date().toISOString();
@@ -122,23 +104,12 @@ export const POST: APIRoute = async ({ request }) => {
 // Removes a single jump (by the `at` timestamp it was recorded with) — used
 // to undo a mis-tap or a typo'd name.
 export const DELETE: APIRoute = async ({ request }) => {
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return new Response(JSON.stringify({ error: 'Invalid JSON body' }), {
-      status: 400,
-      headers: { 'Content-Type': 'application/json' },
-    });
-  }
+  const parsed = await parseJsonBody(request);
+  if ('error' in parsed) return parsed.error;
 
-  const { at } = (body ?? {}) as { at?: string };
-
+  const { at } = (parsed.data ?? {}) as { at?: string };
   if (typeof at !== 'string' || !at) {
-    return new Response(JSON.stringify({ error: 'at is required' }), {
-      status: 400,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return jsonError('at is required');
   }
 
   const state = await removeJump(at);

@@ -20,6 +20,20 @@ export function formatDateKey(d: Date): string {
   return `${y}-${m}-${day}`;
 }
 
+const DATE_KEY_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * Rejects both malformed strings and dates that don't actually exist (e.g.
+ * 2026-02-30, which `Date` would otherwise silently roll into March) —
+ * used by the "backfill a past day" endpoints (api/set-day.ts,
+ * api/tandem-set-day.ts) to validate a date before writing it.
+ */
+export function isValidCalendarDate(date: string): boolean {
+  if (!DATE_KEY_RE.test(date)) return false;
+  const d = parseDateKey(date);
+  return !Number.isNaN(d.getTime()) && formatDateKey(d) === date;
+}
+
 export function addDays(d: Date, n: number): Date {
   const copy = new Date(d);
   copy.setDate(copy.getDate() + n);
