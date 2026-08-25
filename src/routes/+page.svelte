@@ -14,6 +14,7 @@
   import InvoiceSettingsPanel from '$lib/components/tandems/InvoiceSettingsPanel.svelte';
   import LogForm from '$lib/components/LogForm.svelte';
   import ReferenceListPanel from '$lib/components/ReferenceListPanel.svelte';
+  import RigBuilderPanel from '$lib/components/RigBuilderPanel.svelte';
   import SettingsPanel from '$lib/components/SettingsPanel.svelte';
   import DownloadButton from '$lib/components/DownloadButton.svelte';
   import { totalEarnings as packingTotalEarnings, totalPacks } from '$lib/packing';
@@ -35,7 +36,6 @@
     FIELD_LABEL,
     FIELD_LABEL_NARROW,
     FIELD_INPUT,
-    FIELD_SELECT,
   } from '$lib/ui-classes';
   import type { PageData } from './$types';
 
@@ -241,135 +241,14 @@
         {/snippet}
       </ReferenceListPanel>
 
-      <ReferenceListPanel
-        label="Canopies"
-        hint="Each canopy's jump count is how many logged jumps used a rig built with it."
-        items={canopies}
-        emptyText="No canopies saved yet."
-        allowDefault={false}
-        addAction="?/addCanopy"
-        removeAction="?/removeCanopy"
-        submitLabel="Save canopy"
-      >
-        {#snippet fields()}
-          <label class="{FIELD_LABEL} mt-2.5 mb-0">
-            <span>Name</span>
-            <input type="text" name="name" class={FIELD_INPUT} placeholder="e.g. Sabre2 190" autocomplete="off" maxlength="80" required />
-          </label>
-        {/snippet}
-      </ReferenceListPanel>
-
-      <ReferenceListPanel
-        label="Linesets"
-        hint="Each lineset's jump count is how many logged jumps used a rig built with it."
-        items={linesets}
-        emptyText="No linesets saved yet."
-        allowDefault={false}
-        addAction="?/addLineset"
-        removeAction="?/removeLineset"
-        submitLabel="Save lineset"
-      >
-        {#snippet fields()}
-          <label class="{FIELD_LABEL} mt-2.5 mb-0">
-            <span>Name</span>
-            <input type="text" name="name" class={FIELD_INPUT} placeholder="e.g. Dacron, fitted Jan 2026" autocomplete="off" maxlength="80" required />
-          </label>
-        {/snippet}
-      </ReferenceListPanel>
-
-      <ReferenceListPanel
-        label="Pilot chutes"
-        hint="Each pilot chute's jump count is how many logged jumps used a rig built with it."
-        items={pilotChutes}
-        emptyText="No pilot chutes saved yet."
-        allowDefault={false}
-        addAction="?/addPilotChute"
-        removeAction="?/removePilotChute"
-        submitLabel="Save pilot chute"
-      >
-        {#snippet fields()}
-          <label class="{FIELD_LABEL} mt-2.5 mb-0">
-            <span>Name</span>
-            <input type="text" name="name" class={FIELD_INPUT} placeholder="e.g. PD reserve pilot chute" autocomplete="off" maxlength="80" required />
-          </label>
-        {/snippet}
-      </ReferenceListPanel>
-
-      <ReferenceListPanel
-        label="Containers"
-        hint="Each container's jump count is how many logged jumps used a rig built with it."
-        items={containers}
-        emptyText="No containers saved yet."
-        allowDefault={false}
-        addAction="?/addContainer"
-        removeAction="?/removeContainer"
-        submitLabel="Save container"
-      >
-        {#snippet fields()}
-          <label class="{FIELD_LABEL} mt-2.5 mb-0">
-            <span>Name</span>
-            <input type="text" name="name" class={FIELD_INPUT} placeholder="e.g. Wings X 190" autocomplete="off" maxlength="80" required />
-          </label>
-        {/snippet}
-      </ReferenceListPanel>
-
-      <ReferenceListPanel
-        label="Rigs"
-        hint={`Build a rig from the components above. The starred one is pre-selected whenever you start a new jump. If you swap a part later, build a new rig instead of editing this one — that keeps each component's jump count accurate.`}
-        items={rigs}
-        emptyText="No rigs built yet."
-        category="rig"
-        categoryLabel="rig"
-        defaultId={data.logbookSettings.defaultRigId}
-        addAction="?/addRig"
-        removeAction="?/removeRig"
-        submitLabel="Build rig"
-      >
-        {#snippet fields()}
-          <label class="{FIELD_LABEL} mt-2.5 mb-0">
-            <span>Name</span>
-            <input type="text" name="name" class={FIELD_INPUT} placeholder="e.g. Main rig" autocomplete="off" maxlength="80" required />
-          </label>
-          <div class="grid grid-cols-2 gap-x-2.5 gap-y-0 max-[420px]:grid-cols-1">
-            <label class="{FIELD_LABEL} mt-2.5 mb-0">
-              <span>Canopy</span>
-              <select name="canopyId" class={FIELD_SELECT}>
-                <option value="">No canopy selected</option>
-                {#each data.logbookSettings.canopies as c (c.id)}
-                  <option value={c.id}>{c.name}</option>
-                {/each}
-              </select>
-            </label>
-            <label class="{FIELD_LABEL} mt-2.5 mb-0">
-              <span>Lineset</span>
-              <select name="linesetId" class={FIELD_SELECT}>
-                <option value="">No lineset selected</option>
-                {#each data.logbookSettings.linesets as l (l.id)}
-                  <option value={l.id}>{l.name}</option>
-                {/each}
-              </select>
-            </label>
-            <label class="{FIELD_LABEL} mt-2.5 mb-0">
-              <span>Pilot chute</span>
-              <select name="pilotChuteId" class={FIELD_SELECT}>
-                <option value="">No pilot chute selected</option>
-                {#each data.logbookSettings.pilotChutes as pc (pc.id)}
-                  <option value={pc.id}>{pc.name}</option>
-                {/each}
-              </select>
-            </label>
-            <label class="{FIELD_LABEL} mt-2.5 mb-0">
-              <span>Container</span>
-              <select name="containerId" class={FIELD_SELECT}>
-                <option value="">No container selected</option>
-                {#each data.logbookSettings.containers as ctn (ctn.id)}
-                  <option value={ctn.id}>{ctn.name}</option>
-                {/each}
-              </select>
-            </label>
-          </div>
-        {/snippet}
-      </ReferenceListPanel>
+      <RigBuilderPanel
+        {canopies}
+        {linesets}
+        {pilotChutes}
+        {containers}
+        {rigs}
+        defaultRigId={data.logbookSettings.defaultRigId}
+      />
 
       <ReferenceListPanel
         label="Aircraft"
