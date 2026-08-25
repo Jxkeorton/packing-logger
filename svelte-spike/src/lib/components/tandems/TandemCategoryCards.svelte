@@ -1,0 +1,154 @@
+<script lang="ts">
+  import { invalidateAll } from '$app/navigation';
+  import { CATEGORIES, CATEGORY_LABELS, RATES, type Category, type DayState } from '$lib/tandem';
+  import { CARD, CARD_TOP, CARD_LABEL, CARD_RATE, CARD_SUBTOTAL, CATEGORIES_LIST } from '$lib/ui-classes';
+  import TandemNameModal from './TandemNameModal.svelte';
+
+  let { tandemState }: { tandemState: DayState } = $props();
+
+  let pendingCategory = $state<Category | null>(null);
+  let deletingAt = $state<string | null>(null);
+
+  const modalSubtitle = $derived(
+    pendingCategory ? `${CATEGORY_LABELS[pendingCategory]} jump — £${RATES[pendingCategory].toFixed(2)}` : '',
+  );
+
+  async function addJump(name: string) {
+    const category = pendingCategory;
+    if (!category) return;
+    const formData = new FormData();
+    formData.set('category', category);
+    formData.set('name', name);
+    await fetch('?/addTandemJump', { method: 'POST', body: formData });
+    pendingCategory = null;
+    await invalidateAll();
+  }
+
+  async function deleteJump(at: string) {
+    deletingAt = at;
+    const formData = new FormData();
+    formData.set('at', at);
+    await fetch('?/deleteTandemJump', { method: 'POST', body: formData });
+    await invalidateAll();
+    deletingAt = null;
+  }
+</script>
+
+<section class={CATEGORIES_LIST}>
+  {#each CATEGORIES as category (category)}
+    <section class={CARD} data-tandem-category={category} style={`--accent: var(--${category})`}>
+      <div class={CARD_TOP}>
+        <h2 class={CARD_LABEL}>{CATEGORY_LABELS[category]}</h2>
+        <span class={CARD_RATE}>£{RATES[category].toFixed(2)} / jump</span>
+      </div>
+      <button type="button" class="add-jump-btn" style={`--accent: var(--${category})`} onclick={() => (pendingCategory = category)}>
+        &plus; Add {CATEGORY_LABELS[category].toLowerCase()} jump
+      </button>
+      <ul class="list-none mt-1 mb-0 p-0">
+        {#if tandemState.entries[category].length === 0}
+          <li class="tandem-jump-empty">No jumps logged yet today.</li>
+        {:else}
+          {#each tandemState.entries[category] as jump (jump.at)}
+            <li class="tandem-jump-row">
+              <span class="tandem-jump-name">{jump.name}</span>
+              <button
+                type="button"
+                class="tandem-jump-delete"
+                disabled={deletingAt === jump.at}
+                aria-label={`Remove ${jump.name}`}
+                onclick={() => deleteJump(jump.at)}
+              >
+                &times;
+              </button>
+            </li>
+          {/each}
+        {/if}
+      </ul>
+      <div class={CARD_SUBTOTAL}>£{(tandemState.counts[category] * RATES[category]).toFixed(2)}</div>
+    </section>
+  {/each}
+</section>
+
+<TandemNameModal
+  open={pendingCategory !== null}
+  subtitle={modalSubtitle}
+  onSubmit={addJump}
+  onClose={() => (pendingCategory = null)}
+/>
+
+<style>
+  .add-jump-btn {
+    appearance: none;
+    border: 0;
+    border-radius: 0.75rem;
+    width: 100%;
+    height: 46px;
+    margin-top: 10px;
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 14.5px;
+    color: white;
+    background: var(--accent);
+    cursor: pointer;
+    touch-action: manipulation;
+    transition:
+      transform 80ms ease,
+      filter 80ms ease;
+  }
+
+  .add-jump-btn:active {
+    transform: scale(0.97);
+    filter: brightness(0.95);
+  }
+
+  .add-jump-btn:focus-visible {
+    outline: 3px solid var(--gold);
+    outline-offset: 2px;
+  }
+
+  .tandem-jump-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 9px 2px;
+    border-top: 1px solid var(--line);
+    font-size: 13.5px;
+  }
+
+  .tandem-jump-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .tandem-jump-delete {
+    appearance: none;
+    border: none;
+    background: transparent;
+    color: var(--ink-soft);
+    font-size: 18px;
+    line-height: 1;
+    width: 26px;
+    height: 26px;
+    flex: none;
+    border-radius: 8px;
+    cursor: pointer;
+    touch-action: manipulation;
+  }
+
+  .tandem-jump-delete:hover,
+  .tandem-jump-delete:focus-visible {
+    background: var(--danger-soft);
+    color: var(--danger);
+    outline: none;
+  }
+
+  .tandem-jump-empty {
+    margin: 0;
+    padding: 9px 2px;
+    border-top: 1px solid var(--line);
+    color: var(--ink-soft);
+    font-size: 13px;
+  }
+</style>
