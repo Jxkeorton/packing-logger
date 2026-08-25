@@ -25,7 +25,10 @@ function entryInput(overrides: Partial<EntryInput> = {}): EntryInput {
     date: '2026-08-01',
     place: 'Langar',
     exitAltitude: '13,000 ft',
+    rig: '',
     canopy: '',
+    lineset: '',
+    pilotChute: '',
     container: '',
     aad: '',
     aircraft: '',
@@ -132,7 +135,9 @@ describe('readCsvFile', () => {
     const csv = await readCsvFile(0);
     const lines = csv.trim().split('\n');
 
-    expect(lines[0]).toBe('jump_number,date,jump_type,place,exit_altitude,canopy,container,aad,aircraft,description');
+    expect(lines[0]).toBe(
+      'jump_number,date,jump_type,place,exit_altitude,rig,canopy,lineset,pilot_chute,container,aad,aircraft,description',
+    );
     // Oldest first — the reverse of readLogbook's newest-first order.
     expect(lines[1]).toContain('1,2026-08-01');
     expect(lines[1]).toContain('"Freefall, then a hop-and-pop"');
@@ -153,5 +158,29 @@ describe('backward compatibility with rows written before jump_type existed', ()
     expect(result).toHaveLength(1);
     expect(result[0].at).toBe('legacy-at');
     expect(result[0].jumpType).toBe('');
+  });
+});
+
+describe('backward compatibility with rows written before rig/lineset/pilot chute existed', () => {
+  it('defaults rig, lineset and pilotChute to empty for a 10-field legacy row', async () => {
+    // ENTRIES_HEADER now has 13 fields; a legacy row written when it only
+    // had 10 (through jump_type) must still parse, with the three new
+    // trailing fields defaulting to ''.
+    const legacyRow = ['2026-08-01', 'Langar', '13000ft', 'Sabre2 190', 'Wings X', '', '', '', 'legacy-at', 'Sport'].join(
+      ',',
+    );
+    store.set(
+      'logbook.csv',
+      `date,place,exit_altitude,canopy,container,aad,aircraft,description,at,jump_type\n${legacyRow}\n`,
+    );
+
+    const result = await readLogbook(0);
+    expect(result).toHaveLength(1);
+    expect(result[0].at).toBe('legacy-at');
+    expect(result[0].canopy).toBe('Sabre2 190');
+    expect(result[0].container).toBe('Wings X');
+    expect(result[0].rig).toBe('');
+    expect(result[0].lineset).toBe('');
+    expect(result[0].pilotChute).toBe('');
   });
 });

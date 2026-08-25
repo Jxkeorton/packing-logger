@@ -6,7 +6,7 @@ import { fail, type Action } from '@sveltejs/kit';
 import { CATEGORIES, type Category } from '$lib/tandem';
 import { addJump, removeJump } from '$lib/server/tandem';
 import { addEntry as addLogbookEntry, removeEntry as removeLogbookEntry } from '$lib/server/logbook';
-import { ensureJumpType, readLogbookSettings } from '$lib/server/logbook-settings';
+import { ensureJumpType, readLogbookSettings, resolveRigComponents } from '$lib/server/logbook-settings';
 import { readInvoiceSettings, writeInvoiceSettings, type InvoiceSettings } from '$lib/server/invoice-settings';
 import { oneLine, multiLine } from '$lib/server/form-utils';
 
@@ -23,20 +23,23 @@ async function autoLogTandemJump(category: Category, name: string, date: string,
     const jumpTypeName = category === 'instructor' ? 'Tandem Instructor' : 'Tandem Camera';
     await ensureJumpType(jumpTypeName);
     const settings = await readLogbookSettings();
-    // Camera jumps use whatever's currently starred as the default
-    // Equipment profile (the videographer's own camera rig) — blank if
-    // none is set. Instructor jumps use a generic placeholder instead: a
-    // tandem instructor rig isn't one of the videographer's own saved
-    // profiles, so there's nothing meaningful to default it to.
-    const defaultEquipment = settings.equipment.find((eq) => eq.id === settings.defaultEquipmentId);
+    // Camera jumps use whatever's currently starred as the default Rig
+    // (the videographer's own camera rig) — blank if none is set.
+    // Instructor jumps use a generic placeholder instead: a tandem
+    // instructor rig isn't one of the videographer's own saved rigs, so
+    // there's nothing meaningful to default it to.
+    const defaultRig = category === 'instructor' ? null : resolveRigComponents(settings, settings.defaultRigId);
     await addLogbookEntry(
       {
         date,
         place: '',
         exitAltitude: '',
-        canopy: category === 'instructor' ? 'Tandem Rig' : (defaultEquipment?.canopy ?? ''),
-        container: category === 'instructor' ? '' : (defaultEquipment?.container ?? ''),
-        aad: category === 'instructor' ? '' : (defaultEquipment?.aad ?? ''),
+        rig: defaultRig?.rig ?? '',
+        canopy: category === 'instructor' ? 'Tandem Rig' : (defaultRig?.canopy ?? ''),
+        lineset: defaultRig?.lineset ?? '',
+        pilotChute: defaultRig?.pilotChute ?? '',
+        container: defaultRig?.container ?? '',
+        aad: '',
         aircraft: '',
         jumpType: jumpTypeName,
         description: `Auto-logged from the Tandems tab — ${category} jump for ${name}.`,

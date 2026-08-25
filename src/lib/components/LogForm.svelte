@@ -44,7 +44,7 @@
     date: string;
     placeId: string;
     exitAltitude: string;
-    equipmentId: string;
+    rigId: string;
     aircraftId: string;
     jumpTypeId: string;
     description: string;
@@ -55,26 +55,24 @@
       date: today,
       placeId: settings.defaultPlaceId ?? '',
       exitAltitude: '',
-      equipmentId: settings.defaultEquipmentId ?? '',
+      rigId: settings.defaultRigId ?? '',
       aircraftId: settings.defaultAircraftId ?? '',
       jumpTypeId: settings.defaultJumpTypeId ?? '',
       description: '',
     };
   }
 
-  // Entries store the profile's *text*, not its id (the ledger keeps what
-  // was actually jumped, not a reference) — so re-opening one for editing
-  // matches that text back to a saved profile to pre-select the right
+  // Entries store the rig's *name*, not its id (the ledger keeps what was
+  // actually jumped, not a reference) — so re-opening one for editing
+  // matches that name back to a saved rig to pre-select the right
   // dropdown option, same as the real app's formFromEntry.
   function formFromEntry(entry: NumberedEntry): FormFields {
-    const equipment = settings.equipment.find(
-      (eq) => eq.canopy === entry.canopy && eq.container === entry.container && eq.aad === entry.aad,
-    );
+    const rig = settings.rigs.find((r) => r.name === entry.rig);
     return {
       date: entry.date,
       placeId: settings.places.find((p) => p.name === entry.place)?.id ?? '',
       exitAltitude: entry.exitAltitude,
-      equipmentId: equipment?.id ?? '',
+      rigId: rig?.id ?? '',
       aircraftId: settings.aircraft.find((a) => a.plate === entry.aircraft)?.id ?? '',
       jumpTypeId: settings.jumpTypes.find((jt) => jt.name === entry.jumpType)?.id ?? '',
       description: entry.description,
@@ -111,12 +109,12 @@
   // or imperative <select> patching), but not literally zero code; "don't
   // clobber an in-progress choice when the live data refreshes" is a
   // product requirement, not an artifact of how the old version was built.
-  let touched = $state({ placeId: false, equipmentId: false, aircraftId: false, jumpTypeId: false });
+  let touched = $state({ placeId: false, rigId: false, aircraftId: false, jumpTypeId: false });
 
   $effect(() => {
     if (editingAt !== null) return; // edit mode always starts fully "touched", set below
     if (!touched.placeId) form.placeId = settings.defaultPlaceId ?? '';
-    if (!touched.equipmentId) form.equipmentId = settings.defaultEquipmentId ?? '';
+    if (!touched.rigId) form.rigId = settings.defaultRigId ?? '';
     if (!touched.aircraftId) form.aircraftId = settings.defaultAircraftId ?? '';
     if (!touched.jumpTypeId) form.jumpTypeId = settings.defaultJumpTypeId ?? '';
   });
@@ -124,13 +122,13 @@
   function enterAddMode() {
     editingAt = null;
     form = emptyForm();
-    touched = { placeId: false, equipmentId: false, aircraftId: false, jumpTypeId: false };
+    touched = { placeId: false, rigId: false, aircraftId: false, jumpTypeId: false };
   }
 
   function enterEditMode(entry: NumberedEntry) {
     editingAt = entry.at;
     form = formFromEntry(entry);
-    touched = { placeId: true, equipmentId: true, aircraftId: true, jumpTypeId: true };
+    touched = { placeId: true, rigId: true, aircraftId: true, jumpTypeId: true };
     formEl?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
@@ -221,16 +219,16 @@
         />
       </label>
       <label class={FIELD_LABEL}>
-        <span>Equipment</span>
+        <span>Rig</span>
         <select
-          name="equipmentId"
+          name="rigId"
           class={FIELD_SELECT}
-          bind:value={form.equipmentId}
-          onchange={() => (touched.equipmentId = true)}
+          bind:value={form.rigId}
+          onchange={() => (touched.rigId = true)}
         >
-          <option value="">No equipment selected</option>
-          {#each settings.equipment as eq (eq.id)}
-            <option value={eq.id}>{eq.name}</option>
+          <option value="">No rig selected</option>
+          {#each settings.rigs as rig (rig.id)}
+            <option value={rig.id}>{rig.name}</option>
           {/each}
         </select>
       </label>
@@ -308,9 +306,11 @@
               <div><dt>Jump type</dt><dd>{dash(entry.jumpType)}</dd></div>
               <div><dt>Exit altitude</dt><dd>{dash(entry.exitAltitude)}</dd></div>
               <div><dt>Aircraft</dt><dd>{dash(entry.aircraft)}</dd></div>
+              <div><dt>Rig</dt><dd>{dash(entry.rig)}</dd></div>
               <div><dt>Canopy</dt><dd>{dash(entry.canopy)}</dd></div>
+              <div><dt>Lineset</dt><dd>{dash(entry.lineset)}</dd></div>
+              <div><dt>Pilot chute</dt><dd>{dash(entry.pilotChute)}</dd></div>
               <div><dt>Container</dt><dd>{dash(entry.container)}</dd></div>
-              <div><dt>AAD</dt><dd>{dash(entry.aad)}</dd></div>
             </dl>
             {#if entry.description}<p class="logbook-details-description">{entry.description}</p>{/if}
             <div class="logbook-details-actions">

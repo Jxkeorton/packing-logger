@@ -4,17 +4,26 @@
 // file. See that spike (svelte-spike git history) for how this behaves;
 // nothing here changed for the full migration.
 import { fail, type Action } from '@sveltejs/kit';
-import { addEntry, removeEntry, updateEntry, type EntryInput } from '$lib/server/logbook';
+import { addEntry, readLogbook, removeEntry, updateEntry, type EntryInput } from '$lib/server/logbook';
 import {
   addAircraft,
-  addEquipment,
+  addCanopy,
+  addContainer,
   addJumpType,
+  addLineset,
+  addPilotChute,
   addPlace,
+  addRig,
   readLogbookSettings,
   removeAircraft,
-  removeEquipment,
+  removeCanopy,
+  removeContainer,
   removeJumpType,
+  removeLineset,
+  removePilotChute,
   removePlace,
+  removeRig,
+  resolveRigComponents,
   setBaseJumps,
   setDefault,
   type DefaultCategory,
@@ -23,19 +32,24 @@ import { oneLine, multiLine } from '$lib/server/form-utils';
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
-// The form submits dropdown *ids* (placeId/equipmentId/...), same as the
-// main app's <select> values — but here the id->text resolution the main
+// The form submits dropdown *ids* (placeId/rigId/...), same as the main
+// app's <select> values — but here the id->text resolution the main
 // app's client-side JS did (selectedOptionText, the equipment dataset
 // reads) happens server-side instead, against the current saved settings.
 // One consequence worth knowing: this form degrades gracefully with JS
 // disabled, which the fetch-based version never did.
-async function resolveEntryInput(formData: FormData): Promise<{ input: EntryInput } | { error: string }> {
+//
+// aad isn't resolved from anything here — it's no longer collected by the
+// form (see logbook-settings.ts's Rig) — so it's left out of EntryInput's
+// concerns entirely; updateJump below is responsible for carrying an
+// existing entry's aad forward across an edit instead of blanking it.
+async function resolveEntryInput(formData: FormData): Promise<{ input: Omit<EntryInput, 'aad'> } | { error: string }> {
   const date = oneLine(formData.get('date'), 10);
   if (!DATE_RE.test(date)) return { error: 'date is required and must be YYYY-MM-DD' };
 
   const settings = await readLogbookSettings();
   const place = settings.places.find((p) => p.id === formData.get('placeId'));
-  const equipment = settings.equipment.find((e) => e.id === formData.get('equipmentId'));
+  const rigComponents = resolveRigComponents(settings, String(formData.get('rigId') ?? ''));
   const aircraft = settings.aircraft.find((a) => a.id === formData.get('aircraftId'));
   const jumpType = settings.jumpTypes.find((j) => j.id === formData.get('jumpTypeId'));
 
@@ -44,9 +58,11 @@ async function resolveEntryInput(formData: FormData): Promise<{ input: EntryInpu
       date,
       place: place?.name ?? '',
       exitAltitude: oneLine(formData.get('exitAltitude'), 120),
-      canopy: equipment?.canopy ?? '',
-      container: equipment?.container ?? '',
-      aad: equipment?.aad ?? '',
+      rig: rigComponents.rig,
+      canopy: rigComponents.canopy,
+      lineset: rigComponents.lineset,
+      pilotChute: rigComponents.pilotChute,
+      container: rigComponents.container,
       aircraft: aircraft?.plate ?? '',
       jumpType: jumpType?.name ?? '',
       description: multiLine(formData.get('description'), 4000),
@@ -59,7 +75,10 @@ export const logbookActions: Record<string, Action> = {
     const parsed = await resolveEntryInput(await request.formData());
     if ('error' in parsed) return fail(400, { error: parsed.error });
     const settings = await readLogbookSettings();
-    await addEntry(parsed.input, settings.baseJumps);
+    // aad is never set on a new entry — nothing in the form collects it
+    // any more (see resolveEntryInput's comment) — but the field still
+    // exists on every entry so older rows keep round-tripping.
+    await addEntry({ ...parsed.input, aad: '' }, settings.baseJumps);
   },
 
   updateJump: async ({ request }) => {
@@ -69,7 +88,12 @@ export const logbookActions: Record<string, Action> = {
     const parsed = await resolveEntryInput(formData);
     if ('error' in parsed) return fail(400, { error: parsed.error });
     const settings = await readLogbookSettings();
-    const result = await updateEntry(at, parsed.input, settings.baseJumps);
+    // Carry the existing entry's aad forward rather than blanking it —
+    // editing, say, a typo in an old jump's description shouldn't erase
+    // AAD text it was logged with back when the form still collected it.
+    const existing = (await readLogbook(settings.baseJumps)).find((e) => e.at === at);
+    if (!existing) return fail(404, { error: 'No jump found with that id' });
+    const result = await updateEntry(at, { ...parsed.input, aad: existing.aad }, settings.baseJumps);
     if (!result) return fail(404, { error: 'No jump found with that id' });
   },
 
@@ -92,22 +116,72 @@ export const logbookActions: Record<string, Action> = {
     await removePlace(id);
   },
 
-  addEquipment: async ({ request }) => {
+  addCanopy: async ({ request }) => {
+    const name = oneLine((await request.formData()).get('name'), 80);
+    if (!name) return fail(400, { error: 'name is required' });
+    await addCanopy({ name });
+  },
+
+  removeCanopy: async ({ request }) => {
+    const id = String((await request.formData()).get('id') ?? '');
+    if (!id) return fail(400, { error: 'id is required' });
+    await removeCanopy(id);
+  },
+
+  addLineset: async ({ request }) => {
+    const name = oneLine((await request.formData()).get('name'), 80);
+    if (!name) return fail(400, { error: 'name is required' });
+    await addLineset({ name });
+  },
+
+  removeLineset: async ({ request }) => {
+    const id = String((await request.formData()).get('id') ?? '');
+    if (!id) return fail(400, { error: 'id is required' });
+    await removeLineset(id);
+  },
+
+  addPilotChute: async ({ request }) => {
+    const name = oneLine((await request.formData()).get('name'), 80);
+    if (!name) return fail(400, { error: 'name is required' });
+    await addPilotChute({ name });
+  },
+
+  removePilotChute: async ({ request }) => {
+    const id = String((await request.formData()).get('id') ?? '');
+    if (!id) return fail(400, { error: 'id is required' });
+    await removePilotChute(id);
+  },
+
+  addContainer: async ({ request }) => {
+    const name = oneLine((await request.formData()).get('name'), 80);
+    if (!name) return fail(400, { error: 'name is required' });
+    await addContainer({ name });
+  },
+
+  removeContainer: async ({ request }) => {
+    const id = String((await request.formData()).get('id') ?? '');
+    if (!id) return fail(400, { error: 'id is required' });
+    await removeContainer(id);
+  },
+
+  addRig: async ({ request }) => {
     const formData = await request.formData();
     const name = oneLine(formData.get('name'), 80);
     if (!name) return fail(400, { error: 'name is required' });
-    await addEquipment({
+    const idOrNull = (value: FormDataEntryValue | null) => (typeof value === 'string' && value ? value : null);
+    await addRig({
       name,
-      canopy: oneLine(formData.get('canopy'), 80),
-      container: oneLine(formData.get('container'), 80),
-      aad: oneLine(formData.get('aad'), 80),
+      canopyId: idOrNull(formData.get('canopyId')),
+      linesetId: idOrNull(formData.get('linesetId')),
+      pilotChuteId: idOrNull(formData.get('pilotChuteId')),
+      containerId: idOrNull(formData.get('containerId')),
     });
   },
 
-  removeEquipment: async ({ request }) => {
+  removeRig: async ({ request }) => {
     const id = String((await request.formData()).get('id') ?? '');
     if (!id) return fail(400, { error: 'id is required' });
-    await removeEquipment(id);
+    await removeRig(id);
   },
 
   addAircraft: async ({ request }) => {

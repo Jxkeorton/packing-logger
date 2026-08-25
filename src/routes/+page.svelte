@@ -35,6 +35,7 @@
     FIELD_LABEL,
     FIELD_LABEL_NARROW,
     FIELD_INPUT,
+    FIELD_SELECT,
   } from '$lib/ui-classes';
   import type { PageData } from './$types';
 
@@ -54,15 +55,40 @@
   // $derived (not computed once) so these stay current after any action
   // re-runs `load` — no separate "refresh" step anywhere.
   const places = $derived(data.logbookSettings.places.map((p) => ({ id: p.id, name: p.name })));
-  const equipment = $derived(
-    data.logbookSettings.equipment.map((eq) => ({
-      id: eq.id,
-      name: eq.name,
-      detail: [eq.canopy, eq.container, eq.aad].filter(Boolean).join(' · ') || 'No details saved',
-    })),
-  );
   const aircraft = $derived(data.logbookSettings.aircraft.map((ac) => ({ id: ac.id, name: ac.plate })));
   const jumpTypes = $derived(data.logbookSettings.jumpTypes.map((jt) => ({ id: jt.id, name: jt.name })));
+
+  // A component's lifetime jump count is just how many logged entries
+  // mention its name against this part — entries store the name a rig's
+  // component resolved to at the time (see logbook-settings.ts's Rig),
+  // not a live reference, so this stays correct even if that component's
+  // rig is later retired.
+  function jumpsOn(field: 'canopy' | 'lineset' | 'pilotChute' | 'container' | 'rig', name: string): number {
+    return data.logbookEntries.filter((e) => e[field] === name).length;
+  }
+  const jumpsLabel = (n: number) => `${n} jump${n === 1 ? '' : 's'}`;
+
+  const componentItems = (list: { id: string; name: string }[], field: 'canopy' | 'lineset' | 'pilotChute' | 'container') =>
+    list.map((c) => ({ id: c.id, name: c.name, detail: jumpsLabel(jumpsOn(field, c.name)) }));
+  const canopies = $derived(componentItems(data.logbookSettings.canopies, 'canopy'));
+  const linesets = $derived(componentItems(data.logbookSettings.linesets, 'lineset'));
+  const pilotChutes = $derived(componentItems(data.logbookSettings.pilotChutes, 'pilotChute'));
+  const containers = $derived(componentItems(data.logbookSettings.containers, 'container'));
+
+  const componentName = (list: { id: string; name: string }[], id: string | null) =>
+    list.find((c) => c.id === id)?.name ?? '';
+  const rigs = $derived(
+    data.logbookSettings.rigs.map((rig) => {
+      const parts = [
+        componentName(data.logbookSettings.canopies, rig.canopyId),
+        componentName(data.logbookSettings.linesets, rig.linesetId),
+        componentName(data.logbookSettings.pilotChutes, rig.pilotChuteId),
+        componentName(data.logbookSettings.containers, rig.containerId),
+      ].filter(Boolean);
+      const composition = parts.length > 0 ? parts.join(' · ') : 'No components selected';
+      return { id: rig.id, name: rig.name, detail: `${composition} — ${jumpsLabel(jumpsOn('rig', rig.name))}` };
+    }),
+  );
 </script>
 
 <div
@@ -216,16 +242,88 @@
       </ReferenceListPanel>
 
       <ReferenceListPanel
-        label="Equipment"
-        hint="The starred one is pre-selected whenever you start a new jump."
-        items={equipment}
-        emptyText="No equipment saved yet."
-        category="equipment"
-        categoryLabel="equipment"
-        defaultId={data.logbookSettings.defaultEquipmentId}
-        addAction="?/addEquipment"
-        removeAction="?/removeEquipment"
-        submitLabel="Save equipment"
+        label="Canopies"
+        hint="Each canopy's jump count is how many logged jumps used a rig built with it."
+        items={canopies}
+        emptyText="No canopies saved yet."
+        allowDefault={false}
+        addAction="?/addCanopy"
+        removeAction="?/removeCanopy"
+        submitLabel="Save canopy"
+      >
+        {#snippet fields()}
+          <label class="{FIELD_LABEL} mt-2.5 mb-0">
+            <span>Name</span>
+            <input type="text" name="name" class={FIELD_INPUT} placeholder="e.g. Sabre2 190" autocomplete="off" maxlength="80" required />
+          </label>
+        {/snippet}
+      </ReferenceListPanel>
+
+      <ReferenceListPanel
+        label="Linesets"
+        hint="Each lineset's jump count is how many logged jumps used a rig built with it."
+        items={linesets}
+        emptyText="No linesets saved yet."
+        allowDefault={false}
+        addAction="?/addLineset"
+        removeAction="?/removeLineset"
+        submitLabel="Save lineset"
+      >
+        {#snippet fields()}
+          <label class="{FIELD_LABEL} mt-2.5 mb-0">
+            <span>Name</span>
+            <input type="text" name="name" class={FIELD_INPUT} placeholder="e.g. Dacron, fitted Jan 2026" autocomplete="off" maxlength="80" required />
+          </label>
+        {/snippet}
+      </ReferenceListPanel>
+
+      <ReferenceListPanel
+        label="Pilot chutes"
+        hint="Each pilot chute's jump count is how many logged jumps used a rig built with it."
+        items={pilotChutes}
+        emptyText="No pilot chutes saved yet."
+        allowDefault={false}
+        addAction="?/addPilotChute"
+        removeAction="?/removePilotChute"
+        submitLabel="Save pilot chute"
+      >
+        {#snippet fields()}
+          <label class="{FIELD_LABEL} mt-2.5 mb-0">
+            <span>Name</span>
+            <input type="text" name="name" class={FIELD_INPUT} placeholder="e.g. PD reserve pilot chute" autocomplete="off" maxlength="80" required />
+          </label>
+        {/snippet}
+      </ReferenceListPanel>
+
+      <ReferenceListPanel
+        label="Containers"
+        hint="Each container's jump count is how many logged jumps used a rig built with it."
+        items={containers}
+        emptyText="No containers saved yet."
+        allowDefault={false}
+        addAction="?/addContainer"
+        removeAction="?/removeContainer"
+        submitLabel="Save container"
+      >
+        {#snippet fields()}
+          <label class="{FIELD_LABEL} mt-2.5 mb-0">
+            <span>Name</span>
+            <input type="text" name="name" class={FIELD_INPUT} placeholder="e.g. Wings X 190" autocomplete="off" maxlength="80" required />
+          </label>
+        {/snippet}
+      </ReferenceListPanel>
+
+      <ReferenceListPanel
+        label="Rigs"
+        hint={`Build a rig from the components above. The starred one is pre-selected whenever you start a new jump. If you swap a part later, build a new rig instead of editing this one — that keeps each component's jump count accurate.`}
+        items={rigs}
+        emptyText="No rigs built yet."
+        category="rig"
+        categoryLabel="rig"
+        defaultId={data.logbookSettings.defaultRigId}
+        addAction="?/addRig"
+        removeAction="?/removeRig"
+        submitLabel="Build rig"
       >
         {#snippet fields()}
           <label class="{FIELD_LABEL} mt-2.5 mb-0">
@@ -235,15 +333,39 @@
           <div class="grid grid-cols-2 gap-x-2.5 gap-y-0 max-[420px]:grid-cols-1">
             <label class="{FIELD_LABEL} mt-2.5 mb-0">
               <span>Canopy</span>
-              <input type="text" name="canopy" class={FIELD_INPUT} placeholder="e.g. Sabre2 190" autocomplete="off" maxlength="80" />
+              <select name="canopyId" class={FIELD_SELECT}>
+                <option value="">No canopy selected</option>
+                {#each data.logbookSettings.canopies as c (c.id)}
+                  <option value={c.id}>{c.name}</option>
+                {/each}
+              </select>
+            </label>
+            <label class="{FIELD_LABEL} mt-2.5 mb-0">
+              <span>Lineset</span>
+              <select name="linesetId" class={FIELD_SELECT}>
+                <option value="">No lineset selected</option>
+                {#each data.logbookSettings.linesets as l (l.id)}
+                  <option value={l.id}>{l.name}</option>
+                {/each}
+              </select>
+            </label>
+            <label class="{FIELD_LABEL} mt-2.5 mb-0">
+              <span>Pilot chute</span>
+              <select name="pilotChuteId" class={FIELD_SELECT}>
+                <option value="">No pilot chute selected</option>
+                {#each data.logbookSettings.pilotChutes as pc (pc.id)}
+                  <option value={pc.id}>{pc.name}</option>
+                {/each}
+              </select>
             </label>
             <label class="{FIELD_LABEL} mt-2.5 mb-0">
               <span>Container</span>
-              <input type="text" name="container" class={FIELD_INPUT} placeholder="e.g. Wings X 190" autocomplete="off" maxlength="80" />
-            </label>
-            <label class="{FIELD_LABEL} mt-2.5 mb-0">
-              <span>AAD</span>
-              <input type="text" name="aad" class={FIELD_INPUT} placeholder="e.g. Cypres 2" autocomplete="off" maxlength="80" />
+              <select name="containerId" class={FIELD_SELECT}>
+                <option value="">No container selected</option>
+                {#each data.logbookSettings.containers as ctn (ctn.id)}
+                  <option value={ctn.id}>{ctn.name}</option>
+                {/each}
+              </select>
             </label>
           </div>
         {/snippet}

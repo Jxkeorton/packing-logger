@@ -16,11 +16,17 @@ export interface LogbookEntry {
   exitAltitude: string; // free text ("13,000 ft") — not every jump has a clean round number
   canopy: string;
   container: string;
-  aad: string;
+  aad: string; // legacy field — no longer collected by the form (see logbook-settings.ts's Rig),
+  // kept only so rows logged before AAD tracking was dropped still round-trip unchanged.
   aircraft: string;
   jumpType: string; // e.g. "Sport", "Tandem Instructor" — see logbook-settings.ts's saved jump types
   description: string;
   at: string; // ISO timestamp this entry was logged — also its id, for edit/delete
+  rig: string; // the rig picked for this jump, by name — '' if none
+  lineset: string; // that rig's components, by name at the time this jump was logged — a
+  pilotChute: string; // component's lifetime jump count is just how many entries mention its
+  // name (see logbook-settings.ts's Component) — so these, like canopy/container
+  // above, are a snapshot: they don't change if the rig is later changed.
 }
 
 export interface NumberedEntry extends LogbookEntry {
@@ -28,10 +34,11 @@ export interface NumberedEntry extends LogbookEntry {
 }
 
 const ENTRIES_KEY = 'logbook.csv';
-// jump_type is appended after `at` rather than inserted earlier in the row,
-// so older rows written before this field existed still parse correctly —
-// they simply come up one field short and jumpType defaults to ''.
-const ENTRIES_HEADER = 'date,place,exit_altitude,canopy,container,aad,aircraft,description,at,jump_type';
+// jump_type, then rig/lineset/pilot_chute, are appended after `at` rather
+// than inserted earlier in the row, so older rows written before those
+// fields existed still parse correctly — they simply come up short and
+// the missing fields default to ''.
+const ENTRIES_HEADER = 'date,place,exit_altitude,canopy,container,aad,aircraft,description,at,jump_type,rig,lineset,pilot_chute';
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 async function readEntries(): Promise<LogbookEntry[]> {
@@ -40,7 +47,8 @@ async function readEntries(): Promise<LogbookEntry[]> {
   const lines = raw.split('\n').filter((l) => l.trim().length > 0);
   const entries: LogbookEntry[] = [];
   for (const line of lines) {
-    const [date, place, exitAltitude, canopy, container, aad, aircraft, description, at, jumpType] = parseCsvLine(line);
+    const [date, place, exitAltitude, canopy, container, aad, aircraft, description, at, jumpType, rig, lineset, pilotChute] =
+      parseCsvLine(line);
     // Recognize a header row by shape (its first field isn't a real date),
     // not by an exact string match against the current ENTRIES_HEADER —
     // that string has changed as fields were added, and a file written
@@ -58,6 +66,9 @@ async function readEntries(): Promise<LogbookEntry[]> {
       description: description ?? '',
       at,
       jumpType: jumpType ?? '',
+      rig: rig ?? '',
+      lineset: lineset ?? '',
+      pilotChute: pilotChute ?? '',
     });
   }
   return entries;
@@ -85,6 +96,9 @@ async function writeEntries(entries: LogbookEntry[]): Promise<void> {
         csvEscape(e.description),
         e.at,
         csvEscape(e.jumpType),
+        csvEscape(e.rig),
+        csvEscape(e.lineset),
+        csvEscape(e.pilotChute),
       ].join(','),
     )
     .join('\n');
@@ -152,7 +166,8 @@ export async function removeEntry(at: string, baseJumps: number): Promise<Number
 export async function readCsvFile(baseJumps: number): Promise<string> {
   const entries = await readEntries();
   const numbered = withNumbers(entries, baseJumps);
-  const header = 'jump_number,date,jump_type,place,exit_altitude,canopy,container,aad,aircraft,description';
+  const header =
+    'jump_number,date,jump_type,place,exit_altitude,rig,canopy,lineset,pilot_chute,container,aad,aircraft,description';
   const body = numbered
     .map((e) =>
       [
@@ -161,7 +176,10 @@ export async function readCsvFile(baseJumps: number): Promise<string> {
         csvEscape(e.jumpType),
         csvEscape(e.place),
         csvEscape(e.exitAltitude),
+        csvEscape(e.rig),
         csvEscape(e.canopy),
+        csvEscape(e.lineset),
+        csvEscape(e.pilotChute),
         csvEscape(e.container),
         csvEscape(e.aad),
         csvEscape(e.aircraft),

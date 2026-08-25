@@ -25,7 +25,8 @@
     emptyText,
     category,
     categoryLabel,
-    defaultId,
+    defaultId = null,
+    allowDefault = true,
     addAction,
     removeAction,
     submitLabel,
@@ -35,9 +36,15 @@
     hint: string;
     items: Item[];
     emptyText: string;
-    category: string;
-    categoryLabel: string;
-    defaultId: string | null;
+    category?: string;
+    categoryLabel?: string;
+    defaultId?: string | null;
+    // Places/aircraft/jump types/rigs each have one "default" the add-jump
+    // form pre-selects, so their rows get a star toggle. Canopies/linesets/
+    // pilot chutes/containers are only ever picked *through* a rig, so
+    // there's nothing for a star on one of them to do — set this false to
+    // leave it off rather than show a control with no effect.
+    allowDefault?: boolean;
     addAction: string;
     removeAction: string;
     submitLabel: string;
@@ -65,18 +72,20 @@
               <span class="reference-row-name">{item.name}</span>
               {#if item.detail}<span class="reference-row-detail">{item.detail}</span>{/if}
             </div>
-            <form method="POST" action="?/setDefault" use:enhance>
-              <input type="hidden" name="category" value={category} />
-              <input type="hidden" name="id" value={item.id === defaultId ? '' : item.id} />
-              <button
-                type="submit"
-                class="default-star"
-                aria-pressed={item.id === defaultId}
-                aria-label={`Set ${item.name} as the default ${categoryLabel}`}
-              >
-                &#9733;
-              </button>
-            </form>
+            {#if allowDefault}
+              <form method="POST" action="?/setDefault" use:enhance>
+                <input type="hidden" name="category" value={category} />
+                <input type="hidden" name="id" value={item.id === defaultId ? '' : item.id} />
+                <button
+                  type="submit"
+                  class="default-star"
+                  aria-pressed={item.id === defaultId}
+                  aria-label={`Set ${item.name} as the default ${categoryLabel}`}
+                >
+                  &#9733;
+                </button>
+              </form>
+            {/if}
             <form method="POST" action={removeAction} use:enhance>
               <input type="hidden" name="id" value={item.id} />
               <button type="submit" class="reference-delete" aria-label={`Remove ${item.name}`}>&times;</button>
