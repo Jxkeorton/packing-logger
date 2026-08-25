@@ -190,7 +190,26 @@
     <div class="grid grid-cols-2 gap-x-2.5 gap-y-0 max-[420px]:grid-cols-1">
       <label class={FIELD_LABEL}>
         <span>Date *</span>
-        <input type="date" name="date" class="{FIELD_INPUT} min-w-0" required bind:value={form.date} />
+        <!--
+          appearance-none is the actual fix here, not min-w-0/max-w-full
+          (kept as harmless belt-and-braces): Safari renders
+          input[type=date] with its own native control chrome, and that
+          native rendering ignores the box's computed width outright —
+          it was overflowing the card even at 100% width on a single-
+          column (mobile) layout, nothing to do with the grid/flex sizing
+          min-w-0 fixes elsewhere in this file. appearance-none drops
+          Safari's native skin so the input lays out like any other
+          text-like box and finally respects width:100% — same
+          date-picker tap behavior, just without the small calendar
+          glyph Safari drew as part of that native chrome.
+        -->
+        <input
+          type="date"
+          name="date"
+          class="{FIELD_INPUT} min-w-0 max-w-full appearance-none"
+          required
+          bind:value={form.date}
+        />
       </label>
       <label class={FIELD_LABEL}>
         <span>Place</span>
