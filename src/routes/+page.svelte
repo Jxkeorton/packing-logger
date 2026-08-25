@@ -66,7 +66,7 @@
 </script>
 
 <div
-  class="max-w-[560px] mx-auto px-4 pt-5 [padding-bottom:calc(40px+env(safe-area-inset-bottom))] flex flex-col gap-[22px]"
+  class="max-w-140 mx-auto px-4 pt-5 [padding-bottom:calc(40px+env(safe-area-inset-bottom))] flex flex-col gap-5.5"
 >
   <AppTabs bind:activeTab={activeAppTab} />
 

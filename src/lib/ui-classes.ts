@@ -5,14 +5,21 @@
 // hand-copied at every call site: change the look of "a collapsible
 // panel" once here, not once per tab.
 //
-// These only cover markup that's rendered once by Astro and never
-// replaced via innerHTML — see PackingTab.astro's <style> block for why
-// client-rendered lists (tandem jumps, logbook entries, reference-list
-// rows) stay as plain CSS classes instead.
+// Plain string constants rather than Svelte components, so they compose
+// with Tailwind's class-scanning the same way a literal class="..."
+// attribute would.
+//
+// Pixel values that land on a whole multiple of 0.25rem (4px) use
+// Tailwind's numeric spacing scale directly — including fractional steps
+// like `gap-5.5` (22px) — rather than an arbitrary `[22px]` value.
+// Border/outline width take a bare number the same way (`border-l-5` is
+// 5px, no unit). Font-size, letter-spacing and border-radius don't have
+// a numeric scale in Tailwind, so those stay as arbitrary `[Npx]`/`[Nem]`
+// values where they don't land on a named step.
 
 // ---- App shell ----
 
-export const APP_VIEW = 'flex flex-col gap-[22px] [&[hidden]]:hidden';
+export const APP_VIEW = 'flex flex-col gap-5.5 [&[hidden]]:hidden';
 
 // ---- Masthead (date stamp + totals strip) ----
 
@@ -22,7 +29,7 @@ export const STAMP =
 export const STAMP_LABEL = 'font-mono text-[11px] tracking-[0.14em] uppercase text-gold';
 export const STAMP_DATE = 'font-display font-bold text-[19px] tracking-[-0.01em]';
 
-export const TOTALS = 'flex items-center gap-4 px-[18px] py-4 bg-panel border border-line rounded-card shadow-card';
+export const TOTALS = 'flex items-center gap-4 px-4.5 py-4 bg-panel border border-line rounded-card shadow-card';
 export const TOTALS_BLOCK = 'flex flex-col gap-0.5';
 export const TOTALS_BLOCK_FLEX = `${TOTALS_BLOCK} flex-1`;
 export const TOTALS_VALUE =
@@ -36,7 +43,7 @@ export const TOTALS_DIVIDER = 'w-px self-stretch bg-line';
 
 export const CATEGORIES_LIST = 'flex flex-col gap-3 min-[480px]:gap-3.5';
 export const CARD =
-  'bg-panel border border-line rounded-card px-4 pt-3.5 pb-4 shadow-card border-l-[5px] border-l-[var(--accent,var(--line-strong))]';
+  'bg-panel border border-line rounded-card px-4 pt-3.5 pb-4 shadow-card border-l-5 border-l-[var(--accent,var(--line-strong))]';
 export const CARD_TOP = 'flex items-baseline justify-between gap-2';
 export const CARD_LABEL = 'm-0 text-[17px] font-bold tracking-[-0.01em]';
 export const CARD_RATE = 'font-mono text-xs text-ink-soft';
@@ -67,13 +74,13 @@ export const HISTORY_CELL_RIGHT = 'p-2 text-right';
 // ---- Form fields (invoice details, places/equipment/aircraft/jump-types, settings) ----
 
 export const FIELD_LABEL = 'flex flex-col gap-1 mb-3 text-[12.5px] font-semibold text-ink-soft';
-export const FIELD_LABEL_NARROW = `${FIELD_LABEL} max-w-[160px]`;
+export const FIELD_LABEL_NARROW = `${FIELD_LABEL} max-w-40`;
 export const FIELD_INPUT =
-  'w-full px-3 py-2.5 rounded-[10px] border border-line-strong bg-canvas text-ink font-sans text-sm font-normal resize-y focus-visible:outline-[3px] focus-visible:outline-gold focus-visible:outline-offset-1';
+  'w-full px-3 py-2.5 rounded-[10px] border border-line-strong bg-canvas text-ink font-sans text-sm font-normal resize-y focus-visible:outline-3 focus-visible:outline-gold focus-visible:outline-offset-1';
 export const FIELD_SELECT = `${FIELD_INPUT} h-10`;
 export const FORM_ACTIONS = 'flex items-center gap-3 mt-1';
 export const FORM_SAVE_BUTTON =
-  'appearance-none border-0 rounded-[10px] h-[42px] px-5 font-display font-bold text-sm text-white bg-gold cursor-pointer touch-manipulation disabled:opacity-60 disabled:cursor-default';
+  'appearance-none border-0 rounded-[10px] h-10.5 px-5 font-display font-bold text-sm text-white bg-gold cursor-pointer touch-manipulation disabled:opacity-60 disabled:cursor-default';
 export const FORM_STATUS = 'text-[12.5px] text-ink-soft data-[state=ok]:text-student data-[state=error]:text-danger';
 export const PANEL_HINT = 'mt-0 mb-3.5 text-[12.5px] text-ink-soft';
 
