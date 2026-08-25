@@ -1,13 +1,18 @@
 /*
  * Global stylesheet for the whole app. Loaded once (see src/pages/index.astro).
- * By the end of the Tailwind migration this file is just the design
- * tokens: every component's own visual rules live either as Tailwind
- * utilities directly in its markup, or — for the handful of lists that
- * get re-rendered client-side via innerHTML (tandem jumps, logbook
- * entries, the Places/Equipment/Aircraft/Jump-types rows) — as a scoped
- * `<style>` block in the component that owns that markup, using
- * `:global()` so it still reaches content a script injects later. See
- * PackingTab.astro's `<style>` block for the pattern.
+ * By the end of the Tailwind migration this file is mostly design tokens:
+ * every component's own visual rules live either as Tailwind utilities
+ * directly in its markup, or — for the handful of lists that get
+ * re-rendered client-side via innerHTML (tandem jumps, the Places/
+ * Equipment/Aircraft/Jump-types rows) — as a scoped `<style>` block in the
+ * component that owns that markup, using `:global()` so it still reaches
+ * content a script injects later. See PackingTab.astro's `<style>` block
+ * for that pattern.
+ *
+ * The `.logbook-*` rules below are the one exception, living here as
+ * plain global CSS instead: they style LogbookForm.tsx, a React island,
+ * and Astro's `:global()` scoped-style trick only reaches markup Astro
+ * itself renders — it has no effect on a framework component's output.
  */
 @import 'tailwindcss';
 
@@ -112,4 +117,138 @@
   --font-display: 'Space Grotesk', sans-serif;
   --font-sans: 'Inter', system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
+}
+
+/*
+ * LogbookForm.tsx (the Logbook tab's Log sub-view — see the file header
+ * above for why these live here rather than in a component's own scoped
+ * `<style>`).
+ */
+.logbook-empty {
+  margin: 0;
+  padding: 16px;
+  color: var(--ink-soft);
+  font-size: 14px;
+}
+
+.logbook-entry {
+  border-top: 1px solid var(--line);
+}
+
+.logbook-entry:first-child {
+  border-top: none;
+}
+
+.logbook-row {
+  appearance: none;
+  border: none;
+  background: transparent;
+  width: 100%;
+  display: grid;
+  grid-template-columns: 44px 84px 1fr 16px;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  font-family: 'Inter', sans-serif;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.logbook-row-number {
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--gold);
+}
+
+.logbook-row-date {
+  font-size: 12.5px;
+  color: var(--ink-soft);
+  white-space: nowrap;
+}
+
+.logbook-row-place {
+  font-size: 14px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.logbook-row-chevron {
+  font-size: 18px;
+  color: var(--ink-soft);
+  transition: transform 0.15s ease;
+  justify-self: end;
+}
+
+.logbook-row[aria-expanded='true'] .logbook-row-chevron {
+  transform: rotate(90deg);
+}
+
+.logbook-details {
+  padding: 0 14px 14px;
+}
+
+.logbook-details-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 14px;
+  margin: 0;
+}
+
+.logbook-details-grid dt {
+  margin: 0;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-soft);
+}
+
+.logbook-details-grid dd {
+  margin: 2px 0 0;
+  font-size: 13.5px;
+}
+
+.logbook-details-description {
+  margin: 12px 0 0;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+  font-size: 13.5px;
+  white-space: pre-wrap;
+}
+
+.logbook-details-actions {
+  display: flex;
+  gap: 14px;
+  margin-top: 12px;
+}
+
+.logbook-edit,
+.logbook-delete {
+  appearance: none;
+  border: none;
+  background: transparent;
+  font-family: 'Inter', sans-serif;
+  font-weight: 600;
+  font-size: 12.5px;
+  padding: 4px 0;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.logbook-edit {
+  color: var(--gold);
+}
+
+.logbook-delete {
+  color: var(--ink-soft);
+}
+
+.logbook-delete:hover,
+.logbook-delete:focus-visible {
+  color: var(--danger);
+  outline: none;
 }

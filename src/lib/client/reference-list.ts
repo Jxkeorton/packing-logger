@@ -56,10 +56,12 @@ export function wireReferenceList<T extends ReferenceItem>(config: ReferenceList
     const list = document.getElementById(config.listElId);
     if (list) list.innerHTML = listHtml(items, defaultId);
     if (selectEl) {
-      // Only re-apply a previous selection if the user (or edit mode)
-      // actually chose one — see markTouched in LogbookTab. Otherwise let
-      // the freshly rendered default (marked via the `selected` attribute)
-      // stand rather than forcing it back to "unselected".
+      // Only re-apply a previous selection if the caller flagged this
+      // select as `data-user-touched` (a deliberate choice, distinct from
+      // whatever the freshly rendered default marks as `selected`).
+      // Nothing currently sets that flag — no caller links a `<select>`
+      // here any more — but the mechanism is kept since a future one
+      // might.
       const touched = selectEl.dataset.userTouched === 'true';
       const previous = selectEl.value;
       selectEl.innerHTML = config.optionsHtml(items, defaultId);

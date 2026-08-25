@@ -60,37 +60,6 @@ export function money(n: number): string {
   return `£${n.toFixed(2)}`;
 }
 
-// ---- Single-value `<select>` matching ----
-//
-// Several dropdowns (Logbook's Place/Aircraft/Jump type — Equipment is its
-// own case, since it matches on three fields at once) share the same
-// "which option has this label?" logic: mark the field as user-touched, and
-// leave it on "none selected" if nothing matches.
-
-/** Flags a select as deliberately chosen, so a later options rebuild (see reference-list.ts's `apply`) re-applies this value instead of snapping back to the fresh default. */
-export function markTouched(select: HTMLSelectElement | null) {
-  select?.setAttribute('data-user-touched', 'true');
-}
-
-/** The selected option's label — but '' for the placeholder option (value=""), whose own textContent ("No place selected" etc.) isn't a real value. */
-export function selectedOptionText(select: HTMLSelectElement | null): string {
-  if (!select?.value) return '';
-  return select.selectedOptions[0]?.textContent ?? '';
-}
-
-/** Selects whichever option's label matches `text` exactly, or falls back to "none selected" (e.g. the saved profile was since renamed or deleted). */
-export function selectOptionByText(select: HTMLSelectElement | null, text: string) {
-  if (!select) return;
-  markTouched(select);
-  for (const option of Array.from(select.options)) {
-    if (option.textContent === text) {
-      select.value = option.value;
-      return;
-    }
-  }
-  select.value = '';
-}
-
 // ---- File downloads ----
 //
 // Every download on this page is behind the password gate. A plain

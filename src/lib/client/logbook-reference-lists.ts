@@ -1,8 +1,13 @@
 // The Logbook tab's four "saved profile" lists — Places, Equipment,
 // Aircraft, Jump types — each wired through the shared factory in
 // reference-list.ts, plus the "make default" star that's shared across all
-// four (one click updates all four panels + the log-a-jump form's
-// dropdowns at once, since only one item per category can be default).
+// four (one click updates all four panels at once, since only one item
+// per category can be default). The Log sub-tab's dropdowns don't get a
+// live update when these change — that form is a React island (see
+// components/islands/LogbookForm.tsx) seeded once from the page's initial
+// props, so a saved-profile edit here needs a page reload to show up
+// there. No selectEl linkage to keep in sync as a result — simpler than
+// it was when a plain `<select>` lived right there in the DOM.
 import { escapeHtml, wireToggle } from './dom';
 import { wireReferenceList, defaultStarHtml, type ReferenceItem } from './reference-list';
 
@@ -23,18 +28,13 @@ interface JumpTypeData extends ReferenceItem {
 }
 
 export function initLogbookReferenceLists() {
-  const logbookPlace = document.getElementById('logbookPlace') as HTMLSelectElement | null;
-  const logbookEquipment = document.getElementById('logbookEquipment') as HTMLSelectElement | null;
-  const logbookAircraft = document.getElementById('logbookAircraft') as HTMLSelectElement | null;
-  const logbookJumpType = document.getElementById('logbookJumpType') as HTMLSelectElement | null;
-
   const placesList = wireReferenceList<PlaceData>({
     category: 'place',
     apiPath: '/api/places',
     listElId: 'placesList',
     formElId: 'placesForm',
     statusElId: 'placesStatus',
-    selectEl: logbookPlace,
+    selectEl: null,
     emptyListHtml: '<li class="equipment-empty">No places saved yet.</li>',
     optionsHtml: (places, defaultId) => {
       const saved = places
@@ -62,7 +62,7 @@ export function initLogbookReferenceLists() {
     listElId: 'equipmentList',
     formElId: 'equipmentForm',
     statusElId: 'equipmentStatus',
-    selectEl: logbookEquipment,
+    selectEl: null,
     emptyListHtml: '<li class="equipment-empty">No equipment saved yet.</li>',
     optionsHtml: (equipment, defaultId) => {
       const saved = equipment
@@ -102,7 +102,7 @@ export function initLogbookReferenceLists() {
     listElId: 'aircraftList',
     formElId: 'aircraftForm',
     statusElId: 'aircraftStatus',
-    selectEl: logbookAircraft,
+    selectEl: null,
     emptyListHtml: '<li class="equipment-empty">No aircraft saved yet.</li>',
     optionsHtml: (aircraft, defaultId) => {
       const saved = aircraft
@@ -130,7 +130,7 @@ export function initLogbookReferenceLists() {
     listElId: 'jumpTypesList',
     formElId: 'jumpTypesForm',
     statusElId: 'jumpTypesStatus',
-    selectEl: logbookJumpType,
+    selectEl: null,
     emptyListHtml: '<li class="equipment-empty">No jump types saved yet.</li>',
     optionsHtml: (jumpTypes, defaultId) => {
       const saved = jumpTypes
@@ -154,8 +154,8 @@ export function initLogbookReferenceLists() {
 
   // Toggles one item as the default for its category (only one default per
   // category — starring another replaces it, starring the current one
-  // clears it) and refreshes all four panels + dropdowns from the single
-  // settings object the endpoint returns.
+  // clears it) and refreshes all four panels from the single settings
+  // object the endpoint returns.
   async function toggleDefault(star: HTMLButtonElement) {
     const category = star.dataset.defaultCategory;
     const id = star.dataset.defaultId;

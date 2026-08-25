@@ -1,9 +1,10 @@
 // The Logbook tab's "jumps logged before this app" starting-number
-// setting. Saving it shifts every jump number downstream, so it refreshes
-// the entry list + total via applyLogbookState from logbook-jump-form.ts
-// rather than patching numbers in place.
-import { applyLogbookState } from './logbook-jump-form';
-
+// setting. Saving it shifts every jump number downstream — the Log
+// sub-tab's entry list is a React island (see components/islands/
+// LogbookForm.tsx) with its own state, so rather than reaching into it
+// from here, a successful save just reloads the page: the simplest way
+// to get every dependent number back in sync, and this form is edited
+// rarely enough that a reload is no real cost.
 export function initLogbookJumpNumberSettings() {
   const logbookSettingsForm = document.getElementById('logbookSettingsForm') as HTMLFormElement | null;
   const logbookSettingsStatus = document.getElementById('logbookSettingsStatus');
@@ -28,24 +29,13 @@ export function initLogbookJumpNumberSettings() {
         const data = await res.json().catch(() => null);
         throw new Error(data?.error ?? 'Failed to save');
       }
-      // Every jump number downstream shifts with the base, so refetch the
-      // full list rather than patching numbers in place.
-      const listRes = await fetch('/api/logbook');
-      if (listRes.ok) {
-        const listData = await listRes.json();
-        applyLogbookState(listData.entries, listData.nextNumber);
-      }
-      if (logbookSettingsStatus) {
-        logbookSettingsStatus.textContent = 'Saved';
-        logbookSettingsStatus.dataset.state = 'ok';
-      }
+      window.location.reload();
     } catch (err) {
       console.error('Failed to save logbook settings', err);
       if (logbookSettingsStatus) {
         logbookSettingsStatus.textContent = err instanceof Error ? err.message : 'Failed to save';
         logbookSettingsStatus.dataset.state = 'error';
       }
-    } finally {
       if (submitButton) submitButton.disabled = false;
     }
   });
