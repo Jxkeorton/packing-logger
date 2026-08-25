@@ -6,7 +6,7 @@
 // suite happens to run.
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { groupByInvoiceMonth, groupByWeek } from './invoice';
-import type { HistoryRow } from './packing';
+import type { HistoryRow } from '../packing';
 
 function row(date: string, counts: Partial<HistoryRow['counts']>): HistoryRow {
   const full = { tandem: 0, instructor: 0, student: 0, sport: 0, ...counts };

@@ -6,7 +6,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { groupByInvoiceMonth, groupByWeek, invoiceMonthDateRange } from './tandem-invoice';
 import { formatDateKey } from './periods';
-import type { HistoryRow } from './tandem';
+import type { HistoryRow } from '../tandem';
 
 function row(date: string, counts: Partial<HistoryRow['counts']>): HistoryRow {
   const full = { instructor: 0, videographer: 0, ...counts };
