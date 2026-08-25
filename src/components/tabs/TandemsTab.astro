@@ -2,11 +2,13 @@
 // The "Tandems" app tab: today's tandem jump log (credited per-customer,
 // unlike the plain pack-job counters), its history, the invoice letterhead
 // settings used when exporting a month's invoice PDF, and the "who's the
-// customer?" modal shown when adding a jump.
-import { CATEGORIES, CATEGORY_LABELS, RATES, totalEarnings, totalJumps, type DayState, type HistoryRow } from '../../lib/tandem';
+// customer?" modal shown when adding a jump. Each of those pieces is its
+// own component under tabs/tandems/ (or, for the modal, a top-level
+// shared one) — this file just lays them out and owns the props they're
+// built from.
+import { totalEarnings, totalJumps, type DayState, type HistoryRow } from '../../lib/tandem';
 import type { AggregateRow } from '../../lib/tandem-invoice';
 import type { InvoiceSettings } from '../../lib/invoice-settings';
-import { CATEGORY_TEXT_CLASS } from '../../lib/category-colors';
 import {
   APP_VIEW,
   MASTHEAD,
@@ -20,37 +22,12 @@ import {
   TOTALS_VALUE_INK,
   TOTALS_LABEL,
   TOTALS_DIVIDER,
-  CATEGORIES_LIST,
-  CARD,
-  CARD_TOP,
-  CARD_LABEL,
-  CARD_RATE,
-  CARD_SUBTOTAL,
-  TOGGLE_SECTION,
-  TOGGLE_BUTTON,
-  TOGGLE_ICON,
-  TOGGLE_PANEL,
-  TOGGLE_PANEL_PADDED,
-  HISTORY_TABS,
-  HISTORY_TAB,
-  HISTORY_EMPTY,
-  HISTORY_SCROLL,
-  HISTORY_TABLE,
-  HISTORY_THEAD_ROW,
-  HISTORY_TBODY_ROW,
-  HISTORY_CELL_LEFT,
-  HISTORY_CELL_RIGHT,
-  FIELD_LABEL,
-  FIELD_LABEL_NARROW,
-  FIELD_INPUT,
-  FORM_ACTIONS,
-  FORM_SAVE_BUTTON,
-  FORM_STATUS,
-  PANEL_HINT,
   FOOT,
   FOOT_DOWNLOAD,
 } from '../../lib/ui-classes';
-import TandemAggregateTable from '../TandemAggregateTable.astro';
+import TandemCategoryCards from './tandems/TandemCategoryCards.astro';
+import TandemHistoryPanel from './tandems/TandemHistoryPanel.astro';
+import InvoiceSettingsPanel from './tandems/InvoiceSettingsPanel.astro';
 import TandemNameModal from '../TandemNameModal.astro';
 
 interface Props {
@@ -86,170 +63,11 @@ const money = (n: number) => `£${n.toFixed(2)}`;
     </div>
   </header>
 
-  <section class={CATEGORIES_LIST}>
-    {
-      CATEGORIES.map((category) => (
-        <section class={CARD} data-tandem-category={category} style={`--accent: var(--${category})`}>
-          <div class={CARD_TOP}>
-            <h2 class={CARD_LABEL}>{CATEGORY_LABELS[category]}</h2>
-            <span class={CARD_RATE}>£{RATES[category].toFixed(2)} / jump</span>
-          </div>
-          <button
-            type="button"
-            class="appearance-none border-0 rounded-xl w-full h-[46px] mt-2.5 font-display font-bold text-[14.5px] text-white bg-[var(--accent)] cursor-pointer touch-manipulation transition-[transform,filter] duration-[80ms] ease-[ease] active:scale-[0.97] active:brightness-95 focus-visible:outline-[3px] focus-visible:outline-gold focus-visible:outline-offset-2"
-            data-tandem-add={category}
-          >
-            &plus; Add {CATEGORY_LABELS[category].toLowerCase()} jump
-          </button>
-          <ul class="list-none mt-1 mb-0 p-0" data-tandem-list={category}>
-            {tandemState.entries[category].length === 0 ? (
-              <li class="tandem-jump-empty">No jumps logged yet today.</li>
-            ) : (
-              tandemState.entries[category].map((jump) => (
-                <li class="tandem-jump-row" data-at={jump.at}>
-                  <span class="tandem-jump-name">{jump.name}</span>
-                  <button
-                    type="button"
-                    class="tandem-jump-delete"
-                    data-at={jump.at}
-                    aria-label={`Remove ${jump.name}`}
-                  >
-                    &times;
-                  </button>
-                </li>
-              ))
-            )}
-          </ul>
-          <div class={CARD_SUBTOTAL} data-tandem-subtotal={category}>
-            £{(tandemState.counts[category] * RATES[category]).toFixed(2)}
-          </div>
-        </section>
-      ))
-    }
-  </section>
+  <TandemCategoryCards tandemState={tandemState} />
 
-  <section class={TOGGLE_SECTION}>
-    <button
-      class={TOGGLE_BUTTON}
-      id="tandemHistoryToggle"
-      type="button"
-      aria-expanded="false"
-      aria-controls="tandemHistoryPanel"
-    >
-      <span>History</span>
-      <span class={TOGGLE_ICON} id="tandemHistoryToggleIcon">&rsaquo;</span>
-    </button>
-    <div class={TOGGLE_PANEL} id="tandemHistoryPanel" hidden>
-      <div class={HISTORY_TABS} role="tablist" aria-label="Group tandem history by">
-        <button type="button" class={HISTORY_TAB} data-tab="day" role="tab" aria-selected="true">Day</button>
-        <button type="button" class={HISTORY_TAB} data-tab="week" role="tab" aria-selected="false">Week</button>
-        <button type="button" class={HISTORY_TAB} data-tab="month" role="tab" aria-selected="false">Month</button>
-      </div>
+  <TandemHistoryPanel dayRows={dayRows} weekRows={weekRows} monthRows={monthRows} />
 
-      <div data-view="day">
-        {
-          dayRows.length === 0 ? (
-            <p class={HISTORY_EMPTY}>Nothing logged yet before today.</p>
-          ) : (
-            <div class={HISTORY_SCROLL}>
-              <table class={HISTORY_TABLE}>
-                <thead>
-                  <tr class={HISTORY_THEAD_ROW}>
-                    <th scope="col" class={HISTORY_CELL_LEFT}>
-                      Date
-                    </th>
-                    {CATEGORIES.map((c) => (
-                      <th scope="col" class={`${HISTORY_CELL_RIGHT} ${CATEGORY_TEXT_CLASS[c]}`}>
-                        {CATEGORY_LABELS[c].slice(0, 3)}
-                      </th>
-                    ))}
-                    <th scope="col" class={HISTORY_CELL_RIGHT}>
-                      Jumps
-                    </th>
-                    <th scope="col" class={HISTORY_CELL_RIGHT}>
-                      Earned
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {dayRows.map((row) => (
-                    <tr class={HISTORY_TBODY_ROW}>
-                      <td class={HISTORY_CELL_LEFT}>{row.date}</td>
-                      {CATEGORIES.map((c) => (
-                        <td class={`${HISTORY_CELL_RIGHT} ${CATEGORY_TEXT_CLASS[c]}`}>{row.counts[c]}</td>
-                      ))}
-                      <td class={HISTORY_CELL_RIGHT}>{row.totalJumps}</td>
-                      <td class={HISTORY_CELL_RIGHT}>{money(row.totalEarnings)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )
-        }
-      </div>
-
-      <div data-view="week" hidden>
-        <TandemAggregateTable rows={weekRows} currentLabel="This week" prefix="tweek" />
-      </div>
-
-      <div data-view="month" hidden>
-        <TandemAggregateTable rows={monthRows} currentLabel="This invoice month" prefix="tmonth" />
-      </div>
-    </div>
-  </section>
-
-  <section class={TOGGLE_SECTION}>
-    <button
-      class={TOGGLE_BUTTON}
-      id="invoiceSettingsToggle"
-      type="button"
-      aria-expanded="false"
-      aria-controls="invoiceSettingsPanel"
-    >
-      <span>Invoice details</span>
-      <span class={TOGGLE_ICON} id="invoiceSettingsToggleIcon">&rsaquo;</span>
-    </button>
-    <div class={`${TOGGLE_PANEL} ${TOGGLE_PANEL_PADDED}`} id="invoiceSettingsPanel" hidden>
-      <p class={PANEL_HINT}>
-        Used on the "Export PDF" invoices below — your details, who it's billed to, and the next invoice number.
-      </p>
-      <form id="invoiceSettingsForm">
-        <label class={FIELD_LABEL}>
-          <span>Your name</span>
-          <input type="text" id="invoiceFromName" class={FIELD_INPUT} value={invoiceSettings.fromName} required />
-        </label>
-        <label class={FIELD_LABEL}>
-          <span>Your address (one line each)</span>
-          <textarea id="invoiceFromAddress" class={FIELD_INPUT} rows="4">{invoiceSettings.fromAddress.join('\n')}</textarea>
-        </label>
-        <label class={FIELD_LABEL}>
-          <span>VAT note</span>
-          <input type="text" id="invoiceVatNote" class={FIELD_INPUT} value={invoiceSettings.vatNote} />
-        </label>
-        <label class={FIELD_LABEL}>
-          <span>Bill to (one line each)</span>
-          <textarea id="invoiceBillTo" class={FIELD_INPUT} rows="4">{invoiceSettings.billTo.join('\n')}</textarea>
-        </label>
-        <label class={FIELD_LABEL_NARROW}>
-          <span>Next invoice ref</span>
-          <input
-            type="number"
-            id="invoiceNextRef"
-            class={FIELD_INPUT}
-            min="1"
-            step="1"
-            value={invoiceSettings.nextInvoiceRef}
-            required
-          />
-        </label>
-        <div class={FORM_ACTIONS}>
-          <button type="submit" class={FORM_SAVE_BUTTON}>Save details</button>
-          <span class={FORM_STATUS} id="invoiceSettingsStatus" role="status"></span>
-        </div>
-      </form>
-    </div>
-  </section>
+  <InvoiceSettingsPanel invoiceSettings={invoiceSettings} />
 
   <footer class={FOOT}>
     <button
@@ -265,75 +83,10 @@ const money = (n: number) => `£${n.toFixed(2)}`;
   <TandemNameModal />
 </div>
 
-<style>
-  /*
-   * The tandem-jump list is re-rendered client-side via innerHTML after
-   * each add/delete (renderTandemList() below), so — same reasoning as
-   * PackingTab.astro's fastest-board — these stay plain CSS with
-   * `:global()` rather than Tailwind utilities, so the injected markup
-   * keeps picking them up. `.tandem-jump-empty` is used both in the
-   * initial server-rendered markup above and by that same script.
-   */
-  :global(.tandem-jump-row) {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-    padding: 9px 2px;
-    border-top: 1px solid var(--line);
-    font-size: 13.5px;
-  }
-
-  :global(.tandem-jump-name) {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  :global(.tandem-jump-delete) {
-    appearance: none;
-    border: none;
-    background: transparent;
-    color: var(--ink-soft);
-    font-family: 'Inter', sans-serif;
-    font-size: 18px;
-    line-height: 1;
-    width: 26px;
-    height: 26px;
-    flex: none;
-    border-radius: 8px;
-    cursor: pointer;
-    touch-action: manipulation;
-  }
-
-  :global(.tandem-jump-delete:hover),
-  :global(.tandem-jump-delete:focus-visible) {
-    background: var(--danger-soft);
-    color: var(--danger);
-    outline: none;
-  }
-
-  :global(.tandem-jump-empty) {
-    margin: 0;
-    padding: 9px 2px;
-    border-top: 1px solid var(--line);
-    color: var(--ink-soft);
-    font-size: 13px;
-  }
-</style>
-
 <script>
-  import { wireTabGroup, wireToggle, wireDownloadButtons, escapeHtml, money, downloadFile } from '../../lib/client/dom';
-
-  const TANDEM_RATES: Record<string, number> = {
-    instructor: 42,
-    videographer: 42,
-  };
-
-  const TANDEM_CATEGORY_LABELS: Record<string, string> = {
-    instructor: 'Instructor',
-    videographer: 'Videographer',
-  };
+  import { wireTabGroup, wireToggle, wireDownloadButtons, downloadFile } from '../../lib/client/dom';
+  import { initTandemJumpLog } from '../../lib/client/tandems-jump-log';
+  import { initTandemInvoiceSettings } from '../../lib/client/tandems-invoice-settings';
 
   const tandemsView = document.getElementById('tandemsView');
   if (!tandemsView) throw new Error('#tandemsView not found');
@@ -352,204 +105,6 @@ const money = (n: number) => `£${n.toFixed(2)}`;
     });
   });
 
-  // ---- Tandem jump log ----
-  //
-  // Every tandem jump is credited to a customer, so adding one prompts for
-  // a name via a small modal rather than just bumping a count.
-
-  interface Jump {
-    name: string;
-    at: string;
-  }
-
-  interface TandemState {
-    counts: Record<string, number>;
-    entries: Record<string, Jump[]>;
-  }
-
-  interface Aggregate {
-    counts: Record<string, number>;
-    totalJumps?: number;
-    totalEarnings: number;
-  }
-
-  function renderTandemList(category: string, entries: Jump[]) {
-    const list = document.querySelector(`[data-tandem-list="${category}"]`);
-    if (!list) return;
-    if (entries.length === 0) {
-      list.innerHTML = '<li class="tandem-jump-empty">No jumps logged yet today.</li>';
-      return;
-    }
-    list.innerHTML = entries
-      .map(
-        (j) => `
-          <li class="tandem-jump-row" data-at="${j.at}">
-            <span class="tandem-jump-name">${escapeHtml(j.name)}</span>
-            <button type="button" class="tandem-jump-delete" data-at="${j.at}" aria-label="Remove ${escapeHtml(j.name)}">&times;</button>
-          </li>`,
-      )
-      .join('');
-  }
-
-  function applyTandemState(state: TandemState, jumps: number, earnings: number) {
-    for (const category of Object.keys(state.counts)) {
-      renderTandemList(category, state.entries[category] ?? []);
-      const subtotalEl = document.querySelector(`[data-tandem-subtotal="${category}"]`);
-      if (subtotalEl) subtotalEl.textContent = money(state.counts[category] * TANDEM_RATES[category]);
-    }
-    const totalJumpsEl = document.getElementById('tandemTotalJumps');
-    const totalEarningsEl = document.getElementById('tandemTotalEarnings');
-    if (totalJumpsEl) totalJumpsEl.textContent = String(jumps);
-    if (totalEarningsEl) totalEarningsEl.textContent = money(earnings);
-  }
-
-  function applyTandemAggregate(prefix: 'tweek' | 'tmonth', agg: Aggregate) {
-    for (const category of Object.keys(agg.counts)) {
-      const cell = document.querySelector(`[data-agg-count="${prefix}:${category}"]`);
-      if (cell) cell.textContent = String(agg.counts[category]);
-    }
-    const jumpsCell = document.querySelector(`[data-agg-total="${prefix}:jumps"]`);
-    const earningsCell = document.querySelector(`[data-agg-total="${prefix}:earnings"]`);
-    if (jumpsCell) jumpsCell.textContent = String(agg.totalJumps);
-    if (earningsCell) earningsCell.textContent = money(agg.totalEarnings);
-  }
-
-  async function addTandemJump(category: string, name: string) {
-    const res = await fetch('/api/tandem-adjust', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ category, name }),
-    });
-    if (!res.ok) {
-      console.error('Failed to save tandem jump', await res.text());
-      return;
-    }
-    const data = await res.json();
-    applyTandemState(data.state, data.totalJumps, data.totalEarnings);
-    if (data.currentWeek) applyTandemAggregate('tweek', data.currentWeek);
-    if (data.currentMonth) applyTandemAggregate('tmonth', data.currentMonth);
-  }
-
-  async function deleteTandemJump(at: string) {
-    try {
-      const res = await fetch('/api/tandem-adjust', {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ at }),
-      });
-      if (!res.ok) return;
-      const data = await res.json();
-      applyTandemState(data.state, data.totalJumps, data.totalEarnings);
-      if (data.currentWeek) applyTandemAggregate('tweek', data.currentWeek);
-      if (data.currentMonth) applyTandemAggregate('tmonth', data.currentMonth);
-    } catch (err) {
-      console.error('Failed to delete tandem jump', err);
-    }
-  }
-
-  tandemsView.querySelectorAll<HTMLElement>('[data-tandem-list]').forEach((list) => {
-    list.addEventListener('click', (event) => {
-      const button = (event.target as HTMLElement).closest<HTMLButtonElement>('.tandem-jump-delete');
-      if (!button?.dataset.at) return;
-      void deleteTandemJump(button.dataset.at);
-    });
-  });
-
-  // ---- Customer-name modal ----
-
-  let pendingCategory: string | null = null;
-
-  const nameModal = document.getElementById('tandemNameModal');
-  const nameModalSubtitle = document.getElementById('tandemNameModalSubtitle');
-  const nameForm = document.getElementById('tandemNameForm') as HTMLFormElement | null;
-  const nameInput = document.getElementById('tandemNameInput') as HTMLInputElement | null;
-  const nameCancel = document.getElementById('tandemNameCancel');
-
-  function openNameModal(category: string) {
-    pendingCategory = category;
-    if (nameModalSubtitle) {
-      nameModalSubtitle.textContent = `${TANDEM_CATEGORY_LABELS[category] ?? category} jump — ${money(TANDEM_RATES[category])}`;
-    }
-    if (nameInput) nameInput.value = '';
-    if (nameModal) nameModal.hidden = false;
-    nameInput?.focus();
-  }
-
-  function closeNameModal() {
-    pendingCategory = null;
-    if (nameModal) nameModal.hidden = true;
-  }
-
-  tandemsView.querySelectorAll<HTMLButtonElement>('[data-tandem-add]').forEach((button) => {
-    button.addEventListener('click', () => openNameModal(button.dataset.tandemAdd!));
-  });
-
-  nameCancel?.addEventListener('click', closeNameModal);
-  nameModal?.addEventListener('click', (event) => {
-    if (event.target === nameModal) closeNameModal();
-  });
-  document.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape' && nameModal && !nameModal.hidden) closeNameModal();
-  });
-
-  nameForm?.addEventListener('submit', (event) => {
-    event.preventDefault();
-    const name = nameInput?.value.trim();
-    const category = pendingCategory;
-    if (!name || !category) return;
-    const submitButton = nameForm.querySelector<HTMLButtonElement>('button[type="submit"]');
-    if (submitButton) submitButton.disabled = true;
-    addTandemJump(category, name)
-      .then(() => closeNameModal())
-      .finally(() => {
-        if (submitButton) submitButton.disabled = false;
-      });
-  });
-
-  // ---- Invoice settings ----
-
-  const invoiceSettingsForm = document.getElementById('invoiceSettingsForm') as HTMLFormElement | null;
-  const invoiceSettingsStatus = document.getElementById('invoiceSettingsStatus');
-
-  invoiceSettingsForm?.addEventListener('submit', async (event) => {
-    event.preventDefault();
-    const fromName = (document.getElementById('invoiceFromName') as HTMLInputElement | null)?.value ?? '';
-    const fromAddress = (document.getElementById('invoiceFromAddress') as HTMLTextAreaElement | null)?.value ?? '';
-    const vatNote = (document.getElementById('invoiceVatNote') as HTMLInputElement | null)?.value ?? '';
-    const billTo = (document.getElementById('invoiceBillTo') as HTMLTextAreaElement | null)?.value ?? '';
-    const nextInvoiceRef = Number(
-      (document.getElementById('invoiceNextRef') as HTMLInputElement | null)?.value ?? '',
-    );
-
-    const submitButton = invoiceSettingsForm.querySelector<HTMLButtonElement>('button[type="submit"]');
-    if (submitButton) submitButton.disabled = true;
-    if (invoiceSettingsStatus) {
-      invoiceSettingsStatus.textContent = 'Saving…';
-      invoiceSettingsStatus.removeAttribute('data-state');
-    }
-
-    try {
-      const res = await fetch('/api/invoice-settings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ fromName, fromAddress, vatNote, billTo, nextInvoiceRef }),
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => null);
-        throw new Error(data?.error ?? 'Failed to save');
-      }
-      if (invoiceSettingsStatus) {
-        invoiceSettingsStatus.textContent = 'Saved';
-        invoiceSettingsStatus.dataset.state = 'ok';
-      }
-    } catch (err) {
-      console.error('Failed to save invoice settings', err);
-      if (invoiceSettingsStatus) {
-        invoiceSettingsStatus.textContent = err instanceof Error ? err.message : 'Failed to save';
-        invoiceSettingsStatus.dataset.state = 'error';
-      }
-    } finally {
-      if (submitButton) submitButton.disabled = false;
-    }
-  });
+  initTandemJumpLog(tandemsView);
+  initTandemInvoiceSettings();
 </script>

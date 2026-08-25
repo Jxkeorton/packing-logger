@@ -1,0 +1,70 @@
+---
+// Packing tab: the per-category pack-job counter cards, each with a
+// -/count/+ control and a running subtotal. Wired up (increment/decrement,
+// the `.bump` pop animation on a tap) by lib/client/packing-tab.ts's
+// initPackingCounters().
+import { CATEGORIES, CATEGORY_LABELS, RATES, type DayState } from '../../../lib/packing';
+import { CARD, CARD_TOP, CARD_LABEL, CARD_RATE, CARD_SUBTOTAL, CATEGORIES_LIST } from '../../../lib/ui-classes';
+
+interface Props {
+  state: DayState;
+}
+
+const { state } = Astro.props;
+---
+
+<main class={CATEGORIES_LIST}>
+  {
+    CATEGORIES.map((category) => (
+      <section class={CARD} data-category={category} style={`--accent: var(--${category})`}>
+        <div class={CARD_TOP}>
+          <h2 class={CARD_LABEL}>{CATEGORY_LABELS[category]}</h2>
+          <span class={CARD_RATE}>£{RATES[category].toFixed(2)} / pack</span>
+        </div>
+        <div class="grid grid-cols-[64px_1fr_64px] items-center gap-3 mt-2.5">
+          <button
+            class="appearance-none border-2 border-[var(--accent)] rounded-xl w-full h-14 text-[28px] leading-none font-display font-bold text-[var(--accent)] bg-transparent cursor-pointer touch-manipulation transition-[transform,filter] duration-[80ms] ease-[ease] active:scale-[0.93] active:brightness-95 focus-visible:outline-[3px] focus-visible:outline-gold focus-visible:outline-offset-2"
+            type="button"
+            data-action="decrement"
+            data-category={category}
+            aria-label={`Remove one ${CATEGORY_LABELS[category]} pack job`}
+          >
+            &minus;
+          </button>
+          <span
+            class="text-center font-display font-bold text-[40px] [font-variant-numeric:tabular-nums] transition-transform duration-[120ms] ease-[ease]"
+            data-count={category}
+          >
+            {state.counts[category]}
+          </span>
+          <button
+            class="appearance-none border-0 rounded-xl w-full h-14 text-[28px] leading-none font-display font-bold text-white bg-[var(--accent)] cursor-pointer touch-manipulation transition-[transform,filter] duration-[80ms] ease-[ease] active:scale-[0.93] active:brightness-95 focus-visible:outline-[3px] focus-visible:outline-gold focus-visible:outline-offset-2"
+            type="button"
+            data-action="increment"
+            data-category={category}
+            aria-label={`Add one ${CATEGORY_LABELS[category]} pack job`}
+          >
+            &plus;
+          </button>
+        </div>
+        <div class={CARD_SUBTOTAL} data-subtotal={category}>
+          £{(state.counts[category] * RATES[category]).toFixed(2)}
+        </div>
+      </section>
+    ))
+  }
+</main>
+
+<style>
+  /*
+   * `.bump` is toggled by the shared bump() helper (lib/client/dom.ts)
+   * purely by class name after every increment/decrement, rather than as a
+   * Tailwind utility, because a plain named class is simpler for that
+   * helper to add/remove than juggling a long utility string. Not
+   * `:global()`: this element is only ever server-rendered here, never
+   * re-rendered via innerHTML, so Astro's normal scoping is fine.
+   */
+  .bump {
+    transform: scale(1.18);
+  }
+</style>

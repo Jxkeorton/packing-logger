@@ -1,0 +1,114 @@
+---
+// Tandems tab: the per-category jump cards (Instructor/Videographer), each
+// with its "add jump" button, today's list of credited jumps, and a
+// running subtotal. Adding a jump opens TandemNameModal (in the parent
+// tab); both are wired together by lib/client/tandems-jump-log.ts.
+import { CATEGORIES, CATEGORY_LABELS, RATES, type DayState } from '../../../lib/tandem';
+import { CARD, CARD_TOP, CARD_LABEL, CARD_RATE, CARD_SUBTOTAL, CATEGORIES_LIST } from '../../../lib/ui-classes';
+
+interface Props {
+  tandemState: DayState;
+}
+
+const { tandemState } = Astro.props;
+---
+
+<section class={CATEGORIES_LIST}>
+  {
+    CATEGORIES.map((category) => (
+      <section class={CARD} data-tandem-category={category} style={`--accent: var(--${category})`}>
+        <div class={CARD_TOP}>
+          <h2 class={CARD_LABEL}>{CATEGORY_LABELS[category]}</h2>
+          <span class={CARD_RATE}>£{RATES[category].toFixed(2)} / jump</span>
+        </div>
+        <button
+          type="button"
+          class="appearance-none border-0 rounded-xl w-full h-[46px] mt-2.5 font-display font-bold text-[14.5px] text-white bg-[var(--accent)] cursor-pointer touch-manipulation transition-[transform,filter] duration-[80ms] ease-[ease] active:scale-[0.97] active:brightness-95 focus-visible:outline-[3px] focus-visible:outline-gold focus-visible:outline-offset-2"
+          data-tandem-add={category}
+        >
+          &plus; Add {CATEGORY_LABELS[category].toLowerCase()} jump
+        </button>
+        <ul class="list-none mt-1 mb-0 p-0" data-tandem-list={category}>
+          {tandemState.entries[category].length === 0 ? (
+            <li class="tandem-jump-empty">No jumps logged yet today.</li>
+          ) : (
+            tandemState.entries[category].map((jump) => (
+              <li class="tandem-jump-row" data-at={jump.at}>
+                <span class="tandem-jump-name">{jump.name}</span>
+                <button
+                  type="button"
+                  class="tandem-jump-delete"
+                  data-at={jump.at}
+                  aria-label={`Remove ${jump.name}`}
+                >
+                  &times;
+                </button>
+              </li>
+            ))
+          )}
+        </ul>
+        <div class={CARD_SUBTOTAL} data-tandem-subtotal={category}>
+          £{(tandemState.counts[category] * RATES[category]).toFixed(2)}
+        </div>
+      </section>
+    ))
+  }
+</section>
+
+<style>
+  /*
+   * The tandem-jump list is re-rendered client-side via innerHTML after
+   * each add/delete (renderTandemList() in lib/client/tandems-jump-log.ts),
+   * so — same reasoning as PackingTab.astro's fastest-board — these stay
+   * plain CSS with `:global()` rather than Tailwind utilities, so the
+   * injected markup keeps picking them up. `.tandem-jump-empty` is used
+   * both in the initial server-rendered markup above and by that same
+   * script.
+   */
+  :global(.tandem-jump-row) {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 9px 2px;
+    border-top: 1px solid var(--line);
+    font-size: 13.5px;
+  }
+
+  :global(.tandem-jump-name) {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  :global(.tandem-jump-delete) {
+    appearance: none;
+    border: none;
+    background: transparent;
+    color: var(--ink-soft);
+    font-family: 'Inter', sans-serif;
+    font-size: 18px;
+    line-height: 1;
+    width: 26px;
+    height: 26px;
+    flex: none;
+    border-radius: 8px;
+    cursor: pointer;
+    touch-action: manipulation;
+  }
+
+  :global(.tandem-jump-delete:hover),
+  :global(.tandem-jump-delete:focus-visible) {
+    background: var(--danger-soft);
+    color: var(--danger);
+    outline: none;
+  }
+
+  :global(.tandem-jump-empty) {
+    margin: 0;
+    padding: 9px 2px;
+    border-top: 1px solid var(--line);
+    color: var(--ink-soft);
+    font-size: 13px;
+  }
+</style>
