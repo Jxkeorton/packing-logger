@@ -9,9 +9,13 @@
 //
 // The Places/Equipment/Aircraft/Jump types profiles these dropdowns pick
 // from live in the Settings sub-tab, which stays plain Astro + vanilla TS
-// (lib/client/logbook-reference-lists.ts) — this island only reads that
-// list once, from its initial props. Editing a profile there won't be
-// reflected here until the page reloads.
+// (lib/client/logbook-reference-lists.ts). This island doesn't watch that
+// sub-tab for changes — the two are otherwise-independent pieces of the
+// page, and wiring a live cross-island sync for what's a rare edit
+// (add/rename/delete a saved profile, immediately followed by logging a
+// jump in the same page load) would be more moving parts than the problem
+// warrants. Instead the "Refresh profiles" button below just re-fetches
+// GET /api/logbook-settings on demand.
 import { useRef, useState, type FormEvent } from 'react';
 import type { NumberedEntry } from '../../lib/logbook';
 import type { LogbookSettings } from '../../lib/logbook-settings';
@@ -59,7 +63,13 @@ export default function LogbookForm({ today, dateDisplay, nextLogbookNumber, log
   const [editingAt, setEditingAt] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
   const [pendingDelete, setPendingDelete] = useState<Set<string>>(() => new Set());
-  const [form, setForm] = useState<FormFields>(() => emptyForm(today, logbookSettings));
+  // Seeded from props, but replaceable in place by "Refresh profiles"
+  // below — everything that reads the saved Places/Equipment/Aircraft/
+  // Jump types goes through this state, not the `logbookSettings` prop
+  // directly, so a refresh actually reaches the dropdowns.
+  const [settings, setSettings] = useState(logbookSettings);
+  const [refreshing, setRefreshing] = useState(false);
+  const [form, setForm] = useState<FormFields>(() => emptyForm(today, settings));
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState<Status>({ text: '' });
   const formRef = useRef<HTMLFormElement>(null);
@@ -69,13 +79,31 @@ export default function LogbookForm({ today, dateDisplay, nextLogbookNumber, log
 
   function enterAddMode() {
     setEditingAt(null);
-    setForm(emptyForm(today, logbookSettings));
+    setForm(emptyForm(today, settings));
   }
 
   function enterEditMode(entry: NumberedEntry) {
     setEditingAt(entry.at);
-    setForm(formFromEntry(entry, logbookSettings));
+    setForm(formFromEntry(entry, settings));
     formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  // Re-fetches the saved Places/Equipment/Aircraft/Jump types from the
+  // server — the only way this island finds out about an edit made in the
+  // Settings sub-tab, since the two don't otherwise talk to each other
+  // (see the file header comment).
+  async function handleRefresh() {
+    setRefreshing(true);
+    try {
+      const res = await fetch('/api/logbook-settings');
+      if (!res.ok) return;
+      const data = await res.json();
+      setSettings(data.settings);
+    } catch (err) {
+      console.error('Failed to refresh saved profiles', err);
+    } finally {
+      setRefreshing(false);
+    }
   }
 
   function toggleExpanded(at: string) {
@@ -95,7 +123,7 @@ export default function LogbookForm({ today, dateDisplay, nextLogbookNumber, log
       const res = await fetch('/api/logbook', {
         method: editingAt ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(buildPayload(form, logbookSettings, editingAt)),
+        body: JSON.stringify(buildPayload(form, settings, editingAt)),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => null);
@@ -158,7 +186,18 @@ export default function LogbookForm({ today, dateDisplay, nextLogbookNumber, log
       <section className="bg-panel border border-line rounded-card shadow-card px-4 pt-3.5 pb-4">
         <div className="flex items-baseline justify-between gap-2 mb-2.5">
           <h2 className="m-0 text-[17px] font-bold tracking-[-0.01em]">{editingAt ? 'Edit jump' : 'Log a jump'}</h2>
-          <span className="font-mono font-semibold text-sm text-gold">#{displayNumber}</span>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              className="appearance-none border-0 bg-transparent text-ink-soft font-sans text-[12.5px] font-semibold cursor-pointer p-0 underline disabled:opacity-60 disabled:cursor-default"
+              onClick={handleRefresh}
+              disabled={refreshing}
+              title="Re-fetch the saved Places/Equipment/Aircraft/Jump types from Settings"
+            >
+              {refreshing ? 'Refreshing…' : 'Refresh profiles'}
+            </button>
+            <span className="font-mono font-semibold text-sm text-gold">#{displayNumber}</span>
+          </div>
         </div>
         <form ref={formRef} onSubmit={handleSubmit}>
           <div className="grid grid-cols-2 gap-x-2.5 gap-y-0 max-[420px]:grid-cols-1">
@@ -180,7 +219,7 @@ export default function LogbookForm({ today, dateDisplay, nextLogbookNumber, log
                 onChange={(e) => setForm((f) => ({ ...f, placeId: e.target.value }))}
               >
                 <option value="">No place selected</option>
-                {logbookSettings.places.map((p) => (
+                {settings.places.map((p) => (
                   <option key={p.id} value={p.id}>
                     {p.name}
                   </option>
@@ -207,7 +246,7 @@ export default function LogbookForm({ today, dateDisplay, nextLogbookNumber, log
                 onChange={(e) => setForm((f) => ({ ...f, equipmentId: e.target.value }))}
               >
                 <option value="">No equipment selected</option>
-                {logbookSettings.equipment.map((eq) => (
+                {settings.equipment.map((eq) => (
                   <option key={eq.id} value={eq.id}>
                     {eq.name}
                   </option>
@@ -222,7 +261,7 @@ export default function LogbookForm({ today, dateDisplay, nextLogbookNumber, log
                 onChange={(e) => setForm((f) => ({ ...f, aircraftId: e.target.value }))}
               >
                 <option value="">No aircraft selected</option>
-                {logbookSettings.aircraft.map((ac) => (
+                {settings.aircraft.map((ac) => (
                   <option key={ac.id} value={ac.id}>
                     {ac.plate}
                   </option>
@@ -237,7 +276,7 @@ export default function LogbookForm({ today, dateDisplay, nextLogbookNumber, log
                 onChange={(e) => setForm((f) => ({ ...f, jumpTypeId: e.target.value }))}
               >
                 <option value="">No jump type selected</option>
-                {logbookSettings.jumpTypes.map((jt) => (
+                {settings.jumpTypes.map((jt) => (
                   <option key={jt.id} value={jt.id}>
                     {jt.name}
                   </option>

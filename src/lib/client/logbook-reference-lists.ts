@@ -5,9 +5,10 @@
 // per category can be default). The Log sub-tab's dropdowns don't get a
 // live update when these change — that form is a React island (see
 // components/islands/LogbookForm.tsx) seeded once from the page's initial
-// props, so a saved-profile edit here needs a page reload to show up
-// there. No selectEl linkage to keep in sync as a result — simpler than
-// it was when a plain `<select>` lived right there in the DOM.
+// props — so a saved-profile edit here only reaches it once its own
+// "Refresh profiles" button is clicked. No selectEl linkage to keep in
+// sync as a result — simpler than it was when a plain `<select>` lived
+// right there in the DOM.
 import { escapeHtml, wireToggle } from './dom';
 import { wireReferenceList, defaultStarHtml, type ReferenceItem } from './reference-list';
 
