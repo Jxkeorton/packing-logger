@@ -6,6 +6,12 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev"],
       "port": 4321
+    },
+    {
+      "name": "svelte-spike",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": ["-c", "cd svelte-spike && npm run dev -- --port 5173"],
+      "port": 5173
     }
   ]
 }

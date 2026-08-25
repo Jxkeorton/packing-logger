@@ -1,0 +1,104 @@
+/*
+ * Design tokens copied unchanged from the main app's src/styles/app.css —
+ * same palette, same Tailwind v4 @theme mapping. Unlike that file, there's
+ * no note here about client-templated markup needing :global() scoped
+ * styles: nothing in this spike ever builds HTML as a string and assigns
+ * it via innerHTML, so every component's own <style> block just works,
+ * scoped normally by the Svelte compiler.
+ */
+@import 'tailwindcss';
+
+:root {
+  --canvas: #e9f3f6;
+  --panel: #f6fafb;
+  --ink: #14202b;
+  --ink-soft: #4c6575;
+  --line: #d3e1e8;
+  --line-strong: #a9c2ce;
+  --gold: #2185b6;
+
+  --tandem: #122c41;
+  --tandem-soft: #dbe3e9;
+  --instructor: #08445b;
+  --instructor-soft: #d3e3e8;
+  --student: #035042;
+  --student-soft: #d6e8e3;
+  --sport: #2e647a;
+  --sport-soft: #dee7eb;
+  --videographer: #6b4f8a;
+  --videographer-soft: #e3ddec;
+
+  --danger: #b3423a;
+  --danger-soft: #f1dedc;
+
+  --radius: 14px;
+  --shadow: 0 1px 0 rgba(20, 32, 43, 0.05), 0 6px 16px -8px rgba(20, 32, 43, 0.22);
+
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --canvas: #0b1620;
+    --panel: #13232f;
+    --ink: #dceaf0;
+    --ink-soft: #8ca7b5;
+    --line: #223444;
+    --line-strong: #34495b;
+    --gold: #4fb6e0;
+
+    --tandem: #3c6e96;
+    --tandem-soft: #1b2c3a;
+    --instructor: #2e8caf;
+    --instructor-soft: #16303b;
+    --student: #1e9678;
+    --student-soft: #123328;
+    --sport: #6398b2;
+    --sport-soft: #22333d;
+    --videographer: #a186c9;
+    --videographer-soft: #2a2337;
+
+    --danger: #d6685f;
+    --danger-soft: #3a211f;
+
+    color-scheme: dark;
+  }
+}
+
+@theme inline {
+  --color-canvas: var(--canvas);
+  --color-panel: var(--panel);
+  --color-ink: var(--ink);
+  --color-ink-soft: var(--ink-soft);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-gold: var(--gold);
+
+  --color-tandem: var(--tandem);
+  --color-tandem-soft: var(--tandem-soft);
+  --color-instructor: var(--instructor);
+  --color-instructor-soft: var(--instructor-soft);
+  --color-student: var(--student);
+  --color-student-soft: var(--student-soft);
+  --color-sport: var(--sport);
+  --color-sport-soft: var(--sport-soft);
+  --color-videographer: var(--videographer);
+  --color-videographer-soft: var(--videographer-soft);
+
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+
+  --radius-card: var(--radius);
+  --shadow-card: var(--shadow);
+
+  --font-display: 'Space Grotesk', sans-serif;
+  --font-sans: 'Inter', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+}
+
+body {
+  background: var(--canvas);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
