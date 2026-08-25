@@ -1,8 +1,8 @@
 ---
 // Logbook tab: the "jumps logged before this app" starting-number setting.
-// Saving it shifts every jump number downstream, including the Log
-// sub-tab's React island — see lib/client/logbook-jump-number-settings.ts
-// for how a save reaches that.
+// Saving it shifts every jump number downstream, so its submit handler
+// lives with the entry list in lib/client/logbook-jump-form.ts rather than
+// here.
 import {
   TOGGLE_SECTION,
   TOGGLE_BUTTON,

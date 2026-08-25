@@ -1,0 +1,224 @@
+---
+// Logbook tab: the jump entry list, with an expandable detail row per
+// jump. Re-rendered client-side (via innerHTML, in
+// lib/client/logbook-jump-form.ts's logbookRowHtml) after every add/edit/
+// delete, so its styles below stay plain CSS with `:global()` rather than
+// Tailwind utilities — see PackingTab.astro's <style> block for the full
+// reasoning.
+//
+// Each `<li>` only carries `data-at` — enough for the click handler to
+// look the full entry up in the script's own in-memory list rather than
+// round-tripping every field (date/place/altitude/...) through data
+// attributes, the way an earlier version of this did.
+import type { NumberedEntry } from '../../../lib/logbook';
+
+interface Props {
+  logbookEntries: NumberedEntry[];
+}
+
+const { logbookEntries } = Astro.props;
+
+// Read by logbook-jump-form.ts on init so edit mode can look a jump's
+// fields up by id instead of stuffing them into data-* attributes on
+// every row. `</script>`-safe: a description or place name containing
+// that literal text can't prematurely close the tag.
+const entriesJson = JSON.stringify(logbookEntries).replace(/</g, '\\u003c');
+---
+
+<section class="bg-panel border border-line rounded-card shadow-card overflow-hidden">
+  <ul class="list-none m-0 p-0" id="logbookList">
+    {
+      logbookEntries.length === 0 ? (
+        <li class="logbook-empty">No jumps logged yet.</li>
+      ) : (
+        logbookEntries.map((e) => {
+          const shortDate = new Date(`${e.date}T00:00:00`).toLocaleDateString('en-GB', {
+            day: 'numeric',
+            month: 'short',
+            year: 'numeric',
+          });
+          return (
+            <li class="logbook-entry" data-at={e.at}>
+              <button type="button" class="logbook-row" data-toggle={e.at} aria-expanded="false">
+                <span class="logbook-row-number">#{e.number}</span>
+                <span class="logbook-row-date">{shortDate}</span>
+                <span class="logbook-row-place">{e.place || '—'}</span>
+                <span class="logbook-row-chevron">&rsaquo;</span>
+              </button>
+              <div class="logbook-details" id={`logbookDetails-${e.at}`} hidden>
+                <dl class="logbook-details-grid">
+                  <div>
+                    <dt>Jump type</dt>
+                    <dd>{e.jumpType || '—'}</dd>
+                  </div>
+                  <div>
+                    <dt>Exit altitude</dt>
+                    <dd>{e.exitAltitude || '—'}</dd>
+                  </div>
+                  <div>
+                    <dt>Aircraft</dt>
+                    <dd>{e.aircraft || '—'}</dd>
+                  </div>
+                  <div>
+                    <dt>Canopy</dt>
+                    <dd>{e.canopy || '—'}</dd>
+                  </div>
+                  <div>
+                    <dt>Container</dt>
+                    <dd>{e.container || '—'}</dd>
+                  </div>
+                  <div>
+                    <dt>AAD</dt>
+                    <dd>{e.aad || '—'}</dd>
+                  </div>
+                </dl>
+                {e.description && <p class="logbook-details-description">{e.description}</p>}
+                <div class="logbook-details-actions">
+                  <button type="button" class="logbook-edit" data-edit={e.at}>
+                    Edit
+                  </button>
+                  <button type="button" class="logbook-delete" data-delete={e.at}>
+                    Delete
+                  </button>
+                </div>
+              </div>
+            </li>
+          );
+        })
+      )
+    }
+  </ul>
+</section>
+
+<script type="application/json" id="logbookEntriesData" is:inline set:html={entriesJson} />
+
+<style>
+  :global(.logbook-empty) {
+    margin: 0;
+    padding: 16px;
+    color: var(--ink-soft);
+    font-size: 14px;
+  }
+
+  :global(.logbook-entry) {
+    border-top: 1px solid var(--line);
+  }
+
+  :global(.logbook-entry:first-child) {
+    border-top: none;
+  }
+
+  :global(.logbook-row) {
+    appearance: none;
+    border: none;
+    background: transparent;
+    width: 100%;
+    display: grid;
+    grid-template-columns: 44px 84px 1fr 16px;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 14px;
+    font-family: 'Inter', sans-serif;
+    color: var(--ink);
+    text-align: left;
+    cursor: pointer;
+    touch-action: manipulation;
+  }
+
+  :global(.logbook-row-number) {
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 600;
+    font-size: 13px;
+    color: var(--gold);
+  }
+
+  :global(.logbook-row-date) {
+    font-size: 12.5px;
+    color: var(--ink-soft);
+    white-space: nowrap;
+  }
+
+  :global(.logbook-row-place) {
+    font-size: 14px;
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  :global(.logbook-row-chevron) {
+    font-size: 18px;
+    color: var(--ink-soft);
+    transition: transform 0.15s ease;
+    justify-self: end;
+  }
+
+  :global(.logbook-row[aria-expanded='true'] .logbook-row-chevron) {
+    transform: rotate(90deg);
+  }
+
+  :global(.logbook-details) {
+    padding: 0 14px 14px;
+  }
+
+  :global(.logbook-details-grid) {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px 14px;
+    margin: 0;
+  }
+
+  :global(.logbook-details-grid dt) {
+    margin: 0;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--ink-soft);
+  }
+
+  :global(.logbook-details-grid dd) {
+    margin: 2px 0 0;
+    font-size: 13.5px;
+  }
+
+  :global(.logbook-details-description) {
+    margin: 12px 0 0;
+    padding-top: 10px;
+    border-top: 1px solid var(--line);
+    font-size: 13.5px;
+    white-space: pre-wrap;
+  }
+
+  :global(.logbook-details-actions) {
+    display: flex;
+    gap: 14px;
+    margin-top: 12px;
+  }
+
+  :global(.logbook-edit),
+  :global(.logbook-delete) {
+    appearance: none;
+    border: none;
+    background: transparent;
+    font-family: 'Inter', sans-serif;
+    font-weight: 600;
+    font-size: 12.5px;
+    padding: 4px 0;
+    cursor: pointer;
+    touch-action: manipulation;
+  }
+
+  :global(.logbook-edit) {
+    color: var(--gold);
+  }
+
+  :global(.logbook-delete) {
+    color: var(--ink-soft);
+  }
+
+  :global(.logbook-delete:hover),
+  :global(.logbook-delete:focus-visible) {
+    color: var(--danger);
+    outline: none;
+  }
+</style>

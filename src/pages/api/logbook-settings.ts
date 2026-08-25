@@ -1,17 +1,6 @@
 import type { APIRoute } from 'astro';
 import { nextJumpNumber } from '../../lib/logbook';
-import { readLogbookSettings, setBaseJumps } from '../../lib/logbook-settings';
-
-// The full current settings — places/equipment/aircraft/jump types and
-// their defaults, plus baseJumps. Used by LogbookForm.tsx's "Refresh
-// profiles" button: that form is a React island seeded once from the
-// page's initial props, so a saved-profile edit made in the Settings
-// sub-tab (a different, plain-TS part of the page) needs this to show up
-// there without a full page reload.
-export const GET: APIRoute = async () => {
-  const settings = await readLogbookSettings();
-  return new Response(JSON.stringify({ settings }), { headers: { 'Content-Type': 'application/json' } });
-};
+import { setBaseJumps } from '../../lib/logbook-settings';
 
 // Updates the "jumps logged before this app" starting offset. Every jump
 // number downstream is derived from this plus the ledger, so the response

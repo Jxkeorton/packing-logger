@@ -1,21 +1,18 @@
 ---
 // The "Logbook" app tab: its own Log / Settings sub-tabs, mirroring how
 // the Packing tab splits into Pack / Timer. Log is the personal jump
-// ledger (add/edit/delete, with an expandable detail row per jump) — a
-// React island (LogbookForm, client:load) rather than Astro markup +
-// vanilla script, since its edit-mode bookkeeping (which jump, which
-// fields, matching a saved profile back to its dropdown option) reads a
-// lot more plainly as component state than as DOM data-attributes. See
-// that file's header comment for the boundary this draws with the
-// Settings sub-tab below, which stays plain Astro + vanilla TS. Settings
-// holds the saved Places / Equipment / Aircraft / Jump types profiles the
-// form's dropdowns pick from, plus the "jumps logged before this app"
-// starting-number setting; each is its own component under tabs/logbook/.
+// ledger (add/edit/delete, with an expandable detail row per jump).
+// Settings holds the saved Places / Equipment / Aircraft / Jump types
+// profiles its form's dropdowns pick from, plus the "jumps logged before
+// this app" starting-number setting. Each piece is its own component
+// under tabs/logbook/ — this file just lays them out and owns the props
+// they're built from.
 import type { NumberedEntry } from '../../lib/logbook';
 import type { LogbookSettings } from '../../lib/logbook-settings';
 import type { DayState } from '../../lib/packing';
 import { APP_VIEW, FIELD_LABEL, FIELD_LABEL_NARROW, FIELD_INPUT, FOOT, FOOT_DOWNLOAD } from '../../lib/ui-classes';
-import LogbookForm from '../islands/LogbookForm';
+import LogJumpForm from './logbook/LogJumpForm.astro';
+import LogbookEntryList from './logbook/LogbookEntryList.astro';
 import ReferenceListPanel from './logbook/ReferenceListPanel.astro';
 import LogbookSettingsPanel from './logbook/LogbookSettingsPanel.astro';
 
@@ -67,14 +64,9 @@ const fieldOverride = 'mt-2.5 mb-0';
   </div>
 
   <div class="flex flex-col gap-[22px] [&[hidden]]:hidden" data-sub-view="log">
-    <LogbookForm
-      client:load
-      today={state.date}
-      dateDisplay={dateDisplay}
-      nextLogbookNumber={nextLogbookNumber}
-      logbookEntries={logbookEntries}
-      logbookSettings={logbookSettings}
-    />
+    <LogJumpForm state={state} dateDisplay={dateDisplay} nextLogbookNumber={nextLogbookNumber} logbookSettings={logbookSettings} />
+
+    <LogbookEntryList logbookEntries={logbookEntries} />
 
     <footer class={FOOT}>
       <button type="button" class={FOOT_DOWNLOAD} data-download="/api/logbook-export.csv" data-download-name="logbook.csv">
@@ -188,6 +180,7 @@ const fieldOverride = 'mt-2.5 mb-0';
 
 <script>
   import { wireTabGroup, wireDownloadButtons, wireToggle } from '../../lib/client/dom';
+  import { initLogbookJumpForm } from '../../lib/client/logbook-jump-form';
   import { initLogbookJumpNumberSettings } from '../../lib/client/logbook-jump-number-settings';
   import { initLogbookReferenceLists } from '../../lib/client/logbook-reference-lists';
 
@@ -197,6 +190,7 @@ const fieldOverride = 'mt-2.5 mb-0';
   wireTabGroup(logbookView, '[data-sub-tab]', '[data-sub-view]', 'subTab', 'subView');
 
   wireDownloadButtons(logbookView);
+  initLogbookJumpForm();
   initLogbookJumpNumberSettings();
   initLogbookReferenceLists();
   wireToggle('logbookSettingsToggle', 'logbookSettingsPanel');
