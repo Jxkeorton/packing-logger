@@ -9,7 +9,9 @@
     "dev": "astro dev",
     "build": "astro build",
     "preview": "astro preview",
-    "astro": "astro"
+    "astro": "astro",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@astrojs/vercel": "^11.0.7",
@@ -23,7 +25,8 @@
     "@types/node": "^26.2.0",
     "@types/pdfkit": "^0.17.6",
     "tailwindcss": "^4.3.3",
-    "typescript": "^6.0.3"
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.11"
   },
   "overrides": {
     "path-to-regexp": "^6.3.0"
