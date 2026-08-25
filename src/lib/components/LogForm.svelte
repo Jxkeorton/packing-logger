@@ -192,7 +192,7 @@
     <div class="grid grid-cols-2 gap-x-2.5 gap-y-0 max-[420px]:grid-cols-1">
       <label class={FIELD_LABEL}>
         <span>Date *</span>
-        <input type="date" name="date" class={FIELD_INPUT} required bind:value={form.date} />
+        <input type="date" name="date" class="{FIELD_INPUT} min-w-0" required bind:value={form.date} />
       </label>
       <label class={FIELD_LABEL}>
         <span>Place</span>

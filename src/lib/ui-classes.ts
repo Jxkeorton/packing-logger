@@ -73,7 +73,12 @@ export const HISTORY_CELL_RIGHT = 'p-2 text-right';
 
 // ---- Form fields (invoice details, places/equipment/aircraft/jump-types, settings) ----
 
-export const FIELD_LABEL = 'flex flex-col gap-1 mb-3 text-[12.5px] font-semibold text-ink-soft';
+// min-w-0 overrides a flex/grid item's default `min-width: auto`, which
+// otherwise sizes to its content's min-content width — for a native
+// <input type="date">, that min-content can be wider than the grid
+// track (worst in Safari), stretching the track and overflowing the
+// panel instead of respecting FIELD_INPUT's w-full.
+export const FIELD_LABEL = 'flex flex-col gap-1 mb-3 min-w-0 text-[12.5px] font-semibold text-ink-soft';
 export const FIELD_LABEL_NARROW = `${FIELD_LABEL} max-w-40`;
 export const FIELD_INPUT =
   'w-full px-3 py-2.5 rounded-[10px] border border-line-strong bg-canvas text-ink font-sans text-sm font-normal resize-y focus-visible:outline-3 focus-visible:outline-gold focus-visible:outline-offset-1';
