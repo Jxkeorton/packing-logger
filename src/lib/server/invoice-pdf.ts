@@ -9,19 +9,26 @@
 // '.../pdfkit/js/standard-fonts/Helvetica.cjs'" even though it works fine
 // locally. The fix used everywhere pdfkit meets a serverless bundler is to
 // skip the built-in fonts entirely and embed a real font file instead
-// (`font: false` below), which is what src/assets/fonts/ is for.
+// (`font: false` below).
 //
-// Path resolution: `astro.config.mjs`'s `includeFiles` copies these into
-// the deployed function preserving their original repo-relative path
-// (`src/assets/fonts/…` under the function root) — it does NOT follow them
-// into wherever Vite happens to place the compiled chunk that imports them.
-// So the path has to be built from `process.cwd()` (the function root, and
-// the project root in local dev too), not from this file's own location.
-import { readFileSync } from 'node:fs';
-import path from 'node:path';
+// This used to read the .ttf files from disk at request time via
+// fs.readFileSync(path.join(process.cwd(), 'src/assets/fonts/…')) — a
+// direct port of the Astro app's approach, which relied on
+// astro.config.mjs's `includeFiles` to force those two files into the
+// deployed function's filesystem. @sveltejs/adapter-vercel has no
+// equivalent option, so that path silently didn't exist in production:
+// this module threw ENOENT the moment anything imported it, meaning
+// /api/tandem-invoice.pdf always 500'd on Vercel despite working
+// perfectly in local dev (where process.cwd() really is the repo root).
+// Importing the font bytes as base64 text via Vite's `?raw` instead
+// bakes them straight into this module's own compiled output at build
+// time — no filesystem access, no adapter-specific config, works
+// identically wherever the function actually runs.
 import PDFDocument from 'pdfkit';
 import { CATEGORIES, CATEGORY_LABELS, RATES, type Category, type Jump } from '../tandem';
 import type { InvoiceSettings } from './invoice-settings';
+import robotoRegularBase64 from './fonts/roboto-regular.base64.txt?raw';
+import robotoMediumBase64 from './fonts/roboto-medium.base64.txt?raw';
 
 export interface InvoicePdfOptions {
   ref: number;
@@ -37,9 +44,8 @@ const BAR_BLUE = '#3e7cb1';
 const TOTAL_BG = '#d9d3ea';
 const MUTED = '#5c6b78';
 
-const FONT_DIR = path.join(process.cwd(), 'src/assets/fonts');
-const FONT_REGULAR = readFileSync(path.join(FONT_DIR, 'Roboto-Regular.ttf'));
-const FONT_BOLD = readFileSync(path.join(FONT_DIR, 'Roboto-Medium.ttf'));
+const FONT_REGULAR = Buffer.from(robotoRegularBase64, 'base64');
+const FONT_BOLD = Buffer.from(robotoMediumBase64, 'base64');
 
 function formatJumpDate(dateStr: string): string {
   const [y, m, d] = dateStr.split('-');

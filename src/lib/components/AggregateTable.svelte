@@ -39,12 +39,23 @@
   const money = (n: number) => `£${n.toFixed(2)}`;
 
   let exportingKey = $state<string | null>(null);
+  // A failed export used to just silently reset the button — same result
+  // as tapping it and having nothing happen at all, with no way to tell
+  // the two apart. Mirrors DownloadButton.svelte's failed/timeout pattern.
+  let failedKey = $state<string | null>(null);
 
   async function exportMonth(key: string) {
     if (!exportHref) return;
     exportingKey = key;
-    await downloadFile(exportHref(key), 'invoice.pdf');
+    failedKey = null;
+    const { ok } = await downloadFile(exportHref(key), 'invoice.pdf');
     exportingKey = null;
+    if (!ok) {
+      failedKey = key;
+      setTimeout(() => {
+        if (failedKey === key) failedKey = null;
+      }, 2000);
+    }
   }
 </script>
 
@@ -81,11 +92,13 @@
             <td class="p-2 text-right">
               <button
                 type="button"
-                class="appearance-none inline-block border-0 bg-transparent p-0 font-sans text-[11.5px] font-semibold text-gold no-underline border-b border-current whitespace-nowrap cursor-pointer disabled:opacity-60 disabled:cursor-default"
+                class="appearance-none inline-block border-0 bg-transparent p-0 font-sans text-[11.5px] font-semibold no-underline border-b border-current whitespace-nowrap cursor-pointer disabled:opacity-60 disabled:cursor-default"
+                class:text-gold={failedKey !== row.key}
+                class:text-danger={failedKey === row.key}
                 disabled={exportingKey === row.key}
                 onclick={() => exportMonth(row.key)}
               >
-                Export PDF
+                {failedKey === row.key ? 'Export failed' : 'Export PDF'}
               </button>
             </td>
           {/if}
