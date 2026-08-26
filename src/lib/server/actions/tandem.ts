@@ -23,24 +23,31 @@ async function autoLogTandemJump(category: Category, name: string, date: string,
     const jumpTypeName = category === 'instructor' ? 'Tandem Instructor' : 'Tandem Camera';
     await ensureJumpType(jumpTypeName);
     const settings = await readLogbookSettings();
-    // Camera jumps use whatever's currently starred as the default Rig
-    // (the videographer's own camera rig) — blank if none is set.
-    // Instructor jumps use a generic placeholder instead: a tandem
-    // instructor rig isn't one of the videographer's own saved rigs, so
-    // there's nothing meaningful to default it to.
-    const defaultRig = category === 'instructor' ? null : resolveRigComponents(settings, settings.defaultRigId);
+    // Fill every field from its saved default, exactly as starting a jump by
+    // hand would — except the jump type, which has to stay the tandem one
+    // ("Tandem Instructor"/"Tandem Camera") rather than the starred default,
+    // since that's the whole point of auto-logging it from this tab.
+    //
+    // Note this applies the default rig to instructor jumps too (it used to
+    // write a placeholder "Tandem Rig" canopy instead). So if the starred rig
+    // is your own sport rig, its components now accrue jumps from tandem
+    // instructing as well — star the rig you actually jump on tandems, or
+    // clear the default, if you're tracking component wear closely.
+    const place = settings.places.find((p) => p.id === settings.defaultPlaceId);
+    const aircraft = settings.aircraft.find((a) => a.id === settings.defaultAircraftId);
+    const rig = resolveRigComponents(settings, settings.defaultRigId);
     await addLogbookEntry(
       {
         date,
-        place: '',
-        exitAltitude: '',
-        rig: defaultRig?.rig ?? '',
-        canopy: category === 'instructor' ? 'Tandem Rig' : (defaultRig?.canopy ?? ''),
-        lineset: defaultRig?.lineset ?? '',
-        pilotChute: defaultRig?.pilotChute ?? '',
-        container: defaultRig?.container ?? '',
+        place: place?.name ?? '',
+        exitAltitude: '', // no default exists for this one
+        rig: rig.rig,
+        canopy: rig.canopy,
+        lineset: rig.lineset,
+        pilotChute: rig.pilotChute,
+        container: rig.container,
         aad: '',
-        aircraft: '',
+        aircraft: aircraft?.plate ?? '',
         jumpType: jumpTypeName,
         description: `Auto-logged from the Tandems tab — ${category} jump for ${name}.`,
       },

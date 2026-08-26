@@ -66,10 +66,24 @@
   function jumpsOn(field: 'canopy' | 'lineset' | 'pilotChute' | 'container' | 'rig', name: string): number {
     return data.logbookEntries.filter((e) => e[field] === name).length;
   }
-  const jumpsLabel = (n: number) => `${n} jump${n === 1 ? '' : 's'}`;
+  const jumpsLabel = (n: number) => `${n.toLocaleString('en-GB')} jump${n === 1 ? '' : 's'}`;
 
-  const componentItems = (list: { id: string; name: string }[], field: 'canopy' | 'lineset' | 'pilotChute' | 'container') =>
-    list.map((c) => ({ id: c.id, name: c.name, detail: jumpsLabel(jumpsOn(field, c.name)) }));
+  // A component's headline number is its whole working life: the jumps it
+  // already had when it was added (baseJumps) plus the ones logged here.
+  // The split is spelled out when there's a base, so the figure can be
+  // checked against a rigger's card rather than just trusted.
+  const componentItems = (
+    list: { id: string; name: string; baseJumps: number }[],
+    field: 'canopy' | 'lineset' | 'pilotChute' | 'container',
+  ) =>
+    list.map((c) => {
+      const logged = jumpsOn(field, c.name);
+      const detail =
+        c.baseJumps > 0
+          ? `${jumpsLabel(c.baseJumps + logged)} (${c.baseJumps.toLocaleString('en-GB')} before + ${logged.toLocaleString('en-GB')} logged)`
+          : jumpsLabel(logged);
+      return { id: c.id, name: c.name, detail };
+    });
   const canopies = $derived(componentItems(data.logbookSettings.canopies, 'canopy'));
   const linesets = $derived(componentItems(data.logbookSettings.linesets, 'lineset'));
   const pilotChutes = $derived(componentItems(data.logbookSettings.pilotChutes, 'pilotChute'));

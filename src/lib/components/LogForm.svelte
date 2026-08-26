@@ -7,6 +7,7 @@
   // exists here — {#each} replaces the row-template function, $state/$derived
   // replace the DOM reads, and use:enhance replaces the fetch/JSON handlers.
   import { enhance } from '$app/forms';
+  import { exitAltitudeDigits, formatExitAltitude } from '$lib/format';
   import type { NumberedEntry } from '$lib/server/logbook';
   import type { LogbookSettings } from '$lib/server/logbook-settings';
   import {
@@ -71,7 +72,7 @@
     return {
       date: entry.date,
       placeId: settings.places.find((p) => p.name === entry.place)?.id ?? '',
-      exitAltitude: entry.exitAltitude,
+      exitAltitude: exitAltitudeDigits(entry.exitAltitude),
       rigId: rig?.id ?? '',
       aircraftId: settings.aircraft.find((a) => a.plate === entry.aircraft)?.id ?? '',
       jumpTypeId: settings.jumpTypes.find((jt) => jt.name === entry.jumpType)?.id ?? '',
@@ -227,15 +228,26 @@
       </label>
       <label class={FIELD_LABEL}>
         <span>Exit altitude</span>
-        <input
-          type="text"
-          name="exitAltitude"
-          class={FIELD_INPUT}
-          placeholder="e.g. 13,000 ft"
-          autocomplete="off"
-          maxlength="120"
-          bind:value={form.exitAltitude}
-        />
+        <!--
+          Numeric input with the unit rendered beside it rather than typed:
+          "ft" is appended on display (see formatExitAltitude), so there's
+          nothing to key in on a phone but the number itself. inputmode
+          numeric gets the digit keypad on iOS.
+        -->
+        <div class="altitude-field">
+          <input
+            type="number"
+            inputmode="numeric"
+            name="exitAltitude"
+            class="{FIELD_INPUT} min-w-0 altitude-input"
+            placeholder="e.g. 13000"
+            autocomplete="off"
+            min="0"
+            step="100"
+            bind:value={form.exitAltitude}
+          />
+          <span class="altitude-unit" aria-hidden="true">ft</span>
+        </div>
       </label>
       <label class={FIELD_LABEL}>
         <span>Rig</span>
@@ -323,7 +335,7 @@
           <div class="logbook-details">
             <dl class="logbook-details-grid">
               <div><dt>Jump type</dt><dd>{dash(entry.jumpType)}</dd></div>
-              <div><dt>Exit altitude</dt><dd>{dash(entry.exitAltitude)}</dd></div>
+              <div><dt>Exit altitude</dt><dd>{dash(formatExitAltitude(entry.exitAltitude))}</dd></div>
               <div><dt>Aircraft</dt><dd>{dash(entry.aircraft)}</dd></div>
               <div><dt>Rig</dt><dd>{dash(entry.rig)}</dd></div>
               <div><dt>Canopy</dt><dd>{dash(entry.canopy)}</dd></div>
@@ -362,6 +374,24 @@
   /* Same rules as LogbookEntryList.astro's <style> block, plain scoped
      Svelte styles — see ReferenceListPanel.svelte for why :global() isn't
      needed here. */
+  .altitude-field {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+  }
+
+  .altitude-input {
+    flex: 1;
+  }
+
+  .altitude-unit {
+    flex: none;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ink-soft);
+  }
+
   .logbook-empty {
     margin: 0;
     padding: 16px;

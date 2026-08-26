@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { csvEscape, parseCsvLine } from './csv';
+import { csvEscape, parseCsvLine, parseCsvRows } from './csv';
 
 describe('csvEscape', () => {
   it('leaves plain values unquoted', () => {
@@ -46,5 +46,44 @@ describe('parseCsvLine', () => {
     const original = 'Tricky, "quoted"\nvalue';
     const line = ['before', csvEscape(original), 'after'].join(',');
     expect(parseCsvLine(line)).toEqual(['before', original, 'after']);
+  });
+});
+
+describe('parseCsvRows', () => {
+  it('splits plain rows on newlines', () => {
+    expect(parseCsvRows('a,b\nc,d\n')).toEqual([
+      ['a', 'b'],
+      ['c', 'd'],
+    ]);
+  });
+
+  it('keeps a quoted newline inside one field instead of splitting the row', () => {
+    // The bug this function exists for: split('\n') would tear this record
+    // in two and both halves would then be discarded as unparseable.
+    expect(parseCsvRows('2026-08-01,"line one\nline two",at-1\n')).toEqual([
+      ['2026-08-01', 'line one\nline two', 'at-1'],
+    ]);
+  });
+
+  it('handles quoted commas and doubled quotes', () => {
+    expect(parseCsvRows('"Smith, Jane","She said ""hi"""\n')).toEqual([['Smith, Jane', 'She said "hi"']]);
+  });
+
+  it('handles \\r\\n line endings', () => {
+    expect(parseCsvRows('a,b\r\nc,d\r\n')).toEqual([
+      ['a', 'b'],
+      ['c', 'd'],
+    ]);
+  });
+
+  it('keeps a final row that has no trailing newline', () => {
+    expect(parseCsvRows('a,b\nc,d')).toEqual([
+      ['a', 'b'],
+      ['c', 'd'],
+    ]);
+  });
+
+  it('is empty for empty input', () => {
+    expect(parseCsvRows('')).toEqual([]);
   });
 });

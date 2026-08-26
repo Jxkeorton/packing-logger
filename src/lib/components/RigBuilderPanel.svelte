@@ -6,7 +6,7 @@
   // groups all five under one "Rig builder" section instead, in the
   // order you'd actually work through them: add the parts you have,
   // then combine them into a rig.
-  import { TOGGLE_SECTION, TOGGLE_BUTTON, TOGGLE_ICON, TOGGLE_PANEL, TOGGLE_PANEL_PADDED, PANEL_HINT, FIELD_LABEL, FIELD_INPUT, FIELD_SELECT } from '$lib/ui-classes';
+  import { TOGGLE_SECTION, TOGGLE_BUTTON, TOGGLE_ICON, TOGGLE_PANEL, TOGGLE_PANEL_PADDED, PANEL_HINT, FIELD_LABEL, FIELD_LABEL_NARROW, FIELD_INPUT, FIELD_SELECT } from '$lib/ui-classes';
   import ReferenceListBody from './ReferenceListBody.svelte';
 
   interface Item {
@@ -70,6 +70,10 @@
               <span>Name</span>
               <input type="text" name="name" class={FIELD_INPUT} placeholder="e.g. Sabre2 190" autocomplete="off" maxlength="80" required />
             </label>
+            <label class="{FIELD_LABEL_NARROW} mt-2.5 mb-0">
+              <span>Jumps before adding</span>
+              <input type="number" inputmode="numeric" name="baseJumps" class="{FIELD_INPUT} min-w-0" placeholder="0" min="0" step="1" />
+            </label>
           {/snippet}
         </ReferenceListBody>
       </div>
@@ -88,6 +92,10 @@
             <label class="{FIELD_LABEL} mt-2.5 mb-0">
               <span>Name</span>
               <input type="text" name="name" class={FIELD_INPUT} placeholder="e.g. Dacron, fitted Jan 2026" autocomplete="off" maxlength="80" required />
+            </label>
+            <label class="{FIELD_LABEL_NARROW} mt-2.5 mb-0">
+              <span>Jumps before adding</span>
+              <input type="number" inputmode="numeric" name="baseJumps" class="{FIELD_INPUT} min-w-0" placeholder="0" min="0" step="1" />
             </label>
           {/snippet}
         </ReferenceListBody>
@@ -108,6 +116,10 @@
               <span>Name</span>
               <input type="text" name="name" class={FIELD_INPUT} placeholder="e.g. PD reserve pilot chute" autocomplete="off" maxlength="80" required />
             </label>
+            <label class="{FIELD_LABEL_NARROW} mt-2.5 mb-0">
+              <span>Jumps before adding</span>
+              <input type="number" inputmode="numeric" name="baseJumps" class="{FIELD_INPUT} min-w-0" placeholder="0" min="0" step="1" />
+            </label>
           {/snippet}
         </ReferenceListBody>
       </div>
@@ -126,6 +138,10 @@
             <label class="{FIELD_LABEL} mt-2.5 mb-0">
               <span>Name</span>
               <input type="text" name="name" class={FIELD_INPUT} placeholder="e.g. Wings X 190" autocomplete="off" maxlength="80" required />
+            </label>
+            <label class="{FIELD_LABEL_NARROW} mt-2.5 mb-0">
+              <span>Jumps before adding</span>
+              <input type="number" inputmode="numeric" name="baseJumps" class="{FIELD_INPUT} min-w-0" placeholder="0" min="0" step="1" />
             </label>
           {/snippet}
         </ReferenceListBody>

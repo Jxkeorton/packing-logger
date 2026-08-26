@@ -8,7 +8,7 @@
 // date, keeps every number after it gap-free — same as a paper logbook,
 // where you'd cross out and renumber rather than leave a hole.
 import { readText, writeText } from './storage';
-import { csvEscape, parseCsvLine } from './csv';
+import { csvEscape, parseCsvRows } from './csv';
 
 export interface LogbookEntry {
   date: string; // YYYY-MM-DD, local time
@@ -44,11 +44,12 @@ const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 async function readEntries(): Promise<LogbookEntry[]> {
   const raw = await readText(ENTRIES_KEY);
   if (!raw) return [];
-  const lines = raw.split('\n').filter((l) => l.trim().length > 0);
+  // parseCsvRows, not split('\n') — `description` can contain line breaks,
+  // and splitting on '\n' first would tear such a record in two and drop it.
   const entries: LogbookEntry[] = [];
-  for (const line of lines) {
+  for (const row of parseCsvRows(raw)) {
     const [date, place, exitAltitude, canopy, container, aad, aircraft, description, at, jumpType, rig, lineset, pilotChute] =
-      parseCsvLine(line);
+      row;
     // Recognize a header row by shape (its first field isn't a real date),
     // not by an exact string match against the current ENTRIES_HEADER —
     // that string has changed as fields were added, and a file written

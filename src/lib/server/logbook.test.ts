@@ -184,3 +184,37 @@ describe('backward compatibility with rows written before rig/lineset/pilot chut
     expect(result[0].pilotChute).toBe('');
   });
 });
+
+describe('descriptions containing newlines', () => {
+  it('round-trips a multi-line description without losing the entry', async () => {
+    // Regression: writeEntries quotes the newline correctly, but readEntries
+    // used to split the file on '\n' before parsing, tearing the record in
+    // two and discarding both halves — the jump silently vanished.
+    const description = 'line one\nline two\n\nline four';
+    await addEntry(entryInput({ description }), 0, 'at-1');
+
+    const result = await readLogbook(0);
+    expect(result).toHaveLength(1);
+    expect(result[0].description).toBe(description);
+    expect(result[0].at).toBe('at-1');
+  });
+
+  it('keeps neighbouring entries intact around a multi-line one', async () => {
+    await addEntry(entryInput({ date: '2026-08-01' }), 0, 'at-1');
+    await addEntry(entryInput({ date: '2026-08-02', description: 'first\nsecond' }), 0, 'at-2');
+    await addEntry(entryInput({ date: '2026-08-03' }), 0, 'at-3');
+
+    const result = await readLogbook(0);
+    expect(result.map((e) => e.at)).toEqual(['at-3', 'at-2', 'at-1']);
+    expect(result.find((e) => e.at === 'at-2')!.description).toBe('first\nsecond');
+  });
+
+  it('survives an edit that adds a newline to an existing description', async () => {
+    await addEntry(entryInput({ description: 'single line' }), 0, 'at-1');
+    await updateEntry('at-1', entryInput({ description: 'now\nmulti line' }), 0);
+
+    const result = await readLogbook(0);
+    expect(result).toHaveLength(1);
+    expect(result[0].description).toBe('now\nmulti line');
+  });
+});

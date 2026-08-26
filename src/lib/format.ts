@@ -10,6 +10,30 @@ export function formatDuration(ms: number): string {
   return `${minutes}:${String(seconds).padStart(2, '0')}.${tenths}`;
 }
 
+/**
+ * Pulls the digits out of a stored exit altitude.
+ *
+ * The field is numeric now (the form appends "ft" for you), but entries
+ * logged before that change hold free text like "13,000 ft" or "4000ft".
+ * Both shapes have to load back into the number input when a jump is
+ * reopened for editing, so grab the digits and ignore everything else.
+ * Returns '' when there's no number to find.
+ */
+export function exitAltitudeDigits(stored: string): string {
+  const digits = (stored ?? '').replace(/[^\d]/g, '');
+  return digits;
+}
+
+/** "13,000 ft" from a stored altitude; passes odd legacy text through as-is. */
+export function formatExitAltitude(stored: string): string {
+  const value = (stored ?? '').trim();
+  if (!value) return '';
+  // Anything that isn't purely a number is legacy free text the user typed
+  // themselves — show it exactly as they wrote it rather than reformatting.
+  if (!/^\d+$/.test(value)) return value;
+  return `${Number(value).toLocaleString('en-GB')} ft`;
+}
+
 /** "23 Aug, 14:05" for a recorded time's timestamp. */
 export function formatWhen(iso: string): string {
   const d = new Date(iso);

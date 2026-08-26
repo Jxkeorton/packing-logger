@@ -5,7 +5,7 @@
 // lives in).
 import { readText, writeText } from './storage';
 import { todayKey } from '../packing';
-import { csvEscape, parseCsvLine } from './csv';
+import { csvEscape, parseCsvRows } from './csv';
 import {
   CATEGORIES,
   RATES,
@@ -28,11 +28,14 @@ const JUMPS_HEADER = 'date,category,name,at';
 async function readJumps(): Promise<Jump[]> {
   const raw = await readText(JUMPS_KEY);
   if (!raw) return [];
-  const lines = raw.split('\n').filter((l) => l.trim().length > 0);
+  // Customer names are cleaned with oneLine() so they shouldn't contain a
+  // line break today, but parse whole rows anyway — the alternative silently
+  // drops a record if one ever does (see parseCsvRows, and the logbook bug
+  // that motivated it) rather than failing loudly.
   const jumps: Jump[] = [];
-  for (const line of lines) {
-    if (line.trim() === JUMPS_HEADER) continue;
-    const [date, category, name, at] = parseCsvLine(line);
+  for (const row of parseCsvRows(raw)) {
+    if (row.join(',') === JUMPS_HEADER) continue;
+    const [date, category, name, at] = row;
     if (!date || !at || !CATEGORIES.includes(category as Category)) continue;
     jumps.push({ date, category: category as Category, name: name ?? '', at });
   }

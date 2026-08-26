@@ -23,6 +23,11 @@ export interface Place {
 export interface Component {
   id: string;
   name: string; // e.g. "Sabre2 190", "PD reserve pilot chute"
+  // Jumps this part already had on it before it was added here — a canopy
+  // bought second-hand, or one that was in service before this app existed.
+  // Its displayed total is baseJumps plus the jumps logged against it, so
+  // the number reflects the part's real life, not just what we witnessed.
+  baseJumps: number;
 }
 
 // A rig is a named combination of components, built once and then picked
@@ -119,7 +124,11 @@ function asComponentList(value: unknown): Component[] {
   const out: Component[] = [];
   for (const item of value) {
     if (item && typeof item === 'object' && typeof (item as any).id === 'string' && typeof (item as any).name === 'string') {
-      out.push({ id: (item as any).id, name: (item as any).name });
+      // baseJumps predates nothing — components saved before this field
+      // existed simply have none, so default to 0 rather than dropping them.
+      const raw = (item as any).baseJumps;
+      const baseJumps = typeof raw === 'number' && Number.isInteger(raw) && raw >= 0 ? raw : 0;
+      out.push({ id: (item as any).id, name: (item as any).name, baseJumps });
     }
   }
   return out;

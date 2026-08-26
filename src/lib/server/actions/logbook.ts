@@ -32,6 +32,16 @@ import { oneLine, multiLine } from '$lib/server/form-utils';
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
+/**
+ * Jumps a component already carried before it was added here. Blank means
+ * none — a brand-new part — so an empty or junk value is 0 rather than an
+ * error, since this is an optional field on the add form.
+ */
+function componentBaseJumps(formData: FormData): number {
+  const n = Number(formData.get('baseJumps'));
+  return Number.isInteger(n) && n >= 0 ? n : 0;
+}
+
 // The form submits dropdown *ids* (placeId/rigId/...), same as the main
 // app's <select> values — but here the id->text resolution the main
 // app's client-side JS did (selectedOptionText, the equipment dataset
@@ -117,9 +127,10 @@ export const logbookActions: Record<string, Action> = {
   },
 
   addCanopy: async ({ request }) => {
-    const name = oneLine((await request.formData()).get('name'), 80);
+    const formData = await request.formData();
+    const name = oneLine(formData.get('name'), 80);
     if (!name) return fail(400, { error: 'name is required' });
-    await addCanopy({ name });
+    await addCanopy({ name, baseJumps: componentBaseJumps(formData) });
   },
 
   removeCanopy: async ({ request }) => {
@@ -129,9 +140,10 @@ export const logbookActions: Record<string, Action> = {
   },
 
   addLineset: async ({ request }) => {
-    const name = oneLine((await request.formData()).get('name'), 80);
+    const formData = await request.formData();
+    const name = oneLine(formData.get('name'), 80);
     if (!name) return fail(400, { error: 'name is required' });
-    await addLineset({ name });
+    await addLineset({ name, baseJumps: componentBaseJumps(formData) });
   },
 
   removeLineset: async ({ request }) => {
@@ -141,9 +153,10 @@ export const logbookActions: Record<string, Action> = {
   },
 
   addPilotChute: async ({ request }) => {
-    const name = oneLine((await request.formData()).get('name'), 80);
+    const formData = await request.formData();
+    const name = oneLine(formData.get('name'), 80);
     if (!name) return fail(400, { error: 'name is required' });
-    await addPilotChute({ name });
+    await addPilotChute({ name, baseJumps: componentBaseJumps(formData) });
   },
 
   removePilotChute: async ({ request }) => {
@@ -153,9 +166,10 @@ export const logbookActions: Record<string, Action> = {
   },
 
   addContainer: async ({ request }) => {
-    const name = oneLine((await request.formData()).get('name'), 80);
+    const formData = await request.formData();
+    const name = oneLine(formData.get('name'), 80);
     if (!name) return fail(400, { error: 'name is required' });
-    await addContainer({ name });
+    await addContainer({ name, baseJumps: componentBaseJumps(formData) });
   },
 
   removeContainer: async ({ request }) => {
