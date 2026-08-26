@@ -4,6 +4,16 @@
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
 		<meta name="theme-color" content="#122c41" />
+		<!--
+			iOS home-screen icon. Deliberately a literal /static path rather than a
+			bundled import like the favicon in +layout.svelte: iOS also probes this
+			exact filename at the site root as a fallback, which a hashed asset
+			filename would defeat. See static/apple-touch-icon.svg for the master
+			artwork and how to regenerate the PNG.
+		-->
+		<link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+		<!-- Short label shown under the icon on the home screen. -->
+		<meta name="apple-mobile-web-app-title" content="Packing Log" />
 		<title>Packing Log</title>
 		<meta name="description" content="Daily pack job and tandem jump counter and earnings log for a skydive rigger." />
 		<link rel="preconnect" href="https://fonts.googleapis.com" />
