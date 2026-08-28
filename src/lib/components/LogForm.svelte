@@ -95,7 +95,8 @@
   let form = $state<FormFields>(emptyForm());
   let status = $state<{ text: string; kind?: 'ok' | 'error' }>({ text: '' });
   let saving = $state(false);
-  let formEl: HTMLFormElement;
+  let modalOpen = $state(false);
+  let dialogEl: HTMLDivElement | undefined = $state();
 
   const editingEntry = $derived(editingAt ? entries.find((e) => e.at === editingAt) : undefined);
   const displayNumber = $derived(editingEntry ? editingEntry.number : nextNumber);
@@ -130,7 +131,47 @@
     editingAt = entry.at;
     form = formFromEntry(entry);
     touched = { placeId: true, rigId: true, aircraftId: true, jumpTypeId: true };
-    formEl?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  function openAdd() {
+    enterAddMode();
+    status = { text: '' };
+    modalOpen = true;
+  }
+
+  function openEdit(entry: NumberedEntry) {
+    enterEditMode(entry);
+    status = { text: '' };
+    modalOpen = true;
+  }
+
+  function closeModal() {
+    modalOpen = false;
+    // Reset back to a blank add-jump form, so reopening never resurrects a
+    // half-finished edit of a jump the user backed out of.
+    enterAddMode();
+    status = { text: '' };
+  }
+
+  // Focus the dialog itself rather than the first field. Auto-focusing the
+  // date input would spring the date picker open on iOS the moment the
+  // modal appears, which is worse than a keystroke saved.
+  $effect(() => {
+    if (modalOpen) dialogEl?.focus();
+  });
+
+  // Stop the page behind the modal scrolling under it on touch devices.
+  $effect(() => {
+    if (!modalOpen) return;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = previous;
+    };
+  });
+
+  function handleKeydown(event: KeyboardEvent) {
+    if (event.key === 'Escape' && modalOpen) closeModal();
   }
 
   function toggleExpanded(at: string) {
@@ -154,14 +195,43 @@
   </div>
 </header>
 
-<section class="bg-panel border border-line rounded-card shadow-card px-4 pt-3.5 pb-4">
-  <div class="flex items-baseline justify-between gap-2 mb-2.5">
-    <h2 class="m-0 text-[17px] font-bold tracking-[-0.01em]">{editingAt ? 'Edit jump' : 'Log a jump'}</h2>
-    <span class="font-mono font-semibold text-sm text-gold">#{displayNumber}</span>
-  </div>
-  <form
-    bind:this={formEl}
-    method="POST"
+<svelte:window onkeydown={handleKeydown} />
+
+<button type="button" class="log-jump-trigger" onclick={openAdd}>&plus; Log a jump</button>
+
+{#if modalOpen}
+  <!--
+    Backdrop scrolls rather than the panel: the form is tall enough to
+    exceed a phone viewport, and an inner scroll area would strand the
+    submit button. The min-h-full flex wrapper keeps it centred when it
+    does fit. Closing on a backdrop click therefore tests containment
+    rather than TandemNameModal's target===currentTarget — clicks can land
+    on that wrapper as well as the backdrop itself.
+  -->
+  <div
+    class="fixed inset-0 z-20 overflow-y-auto bg-[rgba(11,22,32,0.5)] p-4"
+    onclick={(e) => {
+      if (dialogEl && !dialogEl.contains(e.target as Node)) closeModal();
+    }}
+    role="presentation"
+  >
+    <div class="flex min-h-full items-center justify-center">
+      <div
+        bind:this={dialogEl}
+        tabindex="-1"
+        class="w-full max-w-[520px] bg-panel rounded-card shadow-card px-4 pt-3.5 pb-4 outline-none"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="logFormTitle"
+      >
+        <div class="flex items-baseline justify-between gap-2 mb-2.5">
+          <h2 id="logFormTitle" class="m-0 text-[17px] font-bold tracking-[-0.01em]">
+            {editingAt ? 'Edit jump' : 'Log a jump'}
+          </h2>
+          <span class="font-mono font-semibold text-sm text-gold">#{displayNumber}</span>
+        </div>
+        <form
+          method="POST"
     action={editingAt ? '?/updateJump' : '?/logJump'}
     use:enhance={() => {
       saving = true;
@@ -170,9 +240,9 @@
       return async ({ result, update }) => {
         saving = false;
         if (result.type === 'success') {
-          status = { text: wasEditing ? 'Saved' : 'Logged', kind: 'ok' };
-          enterAddMode();
-          setTimeout(() => (status = { text: '' }), 2000);
+          // The saved jump appearing in the list behind is the confirmation,
+          // so just close — a status message here would be dismissed with it.
+          closeModal();
         } else if (result.type === 'failure') {
           status = { text: (result.data as { error?: string })?.error ?? 'Failed to save', kind: 'error' };
         }
@@ -302,23 +372,24 @@
         bind:value={form.description}
       ></textarea>
     </label>
-    <div class={FORM_ACTIONS}>
-      <button type="submit" class={FORM_SAVE_BUTTON} disabled={saving}>
-        {editingAt ? 'Save changes' : 'Log jump'}
-      </button>
-      {#if editingAt}
-        <button
-          type="button"
-          class="appearance-none border-0 bg-transparent text-ink-soft font-sans text-[13px] font-semibold cursor-pointer p-0 underline"
-          onclick={enterAddMode}
-        >
-          Cancel edit
-        </button>
-      {/if}
-      <span class={FORM_STATUS} data-state={status.kind} role="status">{status.text}</span>
+          <div class={FORM_ACTIONS}>
+            <button type="submit" class={FORM_SAVE_BUTTON} disabled={saving}>
+              {editingAt ? 'Save changes' : 'Log jump'}
+            </button>
+            <button
+              type="button"
+              class="appearance-none border-0 bg-transparent text-ink-soft font-sans text-[13px] font-semibold cursor-pointer p-0 underline"
+              onclick={closeModal}
+            >
+              Cancel
+            </button>
+            <span class={FORM_STATUS} data-state={status.kind} role="status">{status.text}</span>
+          </div>
+        </form>
+      </div>
     </div>
-  </form>
-</section>
+  </div>
+{/if}
 
 <section class="bg-panel border border-line rounded-card shadow-card overflow-hidden">
   <ul class="list-none m-0 p-0">
@@ -345,14 +416,14 @@
             </dl>
             {#if entry.description}<p class="logbook-details-description">{entry.description}</p>{/if}
             <div class="logbook-details-actions">
-              <button type="button" class="logbook-edit" onclick={() => enterEditMode(entry)}>Edit</button>
+              <button type="button" class="logbook-edit" onclick={() => openEdit(entry)}>Edit</button>
               <form
                 method="POST"
                 action="?/deleteJump"
                 use:enhance={() => {
                   const wasEditing = entry.at === editingAt;
                   return async ({ update }) => {
-                    if (wasEditing) enterAddMode();
+                    if (wasEditing) closeModal();
                     await update();
                   };
                 }}
@@ -374,6 +445,34 @@
   /* Same rules as LogbookEntryList.astro's <style> block, plain scoped
      Svelte styles — see ReferenceListPanel.svelte for why :global() isn't
      needed here. */
+  .log-jump-trigger {
+    appearance: none;
+    border: 0;
+    border-radius: 0.75rem;
+    width: 100%;
+    height: 46px;
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 15px;
+    color: white;
+    background: var(--gold);
+    cursor: pointer;
+    touch-action: manipulation;
+    transition:
+      transform 80ms ease,
+      filter 80ms ease;
+  }
+
+  .log-jump-trigger:active {
+    transform: scale(0.99);
+    filter: brightness(0.95);
+  }
+
+  .log-jump-trigger:focus-visible {
+    outline: 3px solid var(--gold);
+    outline-offset: 2px;
+  }
+
   .altitude-field {
     display: flex;
     align-items: center;
