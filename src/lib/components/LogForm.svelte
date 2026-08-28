@@ -8,6 +8,7 @@
   // replace the DOM reads, and use:enhance replaces the fetch/JSON handlers.
   import { enhance } from '$app/forms';
   import { exitAltitudeDigits, formatExitAltitude } from '$lib/format';
+  import { TANDEM_JUMP_TYPES } from '$lib/tandem';
   import type { NumberedEntry } from '$lib/server/logbook';
   import type { LogbookSettings } from '$lib/server/logbook-settings';
   import {
@@ -399,7 +400,12 @@
         <button type="button" class="logbook-row" aria-expanded={isExpanded} onclick={() => toggleExpanded(entry.at)}>
           <span class="logbook-row-number">#{entry.number}</span>
           <span class="logbook-row-date">{formatShortDate(entry.date)}</span>
-          <span class="logbook-row-place">{entry.place || '—'}</span>
+          <span class="logbook-row-place">
+            <span class="logbook-row-place-name">{entry.place || '—'}</span>
+            {#if entry.jumpType === TANDEM_JUMP_TYPES.videographer}
+              <span class="logbook-row-pill">Camera</span>
+            {/if}
+          </span>
           <span class="logbook-row-chevron">&rsaquo;</span>
         </button>
         {#if isExpanded}
@@ -536,11 +542,33 @@
   }
 
   .logbook-row-place {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+  }
+
+  .logbook-row-place-name {
     font-size: 14px;
     font-weight: 600;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  /* flex:none so a long place name truncates before the badge does. */
+  .logbook-row-pill {
+    flex: none;
+    font-family: var(--font-sans);
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--camera);
+    background: var(--camera-soft);
+    border-radius: 999px;
+    padding: 2px 8px;
+    line-height: 1.6;
   }
 
   .logbook-row-chevron {

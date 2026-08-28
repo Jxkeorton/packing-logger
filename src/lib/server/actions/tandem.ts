@@ -3,7 +3,7 @@
 // hand-shaped JSON responses (a plain `use:enhance` re-runs the page's
 // `load` after success, so state/history/week/month refresh together).
 import { fail, type Action } from '@sveltejs/kit';
-import { CATEGORIES, type Category } from '$lib/tandem';
+import { CATEGORIES, TANDEM_JUMP_TYPES, type Category } from '$lib/tandem';
 import { addJump, removeJump } from '$lib/server/tandem';
 import { addEntry as addLogbookEntry, removeEntry as removeLogbookEntry } from '$lib/server/logbook';
 import { ensureJumpType, readLogbookSettings, resolveRigComponents } from '$lib/server/logbook-settings';
@@ -20,7 +20,7 @@ const MAX_NAME_LENGTH = 80;
 // logbook-side failure is logged, not surfaced as an error.
 async function autoLogTandemJump(category: Category, name: string, date: string, at: string): Promise<void> {
   try {
-    const jumpTypeName = category === 'instructor' ? 'Tandem Instructor' : 'Tandem Camera';
+    const jumpTypeName = TANDEM_JUMP_TYPES[category];
     await ensureJumpType(jumpTypeName);
     const settings = await readLogbookSettings();
     // Fill every field from its saved default, exactly as starting a jump by

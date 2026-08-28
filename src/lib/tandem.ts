@@ -8,6 +8,19 @@ export const CATEGORY_LABELS: Record<Category, string> = {
   videographer: 'Videographer',
 };
 
+/**
+ * Logbook jump-type names given to jumps auto-logged from the Tandems tab.
+ *
+ * Shared rather than written inline where they're used: the server picks the
+ * name when auto-logging (actions/tandem.ts) and the logbook list matches on
+ * it to flag camera jumps (LogForm.svelte). Two copies of a bare string that
+ * have to stay identical is exactly how one of them quietly drifts.
+ */
+export const TANDEM_JUMP_TYPES: Record<Category, string> = {
+  instructor: 'Tandem Instructor',
+  videographer: 'Tandem Camera',
+};
+
 export const RATES: Record<Category, number> = {
   instructor: 42,
   videographer: 42,

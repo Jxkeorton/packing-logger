@@ -27,6 +27,10 @@
   --sport-soft: #dee7eb;
   --videographer: #6b4f8a;
   --videographer-soft: #e3ddec;
+  /* Flags a jump auto-logged as tandem camera work. Deliberately warm, to
+     read as a badge at a glance against the otherwise cool palette. */
+  --camera: #a8551f;
+  --camera-soft: #f7e6d8;
 
   --danger: #b3423a;
   --danger-soft: #f1dedc;
@@ -57,6 +61,8 @@
     --sport-soft: #22333d;
     --videographer: #a186c9;
     --videographer-soft: #2a2337;
+    --camera: #e0904f;
+    --camera-soft: #3a2718;
 
     --danger: #d6685f;
     --danger-soft: #3a211f;
@@ -84,6 +90,8 @@
   --color-sport-soft: var(--sport-soft);
   --color-videographer: var(--videographer);
   --color-videographer-soft: var(--videographer-soft);
+  --color-camera: var(--camera);
+  --color-camera-soft: var(--camera-soft);
 
   --color-danger: var(--danger);
   --color-danger-soft: var(--danger-soft);
