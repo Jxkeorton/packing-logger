@@ -91,6 +91,15 @@
 
   const dash = (value: string) => value || '—';
 
+  // Jumps auto-logged from the Tandems tab get a badge on their collapsed
+  // row, so paid tandem work is distinguishable from sport jumps at a
+  // glance. Anything else — a hand-logged jump of any type — gets none.
+  function tandemBadge(jumpType: string): { label: string; kind: string } | null {
+    if (jumpType === TANDEM_JUMP_TYPES.videographer) return { label: 'Camera', kind: 'camera' };
+    if (jumpType === TANDEM_JUMP_TYPES.instructor) return { label: 'Instructor', kind: 'instructor' };
+    return null;
+  }
+
   let editingAt = $state<string | null>(null);
   let expanded = $state<Set<string>>(new Set());
   let form = $state<FormFields>(emptyForm());
@@ -396,14 +405,15 @@
   <ul class="list-none m-0 p-0">
     {#each entries as entry (entry.at)}
       {@const isExpanded = expanded.has(entry.at)}
+      {@const badge = tandemBadge(entry.jumpType)}
       <li class="logbook-entry">
         <button type="button" class="logbook-row" aria-expanded={isExpanded} onclick={() => toggleExpanded(entry.at)}>
           <span class="logbook-row-number">#{entry.number}</span>
           <span class="logbook-row-date">{formatShortDate(entry.date)}</span>
           <span class="logbook-row-place">
             <span class="logbook-row-place-name">{entry.place || '—'}</span>
-            {#if entry.jumpType === TANDEM_JUMP_TYPES.videographer}
-              <span class="logbook-row-pill">Camera</span>
+            {#if badge}
+              <span class="logbook-row-pill" data-kind={badge.kind}>{badge.label}</span>
             {/if}
           </span>
           <span class="logbook-row-chevron">&rsaquo;</span>
@@ -564,11 +574,22 @@
     font-weight: 700;
     letter-spacing: 0.04em;
     text-transform: uppercase;
-    color: var(--camera);
-    background: var(--camera-soft);
     border-radius: 999px;
     padding: 2px 8px;
     line-height: 1.6;
+  }
+
+  .logbook-row-pill[data-kind='camera'] {
+    color: var(--camera);
+    background: var(--camera-soft);
+  }
+
+  /* Reuses the existing --instructor pair rather than adding a token: it's
+     named for exactly this, and the teal reads clearly apart from the
+     camera badge's orange. */
+  .logbook-row-pill[data-kind='instructor'] {
+    color: var(--instructor);
+    background: var(--instructor-soft);
   }
 
   .logbook-row-chevron {
