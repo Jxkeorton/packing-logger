@@ -16,6 +16,9 @@
   import ReferenceListPanel from '$lib/components/ReferenceListPanel.svelte';
   import RigBuilderPanel from '$lib/components/RigBuilderPanel.svelte';
   import SettingsPanel from '$lib/components/SettingsPanel.svelte';
+  import BurbleSyncPanel from '$lib/components/BurbleSyncPanel.svelte';
+  import PendingJumpsMenu from '$lib/components/PendingJumpsMenu.svelte';
+  import BurbleSettingsPanel from '$lib/components/BurbleSettingsPanel.svelte';
   import DownloadButton from '$lib/components/DownloadButton.svelte';
   import { totalEarnings as packingTotalEarnings, totalPacks } from '$lib/packing';
   import { totalEarnings as tandemTotalEarnings, totalJumps } from '$lib/tandem';
@@ -108,6 +111,8 @@
 <div
   class="max-w-140 mx-auto px-4 pt-5 [padding-bottom:calc(40px+env(safe-area-inset-bottom))] flex flex-col gap-5.5"
 >
+  <PendingJumpsMenu pending={data.burblePending} />
+
   <AppTabs bind:activeTab={activeAppTab} />
 
   <!-- Packing -->
@@ -221,6 +226,15 @@
     </div>
 
     <div class={APP_VIEW} hidden={logbookSubTab !== 'log'}>
+      <BurbleSyncPanel
+        enabled={data.logbookSettings.burble.enabled}
+        autoPoll={data.logbookSettings.burble.autoPoll}
+        pollSeconds={data.logbookSettings.burble.pollSeconds}
+        pendingCount={data.burblePending.length}
+        unmappedCodes={data.burbleUnmappedCodes}
+        lastSyncAt={data.burbleLastSyncAt}
+      />
+
       <LogForm
         entries={data.logbookEntries}
         nextNumber={data.nextLogbookNumber}
@@ -303,6 +317,15 @@
           </label>
         {/snippet}
       </ReferenceListPanel>
+
+      <BurbleSettingsPanel
+        enabled={data.logbookSettings.burble.enabled}
+        dzId={data.logbookSettings.burble.dzId}
+        myNames={data.logbookSettings.burble.myNames}
+        pollSeconds={data.logbookSettings.burble.pollSeconds}
+        codeMap={data.logbookSettings.burble.codeMap}
+        unmappedCodes={data.burbleUnmappedCodes}
+      />
 
       <SettingsPanel baseJumps={data.logbookSettings.baseJumps} />
     </div>

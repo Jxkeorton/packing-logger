@@ -1,0 +1,35 @@
+{
+    "baseUrl": "https://eu-displays.burblesoft.com/",
+    "config": {
+        "jm_display_building_time": "0",
+        "jm_display_tribe": 0,
+        "jm_max_columns": 4,
+        "jm_display_landing_zone": 0,
+        "dzm_jm_display_loading_gate": 0,
+        "dzm_jm_display_closed_loads": 0,
+        "jm_display_dzso": 0,
+        "jm_display_gca": 0,
+        "jm_display_load_master": 1,
+        "dzm_jm_show_formation": 0,
+        "dzm_jm_show_rig": 0,
+        "dzm_jm_condense_teams": 0,
+        "dzm_jm_use_display_name_if_available": 1
+    },
+    "setting": {
+        "aircraft": 0,
+        "columns": 4,
+        "display_tandem": 1,
+        "display_student": 1,
+        "display_sport": 1,
+        "display_menu": 1,
+        "font_size": 0
+    },
+    "user": {
+        "user_type": 2,
+        "dropzone_status": 1
+    },
+    "success": true,
+    "dropzone_id": null,
+    "server": "prod4-2022 (AWS)",
+    "operation_time": "4.8971176147461ms"
+}
