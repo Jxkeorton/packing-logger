@@ -21,6 +21,18 @@ export const TANDEM_JUMP_TYPES: Record<Category, string> = {
   videographer: 'Tandem Camera',
 };
 
+/**
+ * What the *other* person on the jump is called, for the category you're
+ * logging: an instructor jump's other staff member is the camera flyer, a
+ * camera jump's is the instructor. Shared for the same reason as
+ * TANDEM_JUMP_TYPES above — the modal labels its input with it and the
+ * server writes it into the auto-logged jump's description.
+ */
+export const OTHER_STAFF_LABELS: Record<Category, string> = {
+  instructor: 'Camera flyer',
+  videographer: 'Instructor',
+};
+
 export const RATES: Record<Category, number> = {
   instructor: 42,
   videographer: 42,

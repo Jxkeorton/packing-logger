@@ -3,7 +3,7 @@
 // hand-shaped JSON responses (a plain `use:enhance` re-runs the page's
 // `load` after success, so state/history/week/month refresh together).
 import { fail, type Action } from '@sveltejs/kit';
-import { CATEGORIES, TANDEM_JUMP_TYPES, type Category } from '$lib/tandem';
+import { CATEGORIES, OTHER_STAFF_LABELS, TANDEM_JUMP_TYPES, type Category } from '$lib/tandem';
 import { addJump, removeJump } from '$lib/server/tandem';
 import { addEntry as addLogbookEntry, removeEntry as removeLogbookEntry } from '$lib/server/logbook';
 import { ensureJumpType, readLogbookSettings, resolveRigComponents } from '$lib/server/logbook-settings';
@@ -18,7 +18,13 @@ const MAX_NAME_LENGTH = 80;
 // logbook entry too, without a separate link table. Best-effort: the
 // tandem jump itself is the record that matters for invoicing, so a
 // logbook-side failure is logged, not surfaced as an error.
-async function autoLogTandemJump(category: Category, name: string, date: string, at: string): Promise<void> {
+async function autoLogTandemJump(
+  category: Category,
+  name: string,
+  staff: string,
+  date: string,
+  at: string,
+): Promise<void> {
   try {
     const jumpTypeName = TANDEM_JUMP_TYPES[category];
     await ensureJumpType(jumpTypeName);
@@ -49,7 +55,13 @@ async function autoLogTandemJump(category: Category, name: string, date: string,
         aad: '',
         aircraft: aircraft?.plate ?? '',
         jumpType: jumpTypeName,
-        description: `Auto-logged from the Tandems tab — ${category} jump for ${name}.`,
+        // The other staff member on the jump, when one was given — named by
+        // their role ("Camera flyer: …" on an instructor jump, "Instructor: …"
+        // on a camera one) so the description reads the same way round for
+        // both, and stays plain enough to edit by hand afterwards.
+        description:
+          `Auto-logged from the Tandems tab — ${category} jump for ${name}.` +
+          (staff ? ` ${OTHER_STAFF_LABELS[category]}: ${staff}.` : ''),
       },
       settings.baseJumps,
       at,
@@ -79,9 +91,12 @@ export const tandemActions: Record<string, Action> = {
     const cleanName = oneLine(formData.get('name'), MAX_NAME_LENGTH);
     if (!cleanName) return fail(400, { error: 'name is required' });
 
+    // Optional: only the customer's name is required to bill the jump.
+    const cleanStaff = oneLine(formData.get('staff'), MAX_NAME_LENGTH);
+
     const at = new Date().toISOString();
     const state = await addJump(category as Category, cleanName, at);
-    await autoLogTandemJump(category as Category, cleanName, state.date, at);
+    await autoLogTandemJump(category as Category, cleanName, cleanStaff, state.date, at);
   },
 
   deleteTandemJump: async ({ request }) => {

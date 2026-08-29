@@ -1,6 +1,6 @@
 <script lang="ts">
   import { invalidateAll } from '$app/navigation';
-  import { CATEGORIES, CATEGORY_LABELS, RATES, type Category, type DayState } from '$lib/tandem';
+  import { CATEGORIES, CATEGORY_LABELS, OTHER_STAFF_LABELS, RATES, type Category, type DayState } from '$lib/tandem';
   import { CARD, CARD_TOP, CARD_LABEL, CARD_RATE, CARD_SUBTOTAL, CATEGORIES_LIST } from '$lib/ui-classes';
   import TandemNameModal from './TandemNameModal.svelte';
 
@@ -13,12 +13,13 @@
     pendingCategory ? `${CATEGORY_LABELS[pendingCategory]} jump — £${RATES[pendingCategory].toFixed(2)}` : '',
   );
 
-  async function addJump(name: string) {
+  async function addJump(name: string, staff: string) {
     const category = pendingCategory;
     if (!category) return;
     const formData = new FormData();
     formData.set('category', category);
     formData.set('name', name);
+    formData.set('staff', staff);
     await fetch('?/addTandemJump', { method: 'POST', body: formData });
     pendingCategory = null;
     await invalidateAll();
@@ -72,6 +73,7 @@
 <TandemNameModal
   open={pendingCategory !== null}
   subtitle={modalSubtitle}
+  staffLabel={pendingCategory ? OTHER_STAFF_LABELS[pendingCategory] : ''}
   onSubmit={addJump}
   onClose={() => (pendingCategory = null)}
 />
