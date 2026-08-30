@@ -195,10 +195,29 @@ describe('confirming a tandem jump', () => {
     expect(entries[0].jumpType).toBe('Tandem Instructor');
     expect(entries[0].description).toContain('G-UKPS load 6');
     expect(entries[0].description).toContain('Miranda Walfield');
+    // The camera flyer manifested on the same group, named the same way
+    // the Tandems tab names the one it asks for by hand.
+    expect(entries[0].description).toContain('Camera flyer: Barry Woollard');
 
     // Same `at` on both, so deleting the tandem jump removes the logbook
     // entry too — the link the Tandems tab already relies on.
     expect(entries[0].at).toBe(tandemState.entries.instructor[0].at);
+  });
+
+  it('leaves the camera flyer out when the manifest showed none', async () => {
+    // Liam Domin-Goddard's group is a customer and him, nothing else — so
+    // there is no other staff member to name, and the description says
+    // nothing rather than trailing an empty label.
+    const noCamera = settingsFor('Liam Domin-Goddard');
+    script(at(ON_CALL, 1));
+    await syncOnce(noCamera);
+
+    const [jump] = pendingJumps(await readSyncState());
+    await commitMatches([jump.slotId]);
+
+    const [entry] = await readLogbook(0);
+    expect(entry.description).toContain('Aleksandra Rola');
+    expect(entry.description).not.toContain('Camera flyer');
   });
 
   it('does not log the same slot twice', async () => {

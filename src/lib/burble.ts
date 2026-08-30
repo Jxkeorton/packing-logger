@@ -176,6 +176,29 @@ export function tandemCustomerName(group: BurbleSlot[]): string {
   return customer?.name?.trim() ?? '';
 }
 
+/**
+ * The other staff member on a tandem — the camera flyer alongside the
+ * instructor, or the instructor alongside the camera flyer.
+ *
+ * Found by elimination rather than by jump code: a group is one booking
+ * (customer + TI + optional camera, see NOTES.md), so anyone in it who
+ * isn't the paying customer and isn't me is the other half of the staff on
+ * that jump. Going by code would mean a DZ shorthand nobody has mapped yet
+ * silently dropping the name, and the name is the whole point here.
+ *
+ * Two of them — a photo *and* a video flyer, which Beccles' two camera
+ * codes allow for — are joined rather than picked between. Better a label
+ * that reads slightly oddly than a name quietly dropped.
+ */
+export function otherTandemStaffName(group: BurbleSlot[], mySlotId: string): string {
+  return group
+    .filter((slot) => slot && typeof slot.name === 'string')
+    .filter((slot) => slot.transaction_type_id !== TANDEM_CUSTOMER_TT && String(slot.id) !== mySlotId)
+    .map((slot) => slot.name.trim())
+    .filter(Boolean)
+    .join(' & ');
+}
+
 /** One slot on the board that turned out to be mine. */
 export interface BurbleMatch {
   slotId: string;
@@ -190,6 +213,11 @@ export interface BurbleMatch {
   role: BurbleRole;
   jumpTypeName: string;
   customerName: string; // '' for a solo
+  /**
+   * Whoever else was working the jump — '' for a solo, and for a tandem
+   * the manifest showed no camera flyer on.
+   */
+  otherStaffName: string;
 }
 
 export interface MatchResult {
@@ -241,6 +269,7 @@ export function matchSlots(loads: BurbleLoad[], myNames: string[], codeMap: Burb
           role: mapping.role,
           jumpTypeName: mapping.jumpTypeName,
           customerName: mapping.role === 'solo' ? '' : tandemCustomerName(group),
+          otherStaffName: mapping.role === 'solo' ? '' : otherTandemStaffName(group, String(slot.id)),
         });
       }
     }

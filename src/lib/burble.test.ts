@@ -10,6 +10,7 @@ import {
   DEFAULT_BURBLE_CODE_MAP,
   matchSlots,
   normaliseName,
+  otherTandemStaffName,
   realLoads,
   splitLoadName,
   tandemCustomerName,
@@ -86,6 +87,31 @@ describe('tandemCustomerName', () => {
   });
 });
 
+describe('otherTandemStaffName', () => {
+  it('picks the camera flyer out of the instructor\'s group', () => {
+    const group = realLoads(onCall)[0].groups[0];
+    // Miranda Walfield (customer) + Dylan Whitehair (TI) + Barry Woollard (camera).
+    expect(otherTandemStaffName(group, '1864662')).toBe('Barry Woollard');
+  });
+
+  it('picks the instructor out of the camera flyer\'s group', () => {
+    const group = realLoads(onCall)[0].groups[0];
+    expect(otherTandemStaffName(group, '1864672')).toBe('Dylan Whitehair');
+  });
+
+  it('comes back empty on a tandem manifested without a camera flyer', () => {
+    // Aleksandra Rola + Liam Domin-Goddard, and nobody else.
+    const group = realLoads(onCall)[0].groups[2];
+    expect(otherTandemStaffName(group, '1864702')).toBe('');
+  });
+
+  it('never returns the paying customer', () => {
+    const group = realLoads(onCall)[0].groups[3];
+    // Just the customer and me: whatever else is true, she isn't staff.
+    expect(otherTandemStaffName(group, '1864632')).toBe('');
+  });
+});
+
 describe('matchSlots', () => {
   const map = DEFAULT_BURBLE_CODE_MAP;
 
@@ -96,6 +122,7 @@ describe('matchSlots', () => {
       role: 'instructor',
       jumpTypeName: 'Tandem Instructor',
       customerName: 'Miranda Walfield',
+      otherStaffName: 'Barry Woollard',
       plate: 'G-UKPS',
       loadNumber: '6',
       code: 'TI',
@@ -110,6 +137,7 @@ describe('matchSlots', () => {
       role: 'videographer',
       jumpTypeName: 'Tandem Camera',
       customerName: 'Samantha Townshend',
+      otherStaffName: 'Gareth Pepperell',
       code: 'CAM PHOTO',
     });
   });
@@ -117,7 +145,7 @@ describe('matchSlots', () => {
   it('finds a solo jumper and leaves the customer blank', () => {
     const { matches } = matchSlots(realLoads(onCall), ['Bethan-Rose Dickinson'], map);
     expect(matches).toHaveLength(1);
-    expect(matches[0]).toMatchObject({ role: 'solo', jumpTypeName: 'Sport', customerName: '' });
+    expect(matches[0]).toMatchObject({ role: 'solo', jumpTypeName: 'Sport', customerName: '', otherStaffName: '' });
   });
 
   it('treats EXP+KIT (kit hire) as an ordinary solo', () => {
@@ -184,6 +212,11 @@ describe('Skydive Langar jump codes', () => {
       customerName: 'A Customer',
       code: 'TAN',
     });
+  });
+
+  it('leaves the other staff member blank when the group has no camera flyer', () => {
+    const { matches } = matchSlots(langarLoad('TAN', 'Jake Orton'), ['Jake Orton'], DEFAULT_BURBLE_CODE_MAP);
+    expect(matches[0].otherStaffName).toBe('');
   });
 
   it('maps VID to tandem camera', () => {

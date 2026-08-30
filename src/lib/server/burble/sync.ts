@@ -26,6 +26,7 @@
 import { readText, writeText } from '../storage';
 import { todayKey } from '../../packing';
 import { addJump, loadTodayState } from '../tandem';
+import { OTHER_STAFF_LABELS } from '../../tandem';
 import { autoLogJump } from '../auto-log';
 import { readLogbookSettings, setBurbleSettings, type BurbleSettings } from '../logbook-settings';
 import { fetchLoads, BurbleError } from './client';
@@ -343,7 +344,14 @@ async function todayTandemKeys(): Promise<Set<string>> {
 function manifestDescription(slot: PendingJump): string {
   const load = slot.loadNumber ? `${slot.plate} load ${slot.loadNumber}` : slot.loadName;
   const who = slot.customerName ? ` with ${slot.customerName}` : '';
-  return `Auto-logged from the manifest — ${load}, ${slot.code}${who}.`;
+  // The other staff member, when the board showed one — worded exactly as
+  // the Tandems tab words the name it asks for by hand, so the two ways of
+  // logging the same jump read alike in the logbook. Truthiness, not just
+  // the type: a sighting captured before this field existed is still
+  // sitting in burble-sync.json without it.
+  const alongside =
+    slot.role !== 'solo' && slot.otherStaffName ? ` ${OTHER_STAFF_LABELS[slot.role]}: ${slot.otherStaffName}.` : '';
+  return `Auto-logged from the manifest — ${load}, ${slot.code}${who}.${alongside}`;
 }
 
 export { describeMatch };
