@@ -18,6 +18,7 @@ import { groupByInvoiceMonth as groupTandemByInvoiceMonth, groupByWeek as groupT
 import { readInvoiceSettings } from '$lib/server/invoice-settings';
 import { readLogbook, nextJumpNumber } from '$lib/server/logbook';
 import { readLogbookSettings } from '$lib/server/logbook-settings';
+import { flightHint, pendingJumps, readSyncState } from '$lib/server/burble/sync';
 import { readFastestFive } from '$lib/server/times';
 import { authEnabled } from '$lib/server/auth';
 import { packingActions } from '$lib/server/actions/packing';
@@ -55,6 +56,13 @@ export const load: PageServerLoad = async () => {
   const logbookEntries = await readLogbook(logbookSettings.baseJumps);
   const nextLogbookNumber = await nextJumpNumber(logbookSettings.baseJumps);
 
+  // Manifest sync state is *read* here, never polled — a page load must
+  // not reach out to Burble. Checking the board is an explicit action.
+  const burbleState = await readSyncState();
+  // Each pending jump carries its own "how sure are we it flew" line, so
+  // the confirmation list can be rendered without re-deriving it client-side.
+  const burblePending = pendingJumps(burbleState).map((jump) => ({ ...jump, hint: flightHint(jump) }));
+
   const today = todayKey();
   const dateDisplay = new Date(`${today}T00:00:00`).toLocaleDateString('en-GB', {
     weekday: 'long',
@@ -78,6 +86,9 @@ export const load: PageServerLoad = async () => {
     logbookEntries,
     nextLogbookNumber,
     logbookSettings,
+    burblePending,
+    burbleUnmappedCodes: burbleState.unmappedCodes,
+    burbleLastSyncAt: burbleState.lastSyncAt,
     showLogout: authEnabled(),
   };
 };

@@ -1,0 +1,21 @@
+{
+    "queries": 4,
+    "loads": [
+        [],
+        [],
+        [],
+        []
+    ],
+    "version": 878,
+    "session_id": 9682,
+    "cache_index": "DZM2_JMP_9682_878_f45eaeb220c0ce6b1da2c1bb1df02bad_40cd750bba9870f18aada2478b24840a",
+    "cached": 1,
+    "user": {
+        "user_type": 2,
+        "dropzone_status": 1
+    },
+    "success": true,
+    "dropzone_id": null,
+    "server": "prod4-2022 (AWS)",
+    "operation_time": "29.603958129883ms"
+}

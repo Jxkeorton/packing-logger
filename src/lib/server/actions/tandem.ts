@@ -5,8 +5,9 @@
 import { fail, type Action } from '@sveltejs/kit';
 import { CATEGORIES, OTHER_STAFF_LABELS, TANDEM_JUMP_TYPES, type Category } from '$lib/tandem';
 import { addJump, removeJump } from '$lib/server/tandem';
-import { addEntry as addLogbookEntry, removeEntry as removeLogbookEntry } from '$lib/server/logbook';
-import { ensureJumpType, readLogbookSettings, resolveRigComponents } from '$lib/server/logbook-settings';
+import { removeEntry as removeLogbookEntry } from '$lib/server/logbook';
+import { readLogbookSettings } from '$lib/server/logbook-settings';
+import { autoLogJump } from '$lib/server/auto-log';
 import { readInvoiceSettings, writeInvoiceSettings, type InvoiceSettings } from '$lib/server/invoice-settings';
 import { oneLine, multiLine } from '$lib/server/form-utils';
 
@@ -15,9 +16,12 @@ const MAX_NAME_LENGTH = 80;
 // A tandem instructor/camera jump is also a jump in its own right, so
 // logging one here auto-adds a matching entry to the personal logbook —
 // sharing the same `at` id so undoing the tandem jump cleanly removes its
-// logbook entry too, without a separate link table. Best-effort: the
-// tandem jump itself is the record that matters for invoicing, so a
-// logbook-side failure is logged, not surfaced as an error.
+// logbook entry too, without a separate link table.
+//
+// The jump type has to stay the tandem one ("Tandem Instructor"/"Tandem
+// Camera") rather than the starred default, since that's the whole point
+// of auto-logging it from this tab. Everything else comes from the saved
+// defaults — see $lib/server/auto-log.ts, which the manifest sync shares.
 async function autoLogTandemJump(
   category: Category,
   name: string,
@@ -25,50 +29,18 @@ async function autoLogTandemJump(
   date: string,
   at: string,
 ): Promise<void> {
-  try {
-    const jumpTypeName = TANDEM_JUMP_TYPES[category];
-    await ensureJumpType(jumpTypeName);
-    const settings = await readLogbookSettings();
-    // Fill every field from its saved default, exactly as starting a jump by
-    // hand would — except the jump type, which has to stay the tandem one
-    // ("Tandem Instructor"/"Tandem Camera") rather than the starred default,
-    // since that's the whole point of auto-logging it from this tab.
-    //
-    // Note this applies the default rig to instructor jumps too (it used to
-    // write a placeholder "Tandem Rig" canopy instead). So if the starred rig
-    // is your own sport rig, its components now accrue jumps from tandem
-    // instructing as well — star the rig you actually jump on tandems, or
-    // clear the default, if you're tracking component wear closely.
-    const place = settings.places.find((p) => p.id === settings.defaultPlaceId);
-    const aircraft = settings.aircraft.find((a) => a.id === settings.defaultAircraftId);
-    const rig = resolveRigComponents(settings, settings.defaultRigId);
-    await addLogbookEntry(
-      {
-        date,
-        place: place?.name ?? '',
-        exitAltitude: '', // no default exists for this one
-        rig: rig.rig,
-        canopy: rig.canopy,
-        lineset: rig.lineset,
-        pilotChute: rig.pilotChute,
-        container: rig.container,
-        aad: '',
-        aircraft: aircraft?.plate ?? '',
-        jumpType: jumpTypeName,
-        // The other staff member on the jump, when one was given — named by
-        // their role ("Camera flyer: …" on an instructor jump, "Instructor: …"
-        // on a camera one) so the description reads the same way round for
-        // both, and stays plain enough to edit by hand afterwards.
-        description:
-          `Auto-logged from the Tandems tab — ${category} jump for ${name}.` +
-          (staff ? ` ${OTHER_STAFF_LABELS[category]}: ${staff}.` : ''),
-      },
-      settings.baseJumps,
-      at,
-    );
-  } catch (err) {
-    console.error('Failed to auto-log tandem jump to the logbook', err);
-  }
+  await autoLogJump({
+    jumpTypeName: TANDEM_JUMP_TYPES[category],
+    date,
+    at,
+    // The other staff member on the jump, when one was given — named by
+    // their role ("Camera flyer: …" on an instructor jump, "Instructor: …"
+    // on a camera one) so the description reads the same way round for
+    // both, and stays plain enough to edit by hand afterwards.
+    description:
+      `Auto-logged from the Tandems tab — ${category} jump for ${name}.` +
+      (staff ? ` ${OTHER_STAFF_LABELS[category]}: ${staff}.` : ''),
+  });
 }
 
 function linesFrom(value: unknown): string[] {

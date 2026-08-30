@@ -7,6 +7,7 @@
 // as the jumps do.
 import { randomUUID } from 'node:crypto';
 import { readText, writeText } from './storage';
+import { DEFAULT_BURBLE_CODE_MAP, type BurbleCodeMapping, type BurbleRole } from '../burble';
 
 export interface Place {
   id: string;
@@ -58,6 +59,30 @@ export interface JumpType {
   name: string; // e.g. "Sport", "Tandem Instructor" — what shows in the dropdown
 }
 
+/**
+ * Burble manifest sync — see $lib/server/burble/NOTES.md. Kept in this
+ * document rather than a file of its own because it's the same shape of
+ * concern as everything else here: small, rarely-changing configuration
+ * for the Logbook tab. The *running* state of a sync (which loads we've
+ * seen, what's waiting to be logged) is a separate ledger, in
+ * $lib/server/burble/sync.ts.
+ */
+export interface BurbleSettings {
+  enabled: boolean;
+  dzId: string; // Burble's dropzone id — 531 is Skydive Langar
+  /**
+   * Names to look for on the board. A list, because the display can show a
+   * display name or a real name depending on DZ config — if sync silently
+   * stops matching, adding the other spelling here is the first fix.
+   */
+  myNames: string[];
+  /** Poll automatically while the Logbook tab is open. Off by default — it only works with the screen awake. */
+  autoPoll: boolean;
+  /** Seconds between automatic polls. Kept well inside the ~2m20s departed window. */
+  pollSeconds: number;
+  codeMap: BurbleCodeMapping[];
+}
+
 export type DefaultCategory = 'place' | 'canopy' | 'lineset' | 'pilotChute' | 'container' | 'rig' | 'aircraft' | 'jumpType';
 
 export interface LogbookSettings {
@@ -70,6 +95,7 @@ export interface LogbookSettings {
   rigs: Rig[];
   aircraft: Aircraft[];
   jumpTypes: JumpType[];
+  burble: BurbleSettings;
   defaultPlaceId: string | null;
   defaultRigId: string | null;
   defaultAircraftId: string | null;
@@ -88,6 +114,15 @@ const DEFAULTS: LogbookSettings = {
   rigs: [],
   aircraft: [],
   jumpTypes: [],
+  burble: {
+    enabled: false,
+    dzId: '531', // Skydive Langar — overridable, but it's where this app's user jumps
+
+    myNames: [],
+    autoPoll: false,
+    pollSeconds: 30,
+    codeMap: DEFAULT_BURBLE_CODE_MAP,
+  },
   defaultPlaceId: null,
   defaultRigId: null,
   defaultAircraftId: null,
@@ -187,6 +222,48 @@ function asId(value: unknown): string | null {
 // id. Used both when resolving a fresh jump's rig (actions/logbook.ts)
 // and when auto-logging a tandem jump against the default rig
 // (actions/tandem.ts).
+const BURBLE_ROLES: BurbleRole[] = ['instructor', 'videographer', 'solo'];
+
+function asBurbleCodeMap(value: unknown): BurbleCodeMapping[] {
+  if (!Array.isArray(value)) return DEFAULT_BURBLE_CODE_MAP;
+  const out: BurbleCodeMapping[] = [];
+  for (const item of value) {
+    if (!item || typeof item !== 'object') continue;
+    const code = (item as any).code;
+    const role = (item as any).role;
+    const jumpTypeName = (item as any).jumpTypeName;
+    if (typeof code !== 'string' || !code.trim()) continue;
+    if (!BURBLE_ROLES.includes(role)) continue;
+    if (typeof jumpTypeName !== 'string' || !jumpTypeName.trim()) continue;
+    out.push({ code: code.trim(), role, jumpTypeName: jumpTypeName.trim() });
+  }
+  return out;
+}
+
+// A settings file written before this feature existed simply has no
+// `burble` key, so every field falls back to the default — sync off, no
+// names, the seeded code map. Same tolerance as everything else here:
+// junk in one field never costs you the rest of the document.
+function asBurbleSettings(value: unknown): BurbleSettings {
+  const fallback = DEFAULTS.burble;
+  if (!value || typeof value !== 'object') return fallback;
+  const raw = value as Record<string, unknown>;
+  const pollSeconds =
+    typeof raw.pollSeconds === 'number' && Number.isFinite(raw.pollSeconds)
+      ? Math.min(300, Math.max(15, Math.round(raw.pollSeconds)))
+      : fallback.pollSeconds;
+  return {
+    enabled: raw.enabled === true,
+    dzId: typeof raw.dzId === 'string' ? raw.dzId.trim() : fallback.dzId,
+    myNames: Array.isArray(raw.myNames)
+      ? raw.myNames.filter((n): n is string => typeof n === 'string' && n.trim().length > 0).map((n) => n.trim())
+      : fallback.myNames,
+    autoPoll: raw.autoPoll === true,
+    pollSeconds,
+    codeMap: asBurbleCodeMap(raw.codeMap),
+  };
+}
+
 export function resolveRigComponents(
   settings: LogbookSettings,
   rigId: string | null | undefined,
@@ -217,6 +294,7 @@ export async function readLogbookSettings(): Promise<LogbookSettings> {
     const rigs = asRigList(parsed.rigs);
     const aircraft = asAircraftList(parsed.aircraft);
     const jumpTypes = asJumpTypeList(parsed.jumpTypes);
+    const burble = asBurbleSettings(parsed.burble);
     const defaultPlaceId = asId(parsed.defaultPlaceId);
     const defaultRigId = asId(parsed.defaultRigId);
     const defaultAircraftId = asId(parsed.defaultAircraftId);
@@ -234,6 +312,7 @@ export async function readLogbookSettings(): Promise<LogbookSettings> {
       rigs,
       aircraft,
       jumpTypes,
+      burble,
       // Guard against a default pointing at an id that's since been deleted
       // (e.g. the settings file was edited by hand, or a delete raced a
       // default-set) — fall back to "no default" rather than dangle.
@@ -256,6 +335,32 @@ export async function setBaseJumps(baseJumps: number): Promise<LogbookSettings> 
   const next: LogbookSettings = { ...current, baseJumps };
   await writeLogbookSettings(next);
   return next;
+}
+
+/**
+ * Update the manifest-sync settings, merging over what's saved — so the
+ * auto-poll toggle can be flipped on its own without the caller having to
+ * resend the dropzone id, names and code map.
+ */
+export async function setBurbleSettings(patch: Partial<BurbleSettings>): Promise<LogbookSettings> {
+  const current = await readLogbookSettings();
+  const next: LogbookSettings = { ...current, burble: { ...current.burble, ...patch } };
+  await writeLogbookSettings(next);
+  return next;
+}
+
+/** Map a jump code seen on the board to a role + logbook jump type, replacing any existing mapping for that code. */
+export async function setBurbleCodeMapping(mapping: BurbleCodeMapping): Promise<LogbookSettings> {
+  const current = await readLogbookSettings();
+  const code = mapping.code.trim();
+  const kept = current.burble.codeMap.filter((m) => m.code.trim().toUpperCase() !== code.toUpperCase());
+  return setBurbleSettings({ codeMap: [...kept, { ...mapping, code }] });
+}
+
+export async function removeBurbleCodeMapping(code: string): Promise<LogbookSettings> {
+  const current = await readLogbookSettings();
+  const kept = current.burble.codeMap.filter((m) => m.code.trim().toUpperCase() !== code.trim().toUpperCase());
+  return setBurbleSettings({ codeMap: kept });
 }
 
 // Places/canopies/linesets/pilot chutes/containers/rigs/aircraft/jump

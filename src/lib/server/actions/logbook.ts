@@ -28,7 +28,14 @@ import {
   setDefault,
   type DefaultCategory,
 } from '$lib/server/logbook-settings';
+import {
+  removeBurbleCodeMapping,
+  setBurbleCodeMapping,
+  setBurbleSettings,
+} from '$lib/server/logbook-settings';
+import { clearUnmappedCodes, commitMatches, dismissMatch, syncOnce } from '$lib/server/burble/sync';
 import { oneLine, multiLine } from '$lib/server/form-utils';
+import type { BurbleRole } from '$lib/burble';
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -236,5 +243,72 @@ export const logbookActions: Record<string, Action> = {
       return fail(400, { error: 'baseJumps must be a whole number, 0 or more' });
     }
     await setBaseJumps(baseJumps);
+  },
+  // ---- Burble manifest sync (see $lib/server/burble/NOTES.md) ----
+
+  saveBurbleSettings: async ({ request }) => {
+    const formData = await request.formData();
+    const dzId = oneLine(formData.get('dzId'), 20);
+    if (dzId && !/^\d+$/.test(dzId)) return fail(400, { error: 'Dropzone id must be a number' });
+
+    // One name per line, same shape as the invoice address field.
+    const myNames = multiLine(formData.get('myNames'), 400)
+      .split('\n')
+      .map((n) => n.trim())
+      .filter(Boolean)
+      .slice(0, 10);
+
+    const pollSeconds = Number(formData.get('pollSeconds'));
+    await setBurbleSettings({
+      enabled: formData.get('enabled') === 'on',
+      dzId,
+      myNames,
+      pollSeconds: Number.isFinite(pollSeconds) ? Math.min(300, Math.max(15, Math.round(pollSeconds))) : 30,
+    });
+  },
+
+  // Its own action rather than part of saveBurbleSettings: the toggle is
+  // flipped from the Log tab mid-session, and shouldn't have to resend
+  // (or risk clobbering) the dropzone id, names and code map.
+  setBurbleAutoPoll: async ({ request }) => {
+    const on = String((await request.formData()).get('autoPoll') ?? '') === 'on';
+    await setBurbleSettings({ autoPoll: on });
+  },
+
+  syncManifest: async () => {
+    const outcome = await syncOnce();
+    if (!outcome.ok) return fail(400, { error: outcome.error ?? 'Sync failed' });
+    return { synced: true, boardLoads: outcome.boardLoads, skipped: outcome.skipped === true };
+  },
+
+  commitManifestJumps: async ({ request }) => {
+    const slotIds = (await request.formData()).getAll('slotId').map(String).filter(Boolean);
+    if (slotIds.length === 0) return fail(400, { error: 'Nothing selected to log' });
+    const result = await commitMatches(slotIds);
+    return { logged: result.logged, skippedDuplicates: result.skippedDuplicates };
+  },
+
+  dismissManifestJump: async ({ request }) => {
+    const slotId = String((await request.formData()).get('slotId') ?? '');
+    if (!slotId) return fail(400, { error: 'slotId is required' });
+    await dismissMatch(slotId);
+  },
+
+  mapBurbleCode: async ({ request }) => {
+    const formData = await request.formData();
+    const code = oneLine(formData.get('code'), 40);
+    const role = String(formData.get('role') ?? '') as BurbleRole;
+    const jumpTypeName = oneLine(formData.get('jumpTypeName'), 40);
+    if (!code) return fail(400, { error: 'code is required' });
+    if (!['instructor', 'videographer', 'solo'].includes(role)) return fail(400, { error: 'Unknown role' });
+    if (!jumpTypeName) return fail(400, { error: 'jump type is required' });
+    await setBurbleCodeMapping({ code, role, jumpTypeName });
+    await clearUnmappedCodes();
+  },
+
+  removeBurbleCode: async ({ request }) => {
+    const code = oneLine((await request.formData()).get('code'), 40);
+    if (!code) return fail(400, { error: 'code is required' });
+    await removeBurbleCodeMapping(code);
   },
 };
