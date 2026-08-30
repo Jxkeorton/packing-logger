@@ -1,20 +1,23 @@
-// One-off: copy this app's stored ledgers from Vercel Blob (or from a
-// local data/ folder) into a Cloudflare R2 bucket.
+// Load a bucket with this app's ledgers, and check what's in one.
 //
+//   node --env-file=.env.migrate scripts/migrate-to-r2.mjs --list
 //   node --env-file=.env.migrate scripts/migrate-to-r2.mjs
-//   node --env-file=.env.migrate scripts/migrate-to-r2.mjs --from=data
 //   node --env-file=.env.migrate scripts/migrate-to-r2.mjs --force
+//
+// --list prints what the bucket holds, with sizes, and flags any ledger
+// that's missing. Run it per bucket before deleting anything upstream:
+// "the migration said OK" and "the data is in the bucket" are different
+// claims, and only one of them is checkable afterwards.
+//
+// Without --list it copies ./data/*.{csv,json} into the bucket. That was
+// the Vercel Blob migration route (download from the Blob dashboard into
+// data/, copy up) and is now the way to restore a backup into a fresh
+// bucket. The direct Blob reader was dropped with the @vercel/blob
+// dependency once the migration was done — `git log -- scripts/` has it
+// if it's ever needed again.
 //
 // Env it needs:
 //   R2_ACCOUNT_ID, R2_BUCKET, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY
-//   BLOB_READ_WRITE_TOKEN   (only for --from=blob; the OIDC path the
-//                            deployed app uses works *inside* a Vercel
-//                            function, not from your laptop, so take a
-//                            read-write token from the store's dashboard)
-//
-// --from=data reads ./data instead, which is the way through if the Blob
-// API is still rate-blocked: download the files from the Blob dashboard
-// into data/ and copy from there.
 //
 // Existing objects are never overwritten without --force, and every object
 // written is read back and compared before the script calls itself done.
@@ -29,7 +32,7 @@ const DATA_DIR = path.join(process.cwd(), 'data');
 
 const args = process.argv.slice(2);
 const force = args.includes('--force');
-const from = (args.find((a) => a.startsWith('--from=')) ?? '--from=blob').slice('--from='.length);
+const listOnly = args.includes('--list');
 
 function required(name) {
   const value = process.env[name];
@@ -57,7 +60,7 @@ const baseUrl = process.env.R2_ENDPOINT
 
 const contentTypeFor = (name) => (name.endsWith('.json') ? 'application/json' : 'text/csv');
 
-/** Every ledger the app writes, as a fallback when listing isn't available. */
+/** Every ledger the app writes — what a fully-migrated bucket should hold. */
 const KNOWN_KEYS = [
   'state.json',
   'packing-log.csv',
@@ -68,29 +71,6 @@ const KNOWN_KEYS = [
   'logbook-settings.json',
   'burble-sync.json',
 ];
-
-async function readFromBlob() {
-  const { list, get } = await import('@vercel/blob');
-  const token = required('BLOB_READ_WRITE_TOKEN');
-
-  // One list call covers anything KNOWN_KEYS doesn't know about — a file
-  // added since this script was written shouldn't be left behind.
-  const { blobs } = await list({ prefix: `${PREFIX}/`, token });
-  const names = blobs.map((b) => b.pathname.slice(`${PREFIX}/`.length)).filter(Boolean);
-  const wanted = names.length > 0 ? names : KNOWN_KEYS;
-  if (names.length === 0) console.warn('Blob list came back empty — falling back to the known key list.');
-
-  const out = new Map();
-  for (const name of wanted) {
-    const result = await get(`${PREFIX}/${name}`, { access: 'private', useCache: false, token });
-    if (!result || result.statusCode !== 200) {
-      console.warn(`  skipped ${name} — not in the Blob store`);
-      continue;
-    }
-    out.set(name, await new Response(result.stream).text());
-  }
-  return out;
-}
 
 async function readFromData() {
   if (!existsSync(DATA_DIR)) {
@@ -112,6 +92,20 @@ async function r2Get(name) {
   return response.text();
 }
 
+/** One page of the bucket's contents is plenty: this app stores eight files. */
+async function r2List() {
+  const url = `${baseUrl}?list-type=2&prefix=${encodeURIComponent(`${PREFIX}/`)}`;
+  const response = await r2.fetch(url, { method: 'GET' });
+  if (!response.ok) throw new Error(`R2 LIST: ${response.status} ${response.statusText}`);
+  const xml = await response.text();
+  // Parsing S3's XML with a regex is fine for a listing of eight keys and
+  // avoids an XML dependency for one call.
+  return [...xml.matchAll(/<Contents>[\s\S]*?<\/Contents>/g)].map((match) => ({
+    key: (match[0].match(/<Key>([^<]*)<\/Key>/) ?? [, ''])[1].slice(`${PREFIX}/`.length),
+    size: Number((match[0].match(/<Size>(\d+)<\/Size>/) ?? [, '0'])[1]),
+  }));
+}
+
 async function r2Put(name, body) {
   const response = await r2.fetch(`${baseUrl}/${PREFIX}/${name}`, {
     method: 'PUT',
@@ -121,11 +115,36 @@ async function r2Put(name, body) {
   if (!response.ok) throw new Error(`R2 PUT ${name}: ${response.status} ${response.statusText}`);
 }
 
+async function listBucket() {
+  console.log(`Bucket: ${bucket}/${PREFIX}/ on account ${accountId}\n`);
+  const objects = await r2List();
+  if (objects.length === 0) {
+    console.log('  (empty)');
+  }
+  for (const { key, size } of objects.sort((a, b) => a.key.localeCompare(b.key))) {
+    console.log(`  ${key.padEnd(24)} ${String(size).padStart(8)} bytes`);
+  }
+
+  // burble-sync.json only exists once the manifest sync has run, so a
+  // missing one is normal rather than a failed copy — say so instead of
+  // sounding an alarm that sends someone hunting for lost data.
+  const present = new Set(objects.map((o) => o.key));
+  const missing = KNOWN_KEYS.filter((k) => !present.has(k));
+  if (missing.length > 0) {
+    console.log(`\nNot in this bucket: ${missing.join(', ')}`);
+    console.log('Expected only if that ledger was never written on this instance.');
+  } else {
+    console.log('\nEvery ledger this app writes is present.');
+  }
+}
+
 async function main() {
-  console.log(`Source: ${from === 'data' ? DATA_DIR : 'Vercel Blob'}`);
+  if (listOnly) return listBucket();
+
+  console.log(`Source: ${DATA_DIR}`);
   console.log(`Target: ${bucket}/${PREFIX}/ on account ${accountId}\n`);
 
-  const source = from === 'data' ? await readFromData() : await readFromBlob();
+  const source = await readFromData();
   if (source.size === 0) {
     console.error('Nothing found to copy — stopping rather than reporting an empty success.');
     process.exit(1);
@@ -138,7 +157,7 @@ async function main() {
     if (existing !== null && !force) {
       // Overwriting here would destroy whatever the live app has already
       // written to R2, which is worse than stopping and being asked twice.
-      console.log(`  ${name}: already in R2 (${existing.length} bytes) — left alone, pass --force to replace`);
+      console.log(`  ${name}: already in R2 (${Buffer.byteLength(existing)} bytes) — left alone, pass --force to replace`);
       skipped += 1;
       continue;
     }
@@ -146,17 +165,21 @@ async function main() {
     await r2Put(name, content);
     const readBack = await r2Get(name);
     if (readBack !== content) {
-      console.error(`  ${name}: FAILED verification — wrote ${content.length} bytes, read back ${readBack?.length ?? 0}`);
+      console.error(
+        `  ${name}: FAILED verification — wrote ${Buffer.byteLength(content)} bytes, ` +
+          `read back ${readBack === null ? 'nothing' : `${Buffer.byteLength(readBack)} bytes`}`,
+      );
       process.exit(1);
     }
-    console.log(`  ${name}: copied and verified (${content.length} bytes)`);
+    // Byte length, not string length — these ledgers are full of em dashes
+    // and accented names, and a size that disagrees with what --list
+    // reports sends someone looking for a corruption that isn't there.
+    console.log(`  ${name}: copied and verified (${Buffer.byteLength(content)} bytes)`);
     copied += 1;
   }
 
   console.log(`\nDone — ${copied} copied, ${skipped} left alone.`);
-  if (copied > 0) {
-    console.log('Set R2_ACCOUNT_ID / R2_BUCKET / R2_ACCESS_KEY_ID / R2_SECRET_ACCESS_KEY in Vercel to switch the app over.');
-  }
+  console.log('Run again with --list to see what the bucket now holds.');
 }
 
 main().catch((err) => {

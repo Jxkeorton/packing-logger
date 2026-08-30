@@ -35,8 +35,28 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+describe('a deployed instance without R2 credentials', () => {
+  it('refuses to run rather than falling back to the ephemeral local disk', async () => {
+    // Vercel's filesystem is per-invocation, so the fallback would read
+    // every ledger as empty and drop every jump logged into it. Loud
+    // beats silent when the alternative looks like an empty logbook.
+    vi.stubEnv('VERCEL', '1');
+    vi.resetModules();
+    const { readText, writeText } = await import('./storage');
+
+    await expect(readText('logbook.csv')).rejects.toThrow(/No R2 credentials on a deployed instance/);
+    await expect(writeText('logbook.csv', 'date\n')).rejects.toThrow(/No R2 credentials/);
+  });
+
+  it('still uses data/ locally, where the filesystem persists', async () => {
+    vi.resetModules();
+    const { storageBackend } = await import('./storage');
+    expect(storageBackend()).toBe('local');
+  });
+});
+
 describe('the R2 backend', () => {
-  it('is chosen over Vercel Blob once its env vars are set', async () => {
+  it('is the backend once its env vars are set', async () => {
     const { storageBackend } = await loadStorage();
     expect(storageBackend()).toBe('r2');
   });

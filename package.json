@@ -30,7 +30,6 @@
 		"vitest": "^4.1.11"
 	},
 	"dependencies": {
-		"@vercel/blob": "^2.8.0",
 		"aws4fetch": "^1.0.20",
 		"pdfkit": "^0.20.1"
 	}

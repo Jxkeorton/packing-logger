@@ -1,34 +1,18 @@
 // Small key/value-ish text storage, backed by:
-//   - Cloudflare R2, when R2_* env vars are set. The current home: Vercel
-//     Blob's Hobby allowance is 2,000 writes and 10,000 reads a *month*,
-//     which this app can burn through in a day of manifest polling, while
-//     R2's free tier is 1M/10M. Same shape of store either way — named
-//     text objects — so only this file knows the difference.
-//   - Vercel Blob, when deployed there and a store is connected to the
-//     project. The @vercel/blob SDK authenticates either via a static
-//     BLOB_READ_WRITE_TOKEN, or (the current default when you "Connect"
-//     a store in the dashboard) via BLOB_STORE_ID plus a short-lived OIDC
-//     token Vercel injects into the function at request time — so BLOB_STORE_ID
-//     is the reliable signal that a store is wired up, not the token itself.
-//     Kept working so unsetting the R2 vars falls straight back to it.
+//   - Cloudflare R2, in production. Vercel Blob was the previous home and
+//     is gone: its Hobby allowance is 2,000 writes and 10,000 reads a
+//     *month*, which a day of manifest polling can spend, against R2's
+//     1M/10M. Same shape of store — named text objects — so only this
+//     file ever knew the difference.
 //   - the local `data/` folder otherwise, so `npm run dev` needs no cloud setup.
 import { existsSync } from 'node:fs';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { get, put } from '@vercel/blob';
 import { AwsClient } from 'aws4fetch';
 
 const DATA_DIR = path.join(process.cwd(), 'data');
-const BLOB_PREFIX = 'packing-logger';
+const KEY_PREFIX = 'packing-logger';
 
-const useBlob = Boolean(process.env.BLOB_READ_WRITE_TOKEN || process.env.BLOB_STORE_ID);
-
-/**
- * R2 wins when it's configured, so the switch-over (and the way back) is
- * setting or clearing env vars rather than a deploy. All four are required:
- * a half-configured store should fall back to Blob loudly-by-behaviour
- * rather than fail every read at runtime.
- */
 const r2 = readR2Config();
 
 function readR2Config() {
@@ -55,16 +39,31 @@ function readR2Config() {
     }),
     // R2_ENDPOINT overrides the derived host. Unset in production; it's
     // there so the R2 path can be exercised against a local S3 stub (or
-    // MinIO) without a bucket, which is how this was checked before it
-    // ever pointed at the real one.
+    // MinIO) without a bucket.
     baseUrl: process.env.R2_ENDPOINT
       ? `${process.env.R2_ENDPOINT.replace(/\/$/, '')}/${bucket}`
       : `https://${accountId}.r2.cloudflarestorage.com/${bucket}`,
   };
 }
 
+/**
+ * Falling back to `data/` on a deployed instance would be silent data
+ * loss: the filesystem there is ephemeral and per-invocation, so every
+ * ledger would read empty and every jump logged would vanish with the
+ * function. A missing env var should stop the app, not quietly empty it.
+ */
+function assertBackend(): void {
+  if (!r2 && process.env.VERCEL) {
+    throw new Error(
+      'No R2 credentials on a deployed instance — set R2_ACCOUNT_ID, R2_BUCKET, ' +
+        'R2_ACCESS_KEY_ID and R2_SECRET_ACCESS_KEY. Refusing to fall back to the ' +
+        'ephemeral local filesystem, which would read as an empty logbook.',
+    );
+  }
+}
+
 function r2Url(name: string): string {
-  return `${r2!.baseUrl}/${BLOB_PREFIX}/${name}`;
+  return `${r2!.baseUrl}/${KEY_PREFIX}/${name}`;
 }
 
 async function ensureDataDir() {
@@ -79,10 +78,12 @@ function contentTypeFor(name: string): string {
 
 /** Read a stored text file, or null if it doesn't exist yet. */
 export async function readText(name: string): Promise<string | null> {
+  assertBackend();
+
   if (r2) {
     // no-store because every caller here is reading a ledger it may be
     // about to rewrite — a cached copy would mean writing back stale rows.
-    const response = await r2!.client.fetch(r2Url(name), { method: 'GET', cache: 'no-store' });
+    const response = await r2.client.fetch(r2Url(name), { method: 'GET', cache: 'no-store' });
     if (response.status === 404) return null;
     if (!response.ok) {
       // Deliberately not `return null`: "missing" and "the store is having
@@ -93,12 +94,6 @@ export async function readText(name: string): Promise<string | null> {
     return response.text();
   }
 
-  if (useBlob) {
-    const result = await get(`${BLOB_PREFIX}/${name}`, { access: 'private', useCache: false });
-    if (!result || result.statusCode !== 200) return null;
-    return new Response(result.stream).text();
-  }
-
   const filePath = path.join(DATA_DIR, name);
   if (!existsSync(filePath)) return null;
   return readFile(filePath, 'utf-8');
@@ -106,8 +101,10 @@ export async function readText(name: string): Promise<string | null> {
 
 /** Write (or overwrite) a stored text file. */
 export async function writeText(name: string, content: string): Promise<void> {
+  assertBackend();
+
   if (r2) {
-    const response = await r2!.client.fetch(r2Url(name), {
+    const response = await r2.client.fetch(r2Url(name), {
       method: 'PUT',
       body: content,
       headers: { 'content-type': contentTypeFor(name) },
@@ -118,23 +115,11 @@ export async function writeText(name: string, content: string): Promise<void> {
     return;
   }
 
-  if (useBlob) {
-    await put(`${BLOB_PREFIX}/${name}`, content, {
-      access: 'private',
-      addRandomSuffix: false,
-      allowOverwrite: true,
-      contentType: contentTypeFor(name),
-    });
-    return;
-  }
-
   await ensureDataDir();
   await writeFile(path.join(DATA_DIR, name), content, 'utf-8');
 }
 
 /** Which backend is live — for the migration script and a settings-screen readout. */
-export function storageBackend(): 'r2' | 'blob' | 'local' {
-  if (r2) return 'r2';
-  if (useBlob) return 'blob';
-  return 'local';
+export function storageBackend(): 'r2' | 'local' {
+  return r2 ? 'r2' : 'local';
 }
