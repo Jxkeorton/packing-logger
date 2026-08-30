@@ -1,13 +1,15 @@
 // Load a bucket with this app's ledgers, and check what's in one.
 //
 //   node --env-file=.env.migrate scripts/migrate-to-r2.mjs --list
+//   node --env-file=.env.migrate scripts/migrate-to-r2.mjs --cat=logbook.csv
 //   node --env-file=.env.migrate scripts/migrate-to-r2.mjs
 //   node --env-file=.env.migrate scripts/migrate-to-r2.mjs --force
 //
 // --list prints what the bucket holds, with sizes, and flags any ledger
-// that's missing. Run it per bucket before deleting anything upstream:
-// "the migration said OK" and "the data is in the bucket" are different
-// claims, and only one of them is checkable afterwards.
+// that's missing. --cat prints one ledger's contents. Run both per bucket
+// before deleting anything upstream: "the migration said OK", "the data
+// is in the bucket" and "it's the *right* data" are three different
+// claims, and only the last one is worth anything.
 //
 // Without --list it copies ./data/*.{csv,json} into the bucket. That was
 // the Vercel Blob migration route (download from the Blob dashboard into
@@ -33,6 +35,7 @@ const DATA_DIR = path.join(process.cwd(), 'data');
 const args = process.argv.slice(2);
 const force = args.includes('--force');
 const listOnly = args.includes('--list');
+const catKey = (args.find((a) => a.startsWith('--cat=')) ?? '').slice('--cat='.length);
 
 function required(name) {
   const value = process.env[name];
@@ -139,6 +142,15 @@ async function listBucket() {
 }
 
 async function main() {
+  if (catKey) {
+    const body = await r2Get(catKey);
+    if (body === null) {
+      console.error(`${catKey} is not in ${bucket}.`);
+      process.exit(1);
+    }
+    process.stdout.write(body);
+    return;
+  }
   if (listOnly) return listBucket();
 
   console.log(`Source: ${DATA_DIR}`);
