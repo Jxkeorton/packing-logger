@@ -55,6 +55,42 @@ describe('a deployed instance without R2 credentials', () => {
   });
 });
 
+describe('per-user scoping', () => {
+  it('leaves single-tenant keys exactly as they were outside runAsUser', async () => {
+    const { readText } = await loadStorage();
+    respond = () => new Response('date\n', { status: 200 });
+    await readText('logbook.csv');
+    expect(calls[0].url).toBe('https://acct123.r2.cloudflarestorage.com/packing-logger/packing-logger/logbook.csv');
+  });
+
+  it('nests a scoped call under users/<id>/, without touching the unscoped key', async () => {
+    const { readText, runAsUser } = await loadStorage();
+    respond = () => new Response('date\n', { status: 200 });
+
+    await runAsUser('u_jake', () => readText('logbook.csv'));
+    expect(calls[0].url).toBe(
+      'https://acct123.r2.cloudflarestorage.com/packing-logger/packing-logger/users/u_jake/logbook.csv',
+    );
+
+    await readText('logbook.csv');
+    expect(calls[1].url).toBe('https://acct123.r2.cloudflarestorage.com/packing-logger/packing-logger/logbook.csv');
+  });
+
+  it('keeps two users on the same deployment from ever sharing a key', async () => {
+    const { readText, runAsUser } = await loadStorage();
+    respond = () => new Response('date\n', { status: 200 });
+
+    await Promise.all([
+      runAsUser('u_aimee', () => readText('logbook.csv')),
+      runAsUser('u_mila', () => readText('logbook.csv')),
+    ]);
+
+    const urls = calls.map((c) => c.url);
+    expect(urls).toContain('https://acct123.r2.cloudflarestorage.com/packing-logger/packing-logger/users/u_aimee/logbook.csv');
+    expect(urls).toContain('https://acct123.r2.cloudflarestorage.com/packing-logger/packing-logger/users/u_mila/logbook.csv');
+  });
+});
+
 describe('the R2 backend', () => {
   it('is the backend once its env vars are set', async () => {
     const { storageBackend } = await loadStorage();

@@ -1,7 +1,8 @@
 <script lang="ts">
-  import type { ActionData } from './$types';
+  import type { ActionData, PageData } from './$types';
 
-  let { form }: { form: ActionData } = $props();
+  let { data, form }: { data: PageData; form: ActionData } = $props();
+  const multi = $derived(data.mode === 'multi');
 </script>
 
 <svelte:head>
@@ -12,17 +13,28 @@
 <main class="wrap">
   <form class="card" method="POST">
     <h1 class="title">Packing Log</h1>
-    <p class="subtitle">Enter the password to continue.</p>
+    <p class="subtitle">{multi ? 'Sign in to continue.' : 'Enter the password to continue.'}</p>
+    {#if multi}
+      <input
+        class="field"
+        type="text"
+        name="username"
+        placeholder="Username"
+        autocomplete="username"
+        autofocus
+        required
+      />
+    {/if}
     <input
       class="field"
       type="password"
       name="password"
       placeholder="Password"
       autocomplete="current-password"
-      autofocus
+      autofocus={!multi}
       required
     />
-    {#if form?.error}<p class="error">Wrong password — try again.</p>{/if}
+    {#if form?.error}<p class="error">{multi ? 'Wrong username or password — try again.' : 'Wrong password — try again.'}</p>{/if}
     <button class="submit" type="submit">Sign in</button>
   </form>
 </main>

@@ -5,6 +5,7 @@
 //     1M/10M. Same shape of store — named text objects — so only this
 //     file ever knew the difference.
 //   - the local `data/` folder otherwise, so `npm run dev` needs no cloud setup.
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { existsSync } from 'node:fs';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
@@ -12,6 +13,35 @@ import { AwsClient } from 'aws4fetch';
 
 const DATA_DIR = path.join(process.cwd(), 'data');
 const KEY_PREFIX = 'packing-logger';
+
+/**
+ * Which user's ledgers the current request is reading and writing, for a
+ * multi-user deployment (see $lib/server/users.ts). One deployment, one
+ * bucket, many people — so `logbook.csv` alone would collide between
+ * them; keyed by user id it becomes `users/<id>/logbook.csv`.
+ *
+ * A single-tenant deployment (Aimee's, Mila's — one bucket, one person,
+ * no login) never calls `runAsUser`, so this is always empty there and
+ * every key is exactly what it always was. Nothing about that setup
+ * changes or needs migrating.
+ *
+ * AsyncLocalStorage rather than a module-level variable: a serverless
+ * runtime can share a warm instance across requests, and a plain variable
+ * would let one request's user id leak into another's concurrently
+ * in-flight read. ALS keeps the value scoped to the async chain hooks.ts
+ * started it on.
+ */
+const userScope = new AsyncLocalStorage<{ userId: string }>();
+
+/** Run `fn` with every readText/writeText call inside it scoped to `userId`'s own ledgers. */
+export function runAsUser<T>(userId: string, fn: () => T): T {
+  return userScope.run({ userId }, fn);
+}
+
+function scopedKey(name: string): string {
+  const scope = userScope.getStore();
+  return scope ? `${KEY_PREFIX}/users/${scope.userId}/${name}` : `${KEY_PREFIX}/${name}`;
+}
 
 const r2 = readR2Config();
 
@@ -63,12 +93,19 @@ function assertBackend(): void {
 }
 
 function r2Url(name: string): string {
-  return `${r2!.baseUrl}/${KEY_PREFIX}/${name}`;
+  return `${r2!.baseUrl}/${scopedKey(name)}`;
 }
 
-async function ensureDataDir() {
-  if (!existsSync(DATA_DIR)) {
-    await mkdir(DATA_DIR, { recursive: true });
+/** `data/<name>` normally, `data/users/<id>/<name>` inside runAsUser — same shape as the R2 key. */
+function localPath(name: string): string {
+  const scope = userScope.getStore();
+  return scope ? path.join(DATA_DIR, 'users', scope.userId, name) : path.join(DATA_DIR, name);
+}
+
+async function ensureParentDir(filePath: string) {
+  const dir = path.dirname(filePath);
+  if (!existsSync(dir)) {
+    await mkdir(dir, { recursive: true });
   }
 }
 
@@ -94,7 +131,7 @@ export async function readText(name: string): Promise<string | null> {
     return response.text();
   }
 
-  const filePath = path.join(DATA_DIR, name);
+  const filePath = localPath(name);
   if (!existsSync(filePath)) return null;
   return readFile(filePath, 'utf-8');
 }
@@ -115,8 +152,9 @@ export async function writeText(name: string, content: string): Promise<void> {
     return;
   }
 
-  await ensureDataDir();
-  await writeFile(path.join(DATA_DIR, name), content, 'utf-8');
+  const filePath = localPath(name);
+  await ensureParentDir(filePath);
+  await writeFile(filePath, content, 'utf-8');
 }
 
 /** Which backend is live — for the migration script and a settings-screen readout. */
