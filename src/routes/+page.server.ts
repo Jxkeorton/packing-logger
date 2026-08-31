@@ -17,6 +17,7 @@ import { toHistoryRow as toTandemHistoryRow } from '$lib/tandem';
 import { groupByInvoiceMonth as groupTandemByInvoiceMonth, groupByWeek as groupTandemByWeek } from '$lib/server/tandem-invoice';
 import { readInvoiceSettings } from '$lib/server/invoice-settings';
 import { readTandemVisibility } from '$lib/server/tandem-visibility';
+import { readTabVisibility } from '$lib/server/tab-visibility';
 import { readLogbook, nextJumpNumber } from '$lib/server/logbook';
 import { readLogbookSettings } from '$lib/server/logbook-settings';
 import { flightHint, pendingJumps, readSyncState } from '$lib/server/burble/sync';
@@ -25,6 +26,7 @@ import { authEnabled } from '$lib/server/auth';
 import { packingActions } from '$lib/server/actions/packing';
 import { tandemActions } from '$lib/server/actions/tandem';
 import { logbookActions } from '$lib/server/actions/logbook';
+import { configActions } from '$lib/server/actions/config';
 
 export const load: PageServerLoad = async () => {
   const state = await loadTodayState();
@@ -51,6 +53,7 @@ export const load: PageServerLoad = async () => {
 
   const invoiceSettings = await readInvoiceSettings();
   const tandemVisibility = await readTandemVisibility();
+  const tabVisibility = await readTabVisibility();
 
   // The personal jump logbook — a separate ledger again, numbered from a
   // configurable starting offset rather than a running daily count.
@@ -86,6 +89,7 @@ export const load: PageServerLoad = async () => {
     tandemMonthRows,
     invoiceSettings,
     tandemVisibility,
+    tabVisibility,
     logbookEntries,
     nextLogbookNumber,
     logbookSettings,
@@ -100,4 +104,5 @@ export const actions: Actions = {
   ...packingActions,
   ...tandemActions,
   ...logbookActions,
+  ...configActions,
 };

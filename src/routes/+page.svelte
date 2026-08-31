@@ -13,10 +13,12 @@
   // change a default. It's now one place, reached the same way from
   // every tab: the cog button next to AppTabs toggles `settingsOpen`,
   // which swaps out whichever tab's content is showing for the settings
-  // view below, grouped as "Logbook options" then "Work jumps" — the
-  // latter now holds both the section-visibility toggles and invoice
+  // view below, grouped as "Config" (which tabs even show — see
+  // tab-visibility.ts), "Logbook options", then "Work jumps" — the
+  // latter holds both the section-visibility toggles and invoice
   // details, since both are about that one tab.
   import AppTabs from '$lib/components/AppTabs.svelte';
+  import ConfigSettingsPanel from '$lib/components/ConfigSettingsPanel.svelte';
   import PackCategoryCards from '$lib/components/packing/PackCategoryCards.svelte';
   import PackHistoryPanel from '$lib/components/packing/PackHistoryPanel.svelte';
   import PackTimerView from '$lib/components/packing/PackTimerView.svelte';
@@ -61,9 +63,30 @@
 
   let { data }: { data: PageData } = $props();
 
-  let activeAppTab = $state<'packing' | 'tandems' | 'logbook'>('packing');
+  // Packing is the traditional default, but only when it's actually
+  // showing — a deployment that's turned it off under Settings > Config
+  // shouldn't land on a tab with no button to reach it. Deliberately a
+  // one-time snapshot at mount, not a $derived — activeAppTab is
+  // ordinary mutable state the tab buttons reassign directly, same as
+  // every other page before Config existed; the $effect right below is
+  // what keeps it honest afterward, mirroring SettingsPanel.svelte's
+  // baseJumps for the same "seed once, correct separately" split.
+  let activeAppTab = $state<'packing' | 'tandems' | 'logbook'>(
+    data.tabVisibility.packing ? 'packing' : data.tabVisibility.tandems ? 'tandems' : 'logbook',
+  );
   let packingSubTab = $state<'pack' | 'timer'>('pack');
   let settingsOpen = $state(false);
+
+  // Catches the tab you're currently on being hidden out from under you
+  // — most directly, unchecking it in Settings > Config right now, but
+  // also another device/tab changing it and this one's data refreshing.
+  // activeAppTab is plain $state, not derived from data, so nothing else
+  // corrects it.
+  $effect(() => {
+    if ((activeAppTab === 'packing' || activeAppTab === 'tandems') && !data.tabVisibility[activeAppTab]) {
+      activeAppTab = data.tabVisibility.packing ? 'packing' : data.tabVisibility.tandems ? 'tandems' : 'logbook';
+    }
+  });
 
   const subTabClass =
     'flex-1 appearance-none border border-line bg-panel text-ink-soft font-sans font-bold text-sm p-2.5 rounded-[10px] cursor-pointer aria-selected:bg-ink aria-selected:border-ink aria-selected:text-canvas';
@@ -132,7 +155,7 @@
 
   <div class="flex gap-2">
     <div class="flex-1">
-      <AppTabs bind:activeTab={activeAppTab} onSelect={() => (settingsOpen = false)} />
+      <AppTabs bind:activeTab={activeAppTab} visibility={data.tabVisibility} onSelect={() => (settingsOpen = false)} />
     </div>
     <button
       type="button"
@@ -161,6 +184,21 @@
         </svg>
       </button>
       <h1 class={SETTINGS_TITLE}>Settings</h1>
+    </div>
+
+    <h2 class={SETTINGS_GROUP_LABEL}>Config</h2>
+    <div class={SETTINGS_GROUP}>
+      <SettingsRow label="Visible tabs" iconColor="var(--gold)">
+        {#snippet icon()}
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+            <rect x="3" y="7" width="18" height="10" rx="5" />
+            <circle cx="9" cy="12" r="3" fill="currentColor" stroke="none" />
+          </svg>
+        {/snippet}
+        {#snippet children()}
+          <ConfigSettingsPanel visibility={data.tabVisibility} />
+        {/snippet}
+      </SettingsRow>
     </div>
 
     <h2 class={SETTINGS_GROUP_LABEL}>Logbook options</h2>

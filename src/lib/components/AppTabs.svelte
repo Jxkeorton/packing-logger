@@ -7,11 +7,19 @@
   // sibling [data-app-view] sections via a shared dom.ts helper; here the
   // active tab is just $state owned by +page.svelte and passed down
   // $bindable, and the views it controls are `{#if}`s in the same file.
+  //
+  // Packing and Work jumps can each be turned off from Settings > Config
+  // (tab-visibility.ts) — Logbook can't, so it's never conditional here,
+  // the one tab guaranteed to still be there if the other two are hidden.
+  import type { AppTab } from '$lib/server/tab-visibility';
+
   let {
     activeTab = $bindable(),
+    visibility,
     onSelect,
   }: {
     activeTab: 'packing' | 'tandems' | 'logbook';
+    visibility: Record<AppTab, boolean>;
     /**
      * Fired on every tab click, even one that leaves activeTab unchanged
      * (re-tapping the tab already open). +page.svelte uses this to close
@@ -27,30 +35,34 @@
 </script>
 
 <div class="flex gap-2" role="tablist" aria-label="Section">
-  <button
-    type="button"
-    class={tabClass}
-    role="tab"
-    aria-selected={activeTab === 'packing'}
-    onclick={() => {
-      activeTab = 'packing';
-      onSelect?.();
-    }}
-  >
-    Packing
-  </button>
-  <button
-    type="button"
-    class={tabClass}
-    role="tab"
-    aria-selected={activeTab === 'tandems'}
-    onclick={() => {
-      activeTab = 'tandems';
-      onSelect?.();
-    }}
-  >
-    Work jumps
-  </button>
+  {#if visibility.packing}
+    <button
+      type="button"
+      class={tabClass}
+      role="tab"
+      aria-selected={activeTab === 'packing'}
+      onclick={() => {
+        activeTab = 'packing';
+        onSelect?.();
+      }}
+    >
+      Packing
+    </button>
+  {/if}
+  {#if visibility.tandems}
+    <button
+      type="button"
+      class={tabClass}
+      role="tab"
+      aria-selected={activeTab === 'tandems'}
+      onclick={() => {
+        activeTab = 'tandems';
+        onSelect?.();
+      }}
+    >
+      Work jumps
+    </button>
+  {/if}
   <button
     type="button"
     class={tabClass}
