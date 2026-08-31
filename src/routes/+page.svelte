@@ -20,9 +20,10 @@
   import TandemHistoryPanel from '$lib/components/tandems/TandemHistoryPanel.svelte';
   import InvoiceSettingsPanel from '$lib/components/tandems/InvoiceSettingsPanel.svelte';
   import LogForm from '$lib/components/LogForm.svelte';
-  import ReferenceListPanel from '$lib/components/ReferenceListPanel.svelte';
+  import ReferenceListBody from '$lib/components/ReferenceListBody.svelte';
   import RigBuilderPanel from '$lib/components/RigBuilderPanel.svelte';
   import SettingsPanel from '$lib/components/SettingsPanel.svelte';
+  import SettingsRow from '$lib/components/SettingsRow.svelte';
   import BurbleSyncPanel from '$lib/components/BurbleSyncPanel.svelte';
   import PendingJumpsMenu from '$lib/components/PendingJumpsMenu.svelte';
   import BurbleSettingsPanel from '$lib/components/BurbleSettingsPanel.svelte';
@@ -49,6 +50,7 @@
     ICON_BUTTON,
     SETTINGS_TITLE,
     SETTINGS_GROUP_LABEL,
+    SETTINGS_GROUP,
   } from '$lib/ui-classes';
   import type { PageData } from './$types';
 
@@ -165,88 +167,170 @@
     </div>
 
     <h2 class={SETTINGS_GROUP_LABEL}>Logbook options</h2>
-    <SettingsPanel baseJumps={data.logbookSettings.baseJumps} />
+    <div class={SETTINGS_GROUP}>
+      <SettingsRow label="Starting jump count" iconColor="var(--gold)">
+        {#snippet icon()}
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+            <path stroke-linecap="round" d="M9 4 7 20M17 4l-2 16M4 9h16M3.5 15h16" />
+          </svg>
+        {/snippet}
+        {#snippet children()}
+          <SettingsPanel baseJumps={data.logbookSettings.baseJumps} />
+        {/snippet}
+      </SettingsRow>
 
-    <ReferenceListPanel
-      label="Dropzones"
-      hint="The starred one is pre-selected whenever you start a new jump."
-      items={places}
-      emptyText="No dropzones saved yet."
-      category="place"
-      categoryLabel="dropzone"
-      defaultId={data.logbookSettings.defaultPlaceId}
-      addAction="?/addPlace"
-      removeAction="?/removePlace"
-      submitLabel="Save dropzone"
-    >
-      {#snippet fields()}
-        <label class="{FIELD_LABEL} mt-2.5 mb-0">
-          <span>Name</span>
-          <input type="text" name="name" class={FIELD_INPUT} placeholder="e.g. Langar" autocomplete="off" maxlength="80" required />
-        </label>
-      {/snippet}
-    </ReferenceListPanel>
+      <SettingsRow label="Dropzones" iconColor="var(--tandem)">
+        {#snippet icon()}
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 21s7-7.2 7-12a7 7 0 1 0-14 0c0 4.8 7 12 7 12Z" />
+            <circle cx="12" cy="9" r="2.3" />
+          </svg>
+        {/snippet}
+        {#snippet children()}
+          <ReferenceListBody
+            hint="The starred one is pre-selected whenever you start a new jump."
+            items={places}
+            emptyText="No dropzones saved yet."
+            category="place"
+            categoryLabel="dropzone"
+            defaultId={data.logbookSettings.defaultPlaceId}
+            addAction="?/addPlace"
+            removeAction="?/removePlace"
+            submitLabel="Save dropzone"
+          >
+            {#snippet fields()}
+              <label class="{FIELD_LABEL} mt-2.5 mb-0">
+                <span>Name</span>
+                <input type="text" name="name" class={FIELD_INPUT} placeholder="e.g. Langar" autocomplete="off" maxlength="80" required />
+              </label>
+            {/snippet}
+          </ReferenceListBody>
+        {/snippet}
+      </SettingsRow>
 
-    <RigBuilderPanel
-      {canopies}
-      {linesets}
-      {pilotChutes}
-      {containers}
-      {rigs}
-      defaultRigId={data.logbookSettings.defaultRigId}
-    />
+      <SettingsRow label="Rig builder" iconColor="var(--videographer)">
+        {#snippet icon()}
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              d="M14.7 6.3a4 4 0 0 0-5.4 5.4L4 17l3 3 5.3-5.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2-2 2.6-2.6Z"
+            />
+          </svg>
+        {/snippet}
+        {#snippet children()}
+          <RigBuilderPanel
+            {canopies}
+            {linesets}
+            {pilotChutes}
+            {containers}
+            {rigs}
+            defaultRigId={data.logbookSettings.defaultRigId}
+          />
+        {/snippet}
+      </SettingsRow>
 
-    <ReferenceListPanel
-      label="Aircraft"
-      hint="The starred one is pre-selected whenever you start a new jump."
-      items={aircraft}
-      emptyText="No aircraft saved yet."
-      category="aircraft"
-      categoryLabel="aircraft"
-      defaultId={data.logbookSettings.defaultAircraftId}
-      addAction="?/addAircraft"
-      removeAction="?/removeAircraft"
-      submitLabel="Save aircraft"
-    >
-      {#snippet fields()}
-        <label class="{FIELD_LABEL_NARROW} mt-2.5 mb-0">
-          <span>Registration</span>
-          <input type="text" name="plate" class={FIELD_INPUT} placeholder="e.g. G-SDSK" autocomplete="off" maxlength="20" required />
-        </label>
-      {/snippet}
-    </ReferenceListPanel>
+      <SettingsRow label="Aircraft" iconColor="var(--sport)">
+        {#snippet icon()}
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M21 3 3 10.5l7 2.5 2.5 7L21 3Z" />
+          </svg>
+        {/snippet}
+        {#snippet children()}
+          <ReferenceListBody
+            hint="The starred one is pre-selected whenever you start a new jump."
+            items={aircraft}
+            emptyText="No aircraft saved yet."
+            category="aircraft"
+            categoryLabel="aircraft"
+            defaultId={data.logbookSettings.defaultAircraftId}
+            addAction="?/addAircraft"
+            removeAction="?/removeAircraft"
+            submitLabel="Save aircraft"
+          >
+            {#snippet fields()}
+              <label class="{FIELD_LABEL_NARROW} mt-2.5 mb-0">
+                <span>Registration</span>
+                <input type="text" name="plate" class={FIELD_INPUT} placeholder="e.g. G-SDSK" autocomplete="off" maxlength="20" required />
+              </label>
+            {/snippet}
+          </ReferenceListBody>
+        {/snippet}
+      </SettingsRow>
 
-    <ReferenceListPanel
-      label="Jump types"
-      hint={`The starred one is pre-selected whenever you start a new jump. "Tandem Instructor" and "Tandem Camera" are added here automatically the first time you log one from the Tandems tab.`}
-      items={jumpTypes}
-      emptyText="No jump types saved yet."
-      category="jumpType"
-      categoryLabel="jump type"
-      defaultId={data.logbookSettings.defaultJumpTypeId}
-      addAction="?/addJumpType"
-      removeAction="?/removeJumpType"
-      submitLabel="Save jump type"
-    >
-      {#snippet fields()}
-        <label class="{FIELD_LABEL} mt-2.5 mb-0">
-          <span>Name</span>
-          <input type="text" name="name" class={FIELD_INPUT} placeholder="e.g. Sport" autocomplete="off" maxlength="40" required />
-        </label>
-      {/snippet}
-    </ReferenceListPanel>
+      <SettingsRow label="Jump types" iconColor="var(--instructor)">
+        {#snippet icon()}
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              d="M11.5 3.5H5a1.5 1.5 0 0 0-1.5 1.5v6.5a1.5 1.5 0 0 0 .44 1.06l8.5 8.5a1.5 1.5 0 0 0 2.12 0l6.44-6.44a1.5 1.5 0 0 0 0-2.12l-8.5-8.5a1.5 1.5 0 0 0-1.06-.44Z"
+            />
+            <circle cx="8" cy="8" r="1.4" />
+          </svg>
+        {/snippet}
+        {#snippet children()}
+          <ReferenceListBody
+            hint={`The starred one is pre-selected whenever you start a new jump. "Tandem Instructor" and "Tandem Camera" are added here automatically the first time you log one from the Tandems tab.`}
+            items={jumpTypes}
+            emptyText="No jump types saved yet."
+            category="jumpType"
+            categoryLabel="jump type"
+            defaultId={data.logbookSettings.defaultJumpTypeId}
+            addAction="?/addJumpType"
+            removeAction="?/removeJumpType"
+            submitLabel="Save jump type"
+          >
+            {#snippet fields()}
+              <label class="{FIELD_LABEL} mt-2.5 mb-0">
+                <span>Name</span>
+                <input type="text" name="name" class={FIELD_INPUT} placeholder="e.g. Sport" autocomplete="off" maxlength="40" required />
+              </label>
+            {/snippet}
+          </ReferenceListBody>
+        {/snippet}
+      </SettingsRow>
 
-    <BurbleSettingsPanel
-      enabled={data.logbookSettings.burble.enabled}
-      dzId={data.logbookSettings.burble.dzId}
-      myNames={data.logbookSettings.burble.myNames}
-      pollSeconds={data.logbookSettings.burble.pollSeconds}
-      codeMap={data.logbookSettings.burble.codeMap}
-      unmappedCodes={data.burbleUnmappedCodes}
-    />
+      <SettingsRow label="Manifest sync" iconColor="var(--camera)">
+        {#snippet icon()}
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              d="M4 12a8 8 0 0 1 14.5-4.5M20 12a8 8 0 0 1-14.5 4.5M18.5 3.5v4h-4M5.5 20.5v-4h4"
+            />
+          </svg>
+        {/snippet}
+        {#snippet children()}
+          <BurbleSettingsPanel
+            enabled={data.logbookSettings.burble.enabled}
+            dzId={data.logbookSettings.burble.dzId}
+            myNames={data.logbookSettings.burble.myNames}
+            pollSeconds={data.logbookSettings.burble.pollSeconds}
+            codeMap={data.logbookSettings.burble.codeMap}
+            unmappedCodes={data.burbleUnmappedCodes}
+          />
+        {/snippet}
+      </SettingsRow>
+    </div>
 
     <h2 class={SETTINGS_GROUP_LABEL}>Invoice details</h2>
-    <InvoiceSettingsPanel invoiceSettings={data.invoiceSettings} />
+    <div class={SETTINGS_GROUP}>
+      <SettingsRow label="Invoice details" iconColor="var(--student)">
+        {#snippet icon()}
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              d="M7 3.5h10v17l-2.5-1.6-2.5 1.6-2.5-1.6-2.5 1.6v-17ZM9 8h6M9 11.5h6M9 15h4"
+            />
+          </svg>
+        {/snippet}
+        {#snippet children()}
+          <InvoiceSettingsPanel invoiceSettings={data.invoiceSettings} />
+        {/snippet}
+      </SettingsRow>
+    </div>
   </div>
 
   <!-- Packing -->

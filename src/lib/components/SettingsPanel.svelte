@@ -1,9 +1,7 @@
 <script lang="ts">
-  // Unlike the other Logbook-settings sections, this one isn't behind a
-  // toggle — it's a single number that's easy to get wrong (typo the
-  // day you start using the app) and annoying to hunt for afterwards, so
-  // it's shown open as soon as you land on Settings rather than needing
-  // to be found and expanded first.
+  // The row chrome (icon, label, chevron, expand/collapse) lives in
+  // SettingsRow.svelte, which wraps this in +page.svelte — this
+  // component only ever renders its own content.
   import { enhance } from '$app/forms';
   import { FIELD_LABEL_NARROW, FIELD_INPUT, FORM_ACTIONS, FORM_SAVE_BUTTON, FORM_STATUS, PANEL_HINT } from '$lib/ui-classes';
 
@@ -22,8 +20,7 @@
   });
 </script>
 
-<section class="bg-panel border border-line rounded-card shadow-card px-4 pt-3.5 pb-4">
-  <h2 class="m-0 mb-2.5 text-[17px] font-bold tracking-[-0.01em]">Starting jump count</h2>
+<div>
   <p class={PANEL_HINT}>
     Jumps you logged before using this app — added to the count above so numbering carries on correctly.
   </p>
@@ -50,4 +47,4 @@
       <span class={FORM_STATUS} data-state={status.kind} role="status">{status.text}</span>
     </div>
   </form>
-</section>
+</div>

@@ -2,15 +2,14 @@
   // Manifest sync configuration, on the shared Settings view. The
   // running state (what's been seen, what's waiting) lives on the
   // Logbook tab in BurbleSyncPanel — this is just the setup you do once.
+  //
+  // The row chrome (icon, label, chevron, expand/collapse) lives in
+  // SettingsRow.svelte, which wraps this in +page.svelte — this
+  // component only ever renders its own content.
   import { enhance } from '$app/forms';
   import { BURBLE_ROLE_LABELS } from '$lib/burble';
   import type { BurbleCodeMapping } from '$lib/burble';
   import {
-    TOGGLE_SECTION,
-    TOGGLE_BUTTON,
-    TOGGLE_ICON,
-    TOGGLE_PANEL,
-    TOGGLE_PANEL_PADDED,
     PANEL_HINT,
     FIELD_LABEL,
     FIELD_LABEL_NARROW,
@@ -37,21 +36,13 @@
     unmappedCodes: string[];
   } = $props();
 
-  let open = $state(false);
   let status = $state<{ text: string; kind?: 'ok' | 'error' }>({ text: '' });
 
   const roles = Object.entries(BURBLE_ROLE_LABELS) as [keyof typeof BURBLE_ROLE_LABELS, string][];
 </script>
 
-<section class={TOGGLE_SECTION}>
-  <button type="button" class={TOGGLE_BUTTON} aria-expanded={open} onclick={() => (open = !open)}>
-    <span>Manifest sync</span>
-    <span class={TOGGLE_ICON} class:rotate-90={open}>&rsaquo;</span>
-  </button>
-
-  {#if open}
-    <div class="{TOGGLE_PANEL} {TOGGLE_PANEL_PADDED}">
-      <p class={PANEL_HINT}>
+<div>
+  <p class={PANEL_HINT}>
         Reads the dropzone's public manifest board and offers your jumps for logging once the load has flown. It can
         only see loads that are on the board at the time it looks — Burble keeps no history — so a jump missed while the
         app was closed has to go in by hand.
@@ -184,10 +175,8 @@
             required
           />
         </label>
-        <div class={FORM_ACTIONS}>
-          <button type="submit" class={FORM_SAVE_BUTTON}>Save code</button>
-        </div>
-      </form>
-    </div>
-  {/if}
-</section>
+      <div class={FORM_ACTIONS}>
+        <button type="submit" class={FORM_SAVE_BUTTON}>Save code</button>
+      </div>
+    </form>
+</div>

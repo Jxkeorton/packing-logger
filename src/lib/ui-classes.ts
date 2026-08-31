@@ -51,6 +51,21 @@ export const ICON_BUTTON =
 export const SETTINGS_TITLE = 'm-0 font-display text-[19px] font-bold tracking-[-0.01em]';
 export const SETTINGS_GROUP_LABEL = 'text-xs font-bold text-ink-soft uppercase tracking-[0.08em]';
 
+// iOS Settings-style row list: one bordered/rounded group per
+// SETTINGS_GROUP, its rows flush against each other (SettingsRow.svelte
+// draws the hairline between them) rather than each option being its
+// own gapped card. A row is a colour-coded icon + label + chevron that
+// expands the row's own content in place — same accordion behaviour the
+// old per-section toggles had, just restyled and with an icon added.
+export const SETTINGS_GROUP = 'flex flex-col bg-panel border border-line rounded-card overflow-hidden';
+export const SETTINGS_ROW_BUTTON =
+  'group w-full flex items-center gap-3 bg-transparent border-0 px-3.5 py-2.5 font-sans text-[15px] text-ink text-left cursor-pointer active:bg-line-strong/15';
+export const SETTINGS_ROW_ICON =
+  'flex items-center justify-center size-7 rounded-[7px] text-white shrink-0 [&>svg]:size-4.5';
+export const SETTINGS_ROW_CHEVRON =
+  'shrink-0 transition-transform duration-150 ease text-lg text-line-strong group-aria-expanded:rotate-90';
+export const SETTINGS_ROW_PANEL = 'border-t border-line px-3.5 pt-3.5 pb-4';
+
 // ---- Category cards ----
 
 export const CATEGORIES_LIST = 'flex flex-col gap-3 min-[480px]:gap-3.5';

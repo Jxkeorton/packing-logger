@@ -1,12 +1,10 @@
 <script lang="ts">
+  // The row chrome (icon, label, chevron, expand/collapse) lives in
+  // SettingsRow.svelte, which wraps this in +page.svelte — this
+  // component only ever renders its own content.
   import { enhance } from '$app/forms';
   import type { InvoiceSettings } from '$lib/server/invoice-settings';
   import {
-    TOGGLE_SECTION,
-    TOGGLE_BUTTON,
-    TOGGLE_ICON,
-    TOGGLE_PANEL,
-    TOGGLE_PANEL_PADDED,
     FIELD_LABEL,
     FIELD_LABEL_NARROW,
     FIELD_INPUT,
@@ -18,18 +16,10 @@
 
   let { invoiceSettings }: { invoiceSettings: InvoiceSettings } = $props();
 
-  let open = $state(false);
   let status = $state<{ text: string; kind?: 'ok' | 'error' }>({ text: '' });
 </script>
 
-<section class={TOGGLE_SECTION}>
-  <button type="button" class={TOGGLE_BUTTON} aria-expanded={open} onclick={() => (open = !open)}>
-    <span>Invoice details</span>
-    <span class={TOGGLE_ICON} class:rotate-90={open}>&rsaquo;</span>
-  </button>
-
-  {#if open}
-    <div class="{TOGGLE_PANEL} {TOGGLE_PANEL_PADDED}">
+<div>
       <p class={PANEL_HINT}>
         Used on the "Export PDF" invoices below — your details, who it's billed to, and the next invoice number.
       </p>
@@ -85,6 +75,4 @@
           <span class={FORM_STATUS} data-state={status.kind} role="status">{status.text}</span>
         </div>
       </form>
-    </div>
-  {/if}
-</section>
+</div>

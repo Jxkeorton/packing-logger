@@ -3,10 +3,14 @@
   // top-level toggles in Logbook settings — each one collapsed by
   // default, so building a rig meant opening and closing four small
   // lists in turn before finally reaching the form that used them. This
-  // groups all five under one "Rig builder" section instead, in the
-  // order you'd actually work through them: add the parts you have,
-  // then combine them into a rig.
-  import { TOGGLE_SECTION, TOGGLE_BUTTON, TOGGLE_ICON, TOGGLE_PANEL, TOGGLE_PANEL_PADDED, PANEL_HINT, FIELD_LABEL, FIELD_LABEL_NARROW, FIELD_INPUT, FIELD_SELECT } from '$lib/ui-classes';
+  // groups all five under one "Rig builder" row instead, in the order
+  // you'd actually work through them: add the parts you have, then
+  // combine them into a rig.
+  //
+  // The row chrome (icon, label, chevron, expand/collapse) lives in
+  // SettingsRow.svelte, which wraps this in +page.svelte — this
+  // component only ever renders its own content.
+  import { PANEL_HINT, FIELD_LABEL, FIELD_LABEL_NARROW, FIELD_INPUT, FIELD_SELECT } from '$lib/ui-classes';
   import ReferenceListBody from './ReferenceListBody.svelte';
 
   interface Item {
@@ -31,22 +35,13 @@
     defaultRigId: string | null;
   } = $props();
 
-  let open = $state(false);
-
   const hasAnyComponent = $derived(
     canopies.length > 0 || linesets.length > 0 || pilotChutes.length > 0 || containers.length > 0,
   );
 </script>
 
-<section class={TOGGLE_SECTION}>
-  <button type="button" class={TOGGLE_BUTTON} aria-expanded={open} onclick={() => (open = !open)}>
-    <span>Rig builder</span>
-    <span class={TOGGLE_ICON} class:rotate-90={open}>&rsaquo;</span>
-  </button>
-
-  {#if open}
-    <div class="{TOGGLE_PANEL} {TOGGLE_PANEL_PADDED} flex flex-col gap-4">
-      <p class={PANEL_HINT}>
+<div class="flex flex-col gap-4">
+  <p class={PANEL_HINT}>
         Add the parts you have below, then build a rig by combining one of
         each — that's what you pick when logging a jump. Each part's jump
         count is how many logged jumps used a rig built with it. If you
@@ -208,9 +203,7 @@
           {/snippet}
         </ReferenceListBody>
       </div>
-    </div>
-  {/if}
-</section>
+</div>
 
 <style>
   .step {
