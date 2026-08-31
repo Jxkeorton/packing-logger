@@ -10,6 +10,7 @@ import { readLogbookSettings } from '$lib/server/logbook-settings';
 import { autoLogJump } from '$lib/server/auto-log';
 import { forgetCommitted } from '$lib/server/burble/sync';
 import { readInvoiceSettings, writeInvoiceSettings, type InvoiceSettings } from '$lib/server/invoice-settings';
+import { setTandemVisibility } from '$lib/server/tandem-visibility';
 import { oneLine, multiLine } from '$lib/server/form-utils';
 
 const MAX_NAME_LENGTH = 80;
@@ -126,5 +127,17 @@ export const tandemActions: Record<string, Action> = {
     };
 
     await writeInvoiceSettings(settings);
+  },
+
+  // A checkbox per category on the Settings > Work jumps row — auto-
+  // submitted on change (see WorkJumpsSettingsPanel.svelte), one request
+  // per toggle rather than a whole-form Save button.
+  saveTandemVisibility: async ({ request }) => {
+    const formData = await request.formData();
+    const category = String(formData.get('category') ?? '');
+    if (!CATEGORIES.includes(category as Category)) return fail(400, { error: 'Unknown category' });
+
+    const visible = formData.get('visible') === 'on';
+    await setTandemVisibility(category as Category, visible);
   },
 };

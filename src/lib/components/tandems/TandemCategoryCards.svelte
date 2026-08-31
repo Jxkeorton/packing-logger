@@ -5,7 +5,13 @@
   import TandemNameModal from './TandemNameModal.svelte';
   import Spinner from '../Spinner.svelte';
 
-  let { tandemState }: { tandemState: DayState } = $props();
+  let { tandemState, visibility }: { tandemState: DayState; visibility: Record<Category, boolean> } = $props();
+
+  // Hiding a category is a display preference only (Settings > Work
+  // jumps) — it never touches tandemState itself, so a jump logged
+  // earlier today under a category since hidden still counts fully
+  // toward the totals above this list; it just doesn't get its own card.
+  const visibleCategories = $derived(CATEGORIES.filter((c) => visibility[c]));
 
   let pendingCategory = $state<Category | null>(null);
   let deletingAt = $state<string | null>(null);
@@ -43,7 +49,12 @@
 </script>
 
 <section class={CATEGORIES_LIST}>
-  {#each CATEGORIES as category (category)}
+  {#if visibleCategories.length === 0}
+    <p class="visibility-empty">
+      Both sections are hidden — turn one back on under <strong>Settings &rarr; Work jumps</strong>.
+    </p>
+  {/if}
+  {#each visibleCategories as category (category)}
     <section class={CARD} data-tandem-category={category} style={`--accent: var(--${category})`}>
       <div class={CARD_TOP}>
         <h2 class={CARD_LABEL}>{CATEGORY_LABELS[category]}</h2>
@@ -87,6 +98,17 @@
 />
 
 <style>
+  .visibility-empty {
+    margin: 0;
+    padding: 16px;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    color: var(--ink-soft);
+    font-size: 13.5px;
+    text-align: center;
+  }
+
   .add-jump-btn {
     appearance: none;
     border: 0;

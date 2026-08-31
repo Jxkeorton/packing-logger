@@ -13,7 +13,8 @@
   // change a default. It's now one place, reached the same way from
   // every tab: the cog button next to AppTabs toggles `settingsOpen`,
   // which swaps out whichever tab's content is showing for the settings
-  // view below, grouped as "Logbook options" then "Invoice details".
+  // view below, grouped as "Logbook options", "Work jumps", then
+  // "Invoice details".
   import AppTabs from '$lib/components/AppTabs.svelte';
   import PackCategoryCards from '$lib/components/packing/PackCategoryCards.svelte';
   import PackHistoryPanel from '$lib/components/packing/PackHistoryPanel.svelte';
@@ -21,6 +22,7 @@
   import TandemCategoryCards from '$lib/components/tandems/TandemCategoryCards.svelte';
   import TandemHistoryPanel from '$lib/components/tandems/TandemHistoryPanel.svelte';
   import InvoiceSettingsPanel from '$lib/components/tandems/InvoiceSettingsPanel.svelte';
+  import WorkJumpsSettingsPanel from '$lib/components/tandems/WorkJumpsSettingsPanel.svelte';
   import LogForm from '$lib/components/LogForm.svelte';
   import ReferenceListBody from '$lib/components/ReferenceListBody.svelte';
   import RigBuilderPanel from '$lib/components/RigBuilderPanel.svelte';
@@ -61,14 +63,6 @@
   let activeAppTab = $state<'packing' | 'tandems' | 'logbook'>('packing');
   let packingSubTab = $state<'pack' | 'timer'>('pack');
   let settingsOpen = $state(false);
-
-  // Switching tabs while Settings is open should leave it, same as
-  // tapping Back — otherwise picking a tab underneath a full-screen
-  // settings view would silently do nothing.
-  $effect(() => {
-    activeAppTab;
-    settingsOpen = false;
-  });
 
   const subTabClass =
     'flex-1 appearance-none border border-line bg-panel text-ink-soft font-sans font-bold text-sm p-2.5 rounded-[10px] cursor-pointer aria-selected:bg-ink aria-selected:border-ink aria-selected:text-canvas';
@@ -137,7 +131,7 @@
 
   <div class="flex gap-2">
     <div class="flex-1">
-      <AppTabs bind:activeTab={activeAppTab} />
+      <AppTabs bind:activeTab={activeAppTab} onSelect={() => (settingsOpen = false)} />
     </div>
     <button
       type="button"
@@ -316,6 +310,25 @@
       </SettingsRow>
     </div>
 
+    <h2 class={SETTINGS_GROUP_LABEL}>Work jumps</h2>
+    <div class={SETTINGS_GROUP}>
+      <SettingsRow label="Visible sections" iconColor="var(--tandem)">
+        {#snippet icon()}
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              d="M2.25 12S5.75 5.5 12 5.5 21.75 12 21.75 12 18.25 18.5 12 18.5 2.25 12 2.25 12Z"
+            />
+            <circle cx="12" cy="12" r="2.8" />
+          </svg>
+        {/snippet}
+        {#snippet children()}
+          <WorkJumpsSettingsPanel visibility={data.tandemVisibility} />
+        {/snippet}
+      </SettingsRow>
+    </div>
+
     <h2 class={SETTINGS_GROUP_LABEL}>Invoice details</h2>
     <div class={SETTINGS_GROUP}>
       <SettingsRow label="Invoice details" iconColor="var(--student)">
@@ -411,7 +424,7 @@
       </div>
     </header>
 
-    <TandemCategoryCards tandemState={data.tandemState} />
+    <TandemCategoryCards tandemState={data.tandemState} visibility={data.tandemVisibility} />
 
     <TandemHistoryPanel dayRows={data.tandemDayRows} weekRows={data.tandemWeekRows} monthRows={data.tandemMonthRows} />
 
