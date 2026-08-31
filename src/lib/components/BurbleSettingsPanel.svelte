@@ -1,7 +1,7 @@
 <script lang="ts">
-  // Manifest sync configuration, on the Logbook's Settings tab. The
-  // running state (what's been seen, what's waiting) lives on the Log tab
-  // in BurbleSyncPanel — this is just the setup you do once.
+  // Manifest sync configuration, on the shared Settings view. The
+  // running state (what's been seen, what's waiting) lives on the
+  // Logbook tab in BurbleSyncPanel — this is just the setup you do once.
   import { enhance } from '$app/forms';
   import { BURBLE_ROLE_LABELS } from '$lib/burble';
   import type { BurbleCodeMapping } from '$lib/burble';
@@ -129,7 +129,7 @@
       </p>
 
       {#if unmappedCodes.length > 0}
-        <p class="mb-3 rounded-[10px] border border-line-strong px-3 py-2.5 text-[12.5px] text-ink-soft">
+        <p class="mb-3 rounded-[var(--radius-control)] border border-line-strong px-3 py-2.5 text-[12.5px] text-ink-soft">
           Seen against your name but not mapped: <strong class="text-ink">{unmappedCodes.join(', ')}</strong>
         </p>
       {/if}

@@ -153,7 +153,7 @@
     width: 26px;
     height: 26px;
     flex: none;
-    border-radius: 8px;
+    border-radius: var(--radius-control);
     cursor: pointer;
     touch-action: manipulation;
   }
@@ -175,7 +175,7 @@
     width: 26px;
     height: 26px;
     flex: none;
-    border-radius: 8px;
+    border-radius: var(--radius-control);
     cursor: pointer;
     touch-action: manipulation;
   }

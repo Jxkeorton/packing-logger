@@ -293,14 +293,14 @@
         />
       </label>
       <label class={FIELD_LABEL}>
-        <span>Place</span>
+        <span>Dropzone</span>
         <select
           name="placeId"
           class={FIELD_SELECT}
           bind:value={form.placeId}
           onchange={() => (touched.placeId = true)}
         >
-          <option value="">No place selected</option>
+          <option value="">No dropzone selected</option>
           {#each settings.places as p (p.id)}
             <option value={p.id}>{p.name}</option>
           {/each}

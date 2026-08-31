@@ -39,6 +39,18 @@ export const TOTALS_VALUE_INK = `${TOTALS_VALUE} text-ink`;
 export const TOTALS_LABEL = 'text-xs text-ink-soft uppercase tracking-[0.08em]';
 export const TOTALS_DIVIDER = 'w-px self-stretch bg-line';
 
+// ---- Settings entry point (cog button + the Settings view it opens) ----
+
+// Square icon button — the header's cog toggle, and (via the same class)
+// the Settings view's own back button. Both read border-radius from
+// --radius-control, so the cog stays in step with the tab bar's own
+// rounding out here, while the back button picks up the tighter value
+// .settings-scope sets once it's rendered inside that view.
+export const ICON_BUTTON =
+  'appearance-none shrink-0 flex items-center justify-center size-10.5 border border-line bg-panel text-ink-soft rounded-[var(--radius-control)] cursor-pointer aria-pressed:bg-ink aria-pressed:border-ink aria-pressed:text-canvas';
+export const SETTINGS_TITLE = 'm-0 font-display text-[19px] font-bold tracking-[-0.01em]';
+export const SETTINGS_GROUP_LABEL = 'text-xs font-bold text-ink-soft uppercase tracking-[0.08em]';
+
 // ---- Category cards ----
 
 export const CATEGORIES_LIST = 'flex flex-col gap-3 min-[480px]:gap-3.5';
@@ -81,11 +93,11 @@ export const HISTORY_CELL_RIGHT = 'p-2 text-right';
 export const FIELD_LABEL = 'flex flex-col gap-1 mb-3 min-w-0 text-[12.5px] font-semibold text-ink-soft';
 export const FIELD_LABEL_NARROW = `${FIELD_LABEL} max-w-40`;
 export const FIELD_INPUT =
-  'w-full px-3 py-2.5 rounded-[10px] border border-line-strong bg-canvas text-ink font-sans text-sm font-normal resize-y focus-visible:outline-3 focus-visible:outline-gold focus-visible:outline-offset-1';
+  'w-full px-3 py-2.5 rounded-[var(--radius-control)] border border-line-strong bg-canvas text-ink font-sans text-sm font-normal resize-y focus-visible:outline-3 focus-visible:outline-gold focus-visible:outline-offset-1';
 export const FIELD_SELECT = `${FIELD_INPUT} h-10`;
 export const FORM_ACTIONS = 'flex items-center gap-3 mt-1';
 export const FORM_SAVE_BUTTON =
-  'appearance-none border-0 rounded-[10px] h-10.5 px-5 font-display font-bold text-sm text-white bg-gold cursor-pointer touch-manipulation disabled:opacity-60 disabled:cursor-default';
+  'appearance-none border-0 rounded-[var(--radius-control)] h-10.5 px-5 font-display font-bold text-sm text-white bg-gold cursor-pointer touch-manipulation disabled:opacity-60 disabled:cursor-default';
 export const FORM_STATUS = 'text-[12.5px] text-ink-soft data-[state=ok]:text-student data-[state=error]:text-danger';
 export const PANEL_HINT = 'mt-0 mb-3.5 text-[12.5px] text-ink-soft';
 

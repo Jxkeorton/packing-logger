@@ -36,6 +36,7 @@
   --danger-soft: #f1dedc;
 
   --radius: 14px;
+  --radius-control: 10px;
   --shadow: 0 1px 0 rgba(20, 32, 43, 0.05), 0 6px 16px -8px rgba(20, 32, 43, 0.22);
 
   color-scheme: light;
@@ -109,4 +110,17 @@ body {
   color: var(--ink);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
+}
+
+/*
+ * The Settings view (opened from the cog button next to the tab bar)
+ * gets its own, tighter corner radius than the rest of the app — cards
+ * and their inputs/buttons both read --radius/--radius-control, so
+ * overriding the two of them here is enough to retint every panel this
+ * wraps. Scoped to a class rather than changed at :root, so Packing/
+ * Tandems/Logbook and the login page keep their existing 14px/10px.
+ */
+.settings-scope {
+  --radius: 5px;
+  --radius-control: 5px;
 }

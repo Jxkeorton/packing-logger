@@ -2,9 +2,16 @@
   // Full port of index.astro + AppTabs.astro + the three tabs/*.astro
   // files. One root route, one client-side tab switch (Packing / Tandems
   // / Logbook) — deliberately not three SvelteKit routes, to keep this a
-  // faithful migration of the existing UX rather than a redesign. Each
-  // tab's own sub-tabs (Pack/Timer, Log/Settings) are the same pattern,
-  // one level down.
+  // faithful migration of the existing UX rather than a redesign. Packing
+  // still has its own Pack/Timer sub-tabs, the same pattern one level down.
+  //
+  // Settings used to be split two ways — invoice details tacked onto the
+  // bottom of Tandems, everything else behind a "Settings" sub-tab buried
+  // inside Logbook — which made it genuinely unclear where to go to
+  // change a default. It's now one place, reached the same way from
+  // every tab: the cog button next to AppTabs toggles `settingsOpen`,
+  // which swaps out whichever tab's content is showing for the settings
+  // view below, grouped as "Logbook options" then "Invoice details".
   import AppTabs from '$lib/components/AppTabs.svelte';
   import PackCategoryCards from '$lib/components/packing/PackCategoryCards.svelte';
   import PackHistoryPanel from '$lib/components/packing/PackHistoryPanel.svelte';
@@ -39,6 +46,9 @@
     FIELD_LABEL,
     FIELD_LABEL_NARROW,
     FIELD_INPUT,
+    ICON_BUTTON,
+    SETTINGS_TITLE,
+    SETTINGS_GROUP_LABEL,
   } from '$lib/ui-classes';
   import type { PageData } from './$types';
 
@@ -46,7 +56,15 @@
 
   let activeAppTab = $state<'packing' | 'tandems' | 'logbook'>('packing');
   let packingSubTab = $state<'pack' | 'timer'>('pack');
-  let logbookSubTab = $state<'log' | 'settings'>('log');
+  let settingsOpen = $state(false);
+
+  // Switching tabs while Settings is open should leave it, same as
+  // tapping Back — otherwise picking a tab underneath a full-screen
+  // settings view would silently do nothing.
+  $effect(() => {
+    activeAppTab;
+    settingsOpen = false;
+  });
 
   const subTabClass =
     'flex-1 appearance-none border border-line bg-panel text-ink-soft font-sans font-bold text-sm p-2.5 rounded-[10px] cursor-pointer aria-selected:bg-ink aria-selected:border-ink aria-selected:text-canvas';
@@ -113,10 +131,126 @@
 >
   <PendingJumpsMenu pending={data.burblePending} />
 
-  <AppTabs bind:activeTab={activeAppTab} />
+  <div class="flex gap-2">
+    <div class="flex-1">
+      <AppTabs bind:activeTab={activeAppTab} />
+    </div>
+    <button
+      type="button"
+      class={ICON_BUTTON}
+      aria-label="Settings"
+      aria-pressed={settingsOpen}
+      onclick={() => (settingsOpen = !settingsOpen)}
+    >
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+        <path
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.431l-1.003.827c-.293.24-.438.613-.431.992a6.759 6.759 0 0 1 0 .255c-.007.378.138.75.43.99l1.005.828c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.431l1.004-.827c.292-.24.437-.613.43-.992a6.932 6.932 0 0 1 0-.255c.007-.378-.138-.75-.43-.99l-1.004-.828a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.28Z"
+        />
+        <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+      </svg>
+    </button>
+  </div>
+
+  <!-- Settings — reached from any tab via the cog button above -->
+  <div class="{APP_VIEW} settings-scope" hidden={!settingsOpen}>
+    <div class="flex items-center gap-3">
+      <button type="button" class={ICON_BUTTON} aria-label="Back" onclick={() => (settingsOpen = false)}>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
+        </svg>
+      </button>
+      <h1 class={SETTINGS_TITLE}>Settings</h1>
+    </div>
+
+    <h2 class={SETTINGS_GROUP_LABEL}>Logbook options</h2>
+    <SettingsPanel baseJumps={data.logbookSettings.baseJumps} />
+
+    <ReferenceListPanel
+      label="Dropzones"
+      hint="The starred one is pre-selected whenever you start a new jump."
+      items={places}
+      emptyText="No dropzones saved yet."
+      category="place"
+      categoryLabel="dropzone"
+      defaultId={data.logbookSettings.defaultPlaceId}
+      addAction="?/addPlace"
+      removeAction="?/removePlace"
+      submitLabel="Save dropzone"
+    >
+      {#snippet fields()}
+        <label class="{FIELD_LABEL} mt-2.5 mb-0">
+          <span>Name</span>
+          <input type="text" name="name" class={FIELD_INPUT} placeholder="e.g. Langar" autocomplete="off" maxlength="80" required />
+        </label>
+      {/snippet}
+    </ReferenceListPanel>
+
+    <RigBuilderPanel
+      {canopies}
+      {linesets}
+      {pilotChutes}
+      {containers}
+      {rigs}
+      defaultRigId={data.logbookSettings.defaultRigId}
+    />
+
+    <ReferenceListPanel
+      label="Aircraft"
+      hint="The starred one is pre-selected whenever you start a new jump."
+      items={aircraft}
+      emptyText="No aircraft saved yet."
+      category="aircraft"
+      categoryLabel="aircraft"
+      defaultId={data.logbookSettings.defaultAircraftId}
+      addAction="?/addAircraft"
+      removeAction="?/removeAircraft"
+      submitLabel="Save aircraft"
+    >
+      {#snippet fields()}
+        <label class="{FIELD_LABEL_NARROW} mt-2.5 mb-0">
+          <span>Registration</span>
+          <input type="text" name="plate" class={FIELD_INPUT} placeholder="e.g. G-SDSK" autocomplete="off" maxlength="20" required />
+        </label>
+      {/snippet}
+    </ReferenceListPanel>
+
+    <ReferenceListPanel
+      label="Jump types"
+      hint={`The starred one is pre-selected whenever you start a new jump. "Tandem Instructor" and "Tandem Camera" are added here automatically the first time you log one from the Tandems tab.`}
+      items={jumpTypes}
+      emptyText="No jump types saved yet."
+      category="jumpType"
+      categoryLabel="jump type"
+      defaultId={data.logbookSettings.defaultJumpTypeId}
+      addAction="?/addJumpType"
+      removeAction="?/removeJumpType"
+      submitLabel="Save jump type"
+    >
+      {#snippet fields()}
+        <label class="{FIELD_LABEL} mt-2.5 mb-0">
+          <span>Name</span>
+          <input type="text" name="name" class={FIELD_INPUT} placeholder="e.g. Sport" autocomplete="off" maxlength="40" required />
+        </label>
+      {/snippet}
+    </ReferenceListPanel>
+
+    <BurbleSettingsPanel
+      enabled={data.logbookSettings.burble.enabled}
+      dzId={data.logbookSettings.burble.dzId}
+      myNames={data.logbookSettings.burble.myNames}
+      pollSeconds={data.logbookSettings.burble.pollSeconds}
+      codeMap={data.logbookSettings.burble.codeMap}
+      unmappedCodes={data.burbleUnmappedCodes}
+    />
+
+    <h2 class={SETTINGS_GROUP_LABEL}>Invoice details</h2>
+    <InvoiceSettingsPanel invoiceSettings={data.invoiceSettings} />
+  </div>
 
   <!-- Packing -->
-  <div class={APP_VIEW} hidden={activeAppTab !== 'packing'}>
+  <div class={APP_VIEW} hidden={activeAppTab !== 'packing' || settingsOpen}>
     <div class="flex gap-2 mb-0.5" role="tablist" aria-label="Packing view">
       <button
         type="button"
@@ -172,7 +306,7 @@
   </div>
 
   <!-- Tandems -->
-  <div class={APP_VIEW} hidden={activeAppTab !== 'tandems'}>
+  <div class={APP_VIEW} hidden={activeAppTab !== 'tandems' || settingsOpen}>
     <header class={MASTHEAD}>
       <div class={STAMP} aria-hidden="false">
         <span class={STAMP_LABEL}>Tandem Log</span>
@@ -195,140 +329,33 @@
 
     <TandemHistoryPanel dayRows={data.tandemDayRows} weekRows={data.tandemWeekRows} monthRows={data.tandemMonthRows} />
 
-    <InvoiceSettingsPanel invoiceSettings={data.invoiceSettings} />
-
     <footer class={FOOT}>
       <DownloadButton href="/api/tandem-export.csv" filename="tandem-log.csv" label="Download full tandem log (.csv)" />
     </footer>
   </div>
 
   <!-- Logbook -->
-  <div class={APP_VIEW} hidden={activeAppTab !== 'logbook'}>
-    <div class="flex gap-2 mb-0.5" role="tablist" aria-label="Logbook view">
-      <button
-        type="button"
-        class={subTabClass}
-        role="tab"
-        aria-selected={logbookSubTab === 'log'}
-        onclick={() => (logbookSubTab = 'log')}
-      >
-        Log
-      </button>
-      <button
-        type="button"
-        class={subTabClass}
-        role="tab"
-        aria-selected={logbookSubTab === 'settings'}
-        onclick={() => (logbookSubTab = 'settings')}
-      >
-        Settings
-      </button>
-    </div>
+  <div class={APP_VIEW} hidden={activeAppTab !== 'logbook' || settingsOpen}>
+    <BurbleSyncPanel
+      enabled={data.logbookSettings.burble.enabled}
+      autoPoll={data.logbookSettings.burble.autoPoll}
+      pollSeconds={data.logbookSettings.burble.pollSeconds}
+      pendingCount={data.burblePending.length}
+      unmappedCodes={data.burbleUnmappedCodes}
+      lastSyncAt={data.burbleLastSyncAt}
+    />
 
-    <div class={APP_VIEW} hidden={logbookSubTab !== 'log'}>
-      <BurbleSyncPanel
-        enabled={data.logbookSettings.burble.enabled}
-        autoPoll={data.logbookSettings.burble.autoPoll}
-        pollSeconds={data.logbookSettings.burble.pollSeconds}
-        pendingCount={data.burblePending.length}
-        unmappedCodes={data.burbleUnmappedCodes}
-        lastSyncAt={data.burbleLastSyncAt}
-      />
+    <LogForm
+      entries={data.logbookEntries}
+      nextNumber={data.nextLogbookNumber}
+      settings={data.logbookSettings}
+      today={data.today}
+      dateDisplay={data.dateDisplay}
+    />
 
-      <LogForm
-        entries={data.logbookEntries}
-        nextNumber={data.nextLogbookNumber}
-        settings={data.logbookSettings}
-        today={data.today}
-        dateDisplay={data.dateDisplay}
-      />
-
-      <footer class={FOOT}>
-        <DownloadButton href="/api/logbook-export.csv" filename="logbook.csv" label="Download full logbook (.csv)" />
-      </footer>
-    </div>
-
-    <div class={APP_VIEW} hidden={logbookSubTab !== 'settings'}>
-      <ReferenceListPanel
-        label="Places"
-        hint="The starred one is pre-selected whenever you start a new jump."
-        items={places}
-        emptyText="No places saved yet."
-        category="place"
-        categoryLabel="place"
-        defaultId={data.logbookSettings.defaultPlaceId}
-        addAction="?/addPlace"
-        removeAction="?/removePlace"
-        submitLabel="Save place"
-      >
-        {#snippet fields()}
-          <label class="{FIELD_LABEL} mt-2.5 mb-0">
-            <span>Name</span>
-            <input type="text" name="name" class={FIELD_INPUT} placeholder="e.g. Langar" autocomplete="off" maxlength="80" required />
-          </label>
-        {/snippet}
-      </ReferenceListPanel>
-
-      <RigBuilderPanel
-        {canopies}
-        {linesets}
-        {pilotChutes}
-        {containers}
-        {rigs}
-        defaultRigId={data.logbookSettings.defaultRigId}
-      />
-
-      <ReferenceListPanel
-        label="Aircraft"
-        hint="The starred one is pre-selected whenever you start a new jump."
-        items={aircraft}
-        emptyText="No aircraft saved yet."
-        category="aircraft"
-        categoryLabel="aircraft"
-        defaultId={data.logbookSettings.defaultAircraftId}
-        addAction="?/addAircraft"
-        removeAction="?/removeAircraft"
-        submitLabel="Save aircraft"
-      >
-        {#snippet fields()}
-          <label class="{FIELD_LABEL_NARROW} mt-2.5 mb-0">
-            <span>Registration</span>
-            <input type="text" name="plate" class={FIELD_INPUT} placeholder="e.g. G-SDSK" autocomplete="off" maxlength="20" required />
-          </label>
-        {/snippet}
-      </ReferenceListPanel>
-
-      <ReferenceListPanel
-        label="Jump types"
-        hint={`The starred one is pre-selected whenever you start a new jump. "Tandem Instructor" and "Tandem Camera" are added here automatically the first time you log one from the Tandems tab.`}
-        items={jumpTypes}
-        emptyText="No jump types saved yet."
-        category="jumpType"
-        categoryLabel="jump type"
-        defaultId={data.logbookSettings.defaultJumpTypeId}
-        addAction="?/addJumpType"
-        removeAction="?/removeJumpType"
-        submitLabel="Save jump type"
-      >
-        {#snippet fields()}
-          <label class="{FIELD_LABEL} mt-2.5 mb-0">
-            <span>Name</span>
-            <input type="text" name="name" class={FIELD_INPUT} placeholder="e.g. Sport" autocomplete="off" maxlength="40" required />
-          </label>
-        {/snippet}
-      </ReferenceListPanel>
-
-      <BurbleSettingsPanel
-        enabled={data.logbookSettings.burble.enabled}
-        dzId={data.logbookSettings.burble.dzId}
-        myNames={data.logbookSettings.burble.myNames}
-        pollSeconds={data.logbookSettings.burble.pollSeconds}
-        codeMap={data.logbookSettings.burble.codeMap}
-        unmappedCodes={data.burbleUnmappedCodes}
-      />
-
-      <SettingsPanel baseJumps={data.logbookSettings.baseJumps} />
-    </div>
+    <footer class={FOOT}>
+      <DownloadButton href="/api/logbook-export.csv" filename="logbook.csv" label="Download full logbook (.csv)" />
+    </footer>
   </div>
 
   {#if data.showLogout}
