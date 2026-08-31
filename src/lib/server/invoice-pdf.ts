@@ -151,12 +151,27 @@ export async function buildTandemInvoicePdf(opts: InvoicePdfOptions): Promise<Bu
     doc.font('Body').fontSize(9.5);
 
     if (category === 'videographer') {
-      // Billed as a gross video & photos package with a flight-ticket
-      // deduction beneath it, rather than one line per jump — a
-      // dropzone paperwork convention, not a different rate: the two
-      // amounts below always net to RATES.videographer per jump (see
-      // VIDEOGRAPHER_PACKAGE_RATE's own comment), so `total` further
-      // down doesn't need to know any of this happened.
+      // Who the jumps were for is still worth keeping on the invoice for
+      // reference, even though the price itself is billed as a gross
+      // package with a flight-ticket deduction beneath it, rather than
+      // one line per jump — a dropzone paperwork convention, not a
+      // different rate: the two amounts further down always net to
+      // RATES.videographer per jump (see VIDEOGRAPHER_PACKAGE_RATE's own
+      // comment), so `total` at the bottom doesn't need to know any of
+      // this happened. No per-row amount here — showing £42 next to each
+      // name and then £92/£50 below would read as three separate charges
+      // per jump instead of one.
+      for (const jump of jumps) {
+        if (y > doc.page.height - MARGIN - 60) {
+          doc.addPage();
+          y = MARGIN;
+        }
+        doc.text(formatJumpDate(jump.date), MARGIN, y, { width: dateColW, lineBreak: false });
+        doc.text(jump.name, MARGIN + dateColW, y, { width: nameColW + amountColW - 8, lineBreak: false });
+        y += 14;
+      }
+      y += 2;
+
       const qtyColW = 50;
       const labelW = pageWidth - amountColW - qtyColW;
       const flightDeduction = VIDEOGRAPHER_PACKAGE_RATE - RATES.videographer;
