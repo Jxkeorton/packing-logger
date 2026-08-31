@@ -18,6 +18,7 @@ import { groupByInvoiceMonth as groupTandemByInvoiceMonth, groupByWeek as groupT
 import { readInvoiceSettings } from '$lib/server/invoice-settings';
 import { readTandemVisibility } from '$lib/server/tandem-visibility';
 import { readTabVisibility } from '$lib/server/tab-visibility';
+import { readRateSettings } from '$lib/server/rate-settings';
 import { readLogbook, nextJumpNumber } from '$lib/server/logbook';
 import { readLogbookSettings } from '$lib/server/logbook-settings';
 import { flightHint, pendingJumps, readSyncState } from '$lib/server/burble/sync';
@@ -27,10 +28,12 @@ import { packingActions } from '$lib/server/actions/packing';
 import { tandemActions } from '$lib/server/actions/tandem';
 import { logbookActions } from '$lib/server/actions/logbook';
 import { configActions } from '$lib/server/actions/config';
+import { ratesActions } from '$lib/server/actions/rates';
 
 export const load: PageServerLoad = async () => {
   const state = await loadTodayState();
   const topTimes = await readFastestFive();
+  const rateSettings = await readRateSettings();
 
   // A wider window of history feeds the week/month rollups; the
   // day-by-day table only shows the most recent slice of it.
@@ -39,17 +42,17 @@ export const load: PageServerLoad = async () => {
 
   // Today isn't in the CSV-backed history yet (it's still being logged),
   // but it belongs in this week's and this invoice month's running totals.
-  const combined = [...fullHistory, toHistoryRow(state)];
-  const weekRows = groupByWeek(combined).slice(0, 12);
-  const monthRows = groupByInvoiceMonth(combined).slice(0, 12);
+  const combined = [...fullHistory, toHistoryRow(state, rateSettings.packing)];
+  const weekRows = groupByWeek(combined, rateSettings.packing).slice(0, 12);
+  const monthRows = groupByInvoiceMonth(combined, rateSettings.packing).slice(0, 12);
 
   // Same shape again, for the separate tandem-jump log.
   const tandemState = await loadTodayTandemState();
   const tandemFullHistory = await readTandemHistory(400);
   const tandemDayRows = tandemFullHistory.slice(0, 14);
-  const tandemCombined = [...tandemFullHistory, toTandemHistoryRow(tandemState)];
-  const tandemWeekRows = groupTandemByWeek(tandemCombined).slice(0, 12);
-  const tandemMonthRows = groupTandemByInvoiceMonth(tandemCombined).slice(0, 12);
+  const tandemCombined = [...tandemFullHistory, toTandemHistoryRow(tandemState, rateSettings.tandem)];
+  const tandemWeekRows = groupTandemByWeek(tandemCombined, rateSettings.tandem).slice(0, 12);
+  const tandemMonthRows = groupTandemByInvoiceMonth(tandemCombined, rateSettings.tandem).slice(0, 12);
 
   const invoiceSettings = await readInvoiceSettings();
   const tandemVisibility = await readTandemVisibility();
@@ -90,6 +93,7 @@ export const load: PageServerLoad = async () => {
     invoiceSettings,
     tandemVisibility,
     tabVisibility,
+    rateSettings,
     logbookEntries,
     nextLogbookNumber,
     logbookSettings,
@@ -105,4 +109,5 @@ export const actions: Actions = {
   ...tandemActions,
   ...logbookActions,
   ...configActions,
+  ...ratesActions,
 };

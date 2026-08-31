@@ -26,6 +26,7 @@
   import TandemHistoryPanel from '$lib/components/tandems/TandemHistoryPanel.svelte';
   import InvoiceSettingsPanel from '$lib/components/tandems/InvoiceSettingsPanel.svelte';
   import WorkJumpsSettingsPanel from '$lib/components/tandems/WorkJumpsSettingsPanel.svelte';
+  import RatesSettingsPanel from '$lib/components/tandems/RatesSettingsPanel.svelte';
   import LogForm from '$lib/components/LogForm.svelte';
   import ReferenceListBody from '$lib/components/ReferenceListBody.svelte';
   import RigBuilderPanel from '$lib/components/RigBuilderPanel.svelte';
@@ -367,6 +368,19 @@
         {/snippet}
       </SettingsRow>
 
+      <SettingsRow label="Rates" iconColor="var(--camera)">
+        {#snippet icon()}
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+            <ellipse cx="12" cy="6" rx="7" ry="3" />
+            <path stroke-linecap="round" d="M5 6v6c0 1.7 3.1 3 7 3s7-1.3 7-3V6" />
+            <path stroke-linecap="round" d="M5 12v6c0 1.7 3.1 3 7 3s7-1.3 7-3v-6" />
+          </svg>
+        {/snippet}
+        {#snippet children()}
+          <RatesSettingsPanel rates={data.rateSettings} />
+        {/snippet}
+      </SettingsRow>
+
       <SettingsRow label="Invoice details" iconColor="var(--student)">
         {#snippet icon()}
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
@@ -415,7 +429,7 @@
         </div>
         <div class={TOTALS}>
           <div class={TOTALS_BLOCK}>
-            <span class={TOTALS_VALUE_GOLD}>{money(packingTotalEarnings(data.state.counts))}</span>
+            <span class={TOTALS_VALUE_GOLD}>{money(packingTotalEarnings(data.state.counts, data.rateSettings.packing))}</span>
             <span class={TOTALS_LABEL}>earned today</span>
           </div>
           <div class={TOTALS_DIVIDER} aria-hidden="true"></div>
@@ -426,7 +440,7 @@
         </div>
       </header>
 
-      <PackCategoryCards counts={data.state.counts} />
+      <PackCategoryCards counts={data.state.counts} rates={data.rateSettings.packing} />
 
       <PackHistoryPanel dayRows={data.dayRows} weekRows={data.weekRows} monthRows={data.monthRows} />
 
@@ -449,7 +463,7 @@
       </div>
       <div class={TOTALS}>
         <div class={TOTALS_BLOCK}>
-          <span class={TOTALS_VALUE_GOLD}>{money(tandemTotalEarnings(data.tandemState.counts))}</span>
+          <span class={TOTALS_VALUE_GOLD}>{money(tandemTotalEarnings(data.tandemState.counts, data.rateSettings.tandem))}</span>
           <span class={TOTALS_LABEL}>earned today</span>
         </div>
         <div class={TOTALS_DIVIDER} aria-hidden="true"></div>
@@ -460,7 +474,7 @@
       </div>
     </header>
 
-    <TandemCategoryCards tandemState={data.tandemState} visibility={data.tandemVisibility} />
+    <TandemCategoryCards tandemState={data.tandemState} visibility={data.tandemVisibility} rates={data.rateSettings.tandem} />
 
     <TandemHistoryPanel dayRows={data.tandemDayRows} weekRows={data.tandemWeekRows} monthRows={data.tandemMonthRows} />
 

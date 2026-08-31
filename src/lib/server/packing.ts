@@ -2,6 +2,7 @@
 // $lib/packing.ts for the categories/rates/pure-total half this imports.
 import { readText, writeText } from './storage';
 import { CATEGORIES, todayKey, totalEarnings, totalPacks, zeroCounts, type Category, type Counts, type DayState, type HistoryRow } from '../packing';
+import { readRateSettings } from './rate-settings';
 
 export type { Category, Counts, DayState, HistoryRow };
 
@@ -60,8 +61,9 @@ async function readCsvRows(): Promise<Map<string, string>> {
 /** Insert or update the CSV row for a given day's totals, keeping dates in order. */
 async function upsertCsvRow(state: DayState): Promise<void> {
   const rows = await readCsvRows();
+  const rates = await readRateSettings();
   const packs = totalPacks(state.counts);
-  const earnings = totalEarnings(state.counts);
+  const earnings = totalEarnings(state.counts, rates.packing);
   const line = [
     csvEscapeDate(state.date),
     state.counts.tandem,
@@ -139,6 +141,7 @@ export async function readCsvFile(): Promise<string> {
 /** Most recent history rows (excluding today), newest first. */
 export async function readHistory(limit = 14): Promise<HistoryRow[]> {
   const rows = await readCsvRows();
+  const rates = await readRateSettings();
   const today = todayKey();
   const dates = [...rows.keys()]
     .filter((d) => d !== today)
@@ -159,7 +162,7 @@ export async function readHistory(limit = 14): Promise<HistoryRow[]> {
       date,
       counts,
       totalPacks: totalPacks(counts),
-      totalEarnings: totalEarnings(counts),
+      totalEarnings: totalEarnings(counts, rates.packing),
     };
   });
 }

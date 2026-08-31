@@ -25,7 +25,7 @@
 // time — no filesystem access, no adapter-specific config, works
 // identically wherever the function actually runs.
 import PDFDocument from 'pdfkit';
-import { CATEGORIES, CATEGORY_LABELS, RATES, VIDEOGRAPHER_PACKAGE_RATE, type Category, type Jump } from '../tandem';
+import { CATEGORIES, CATEGORY_LABELS, type Category, type Jump } from '../tandem';
 import type { InvoiceSettings } from './invoice-settings';
 import robotoRegularBase64 from './fonts/roboto-regular.base64.txt?raw';
 import robotoMediumBase64 from './fonts/roboto-medium.base64.txt?raw';
@@ -36,6 +36,9 @@ export interface InvoicePdfOptions {
   periodLabel: string;
   settings: InvoiceSettings;
   jumpsByCategory: Record<Category, Jump[]>;
+  /** Per-jump pay rate, and the gross package rate videographer jumps are billed at — see rate-settings.ts. Passed in rather than imported so the PDF always reflects whatever's actually saved, not the hardcoded defaults. */
+  rates: Record<Category, number>;
+  videographerPackageRate: number;
 }
 
 const MARGIN = 50;
@@ -156,11 +159,11 @@ export async function buildTandemInvoicePdf(opts: InvoicePdfOptions): Promise<Bu
       // package with a flight-ticket deduction beneath it, rather than
       // one line per jump — a dropzone paperwork convention, not a
       // different rate: the two amounts further down always net to
-      // RATES.videographer per jump (see VIDEOGRAPHER_PACKAGE_RATE's own
-      // comment), so `total` at the bottom doesn't need to know any of
-      // this happened. No per-row amount here — showing £42 next to each
-      // name and then £92/£50 below would read as three separate charges
-      // per jump instead of one.
+      // opts.rates.videographer per jump (see InvoicePdfOptions'
+      // videographerPackageRate field), so `total` at the bottom doesn't
+      // need to know any of this happened. No per-row amount here —
+      // showing £42 next to each name and then £92/£50 below would read
+      // as three separate charges per jump instead of one.
       for (const jump of jumps) {
         if (y > doc.page.height - MARGIN - 60) {
           doc.addPage();
@@ -174,11 +177,11 @@ export async function buildTandemInvoicePdf(opts: InvoicePdfOptions): Promise<Bu
 
       const qtyColW = 50;
       const labelW = pageWidth - amountColW - qtyColW;
-      const flightDeduction = VIDEOGRAPHER_PACKAGE_RATE - RATES.videographer;
+      const flightDeduction = opts.videographerPackageRate - opts.rates.videographer;
 
       doc.text('CASH CALL - Video & photos package', MARGIN, y, { width: labelW, lineBreak: false });
       doc.text(`${jumps.length} @`, MARGIN + labelW, y, { width: qtyColW, align: 'right', lineBreak: false });
-      doc.text(money(VIDEOGRAPHER_PACKAGE_RATE), MARGIN + pageWidth - amountColW, y, {
+      doc.text(money(opts.videographerPackageRate), MARGIN + pageWidth - amountColW, y, {
         width: amountColW,
         align: 'right',
         lineBreak: false,
@@ -201,14 +204,14 @@ export async function buildTandemInvoicePdf(opts: InvoicePdfOptions): Promise<Bu
         }
         doc.text(formatJumpDate(jump.date), MARGIN, y, { width: dateColW, lineBreak: false });
         doc.text(jump.name, MARGIN + dateColW, y, { width: nameColW - 8, lineBreak: false });
-        doc.text(money(RATES[category]), MARGIN + dateColW + nameColW, y, { width: amountColW, align: 'right', lineBreak: false });
+        doc.text(money(opts.rates[category]), MARGIN + dateColW + nameColW, y, { width: amountColW, align: 'right', lineBreak: false });
         y += 14;
       }
 
-      const subtotal = jumps.length * RATES[category];
+      const subtotal = jumps.length * opts.rates[category];
       y += 2;
       doc.font('Body-Bold');
-      doc.text(`${jumps.length} @ ${money(RATES[category])}`, MARGIN, y, {
+      doc.text(`${jumps.length} @ ${money(opts.rates[category])}`, MARGIN, y, {
         width: pageWidth - amountColW,
         align: 'right',
         lineBreak: false,
@@ -218,7 +221,7 @@ export async function buildTandemInvoicePdf(opts: InvoicePdfOptions): Promise<Bu
       y += 24;
     }
 
-    total += jumps.length * RATES[category];
+    total += jumps.length * opts.rates[category];
   }
 
   if (!anyJumps) {

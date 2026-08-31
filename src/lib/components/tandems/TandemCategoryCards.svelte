@@ -1,11 +1,18 @@
 <script lang="ts">
   import { invalidateAll } from '$app/navigation';
-  import { CATEGORIES, CATEGORY_LABELS, OTHER_STAFF_LABELS, RATES, type Category, type DayState } from '$lib/tandem';
+  import { CATEGORIES, CATEGORY_LABELS, OTHER_STAFF_LABELS, type Category, type DayState } from '$lib/tandem';
   import { CARD, CARD_TOP, CARD_LABEL, CARD_RATE, CARD_SUBTOTAL, CATEGORIES_LIST } from '$lib/ui-classes';
   import TandemNameModal from './TandemNameModal.svelte';
   import Spinner from '../Spinner.svelte';
 
-  let { tandemState, visibility }: { tandemState: DayState; visibility: Record<Category, boolean> } = $props();
+  // `rates` comes from data.rateSettings.tandem (Settings > Work jumps >
+  // Rates) rather than the RATES this module used to import directly —
+  // see rate-settings.ts for why display now always needs the live value.
+  let {
+    tandemState,
+    visibility,
+    rates,
+  }: { tandemState: DayState; visibility: Record<Category, boolean>; rates: Record<Category, number> } = $props();
 
   // Hiding a category is a display preference only (Settings > Work
   // jumps) — it never touches tandemState itself, so a jump logged
@@ -18,7 +25,7 @@
   let addingJump = $state(false);
 
   const modalSubtitle = $derived(
-    pendingCategory ? `${CATEGORY_LABELS[pendingCategory]} jump — £${RATES[pendingCategory].toFixed(2)}` : '',
+    pendingCategory ? `${CATEGORY_LABELS[pendingCategory]} jump — £${rates[pendingCategory].toFixed(2)}` : '',
   );
 
   async function addJump(name: string, staff: string) {
@@ -58,7 +65,7 @@
     <section class={CARD} data-tandem-category={category} style={`--accent: var(--${category})`}>
       <div class={CARD_TOP}>
         <h2 class={CARD_LABEL}>{CATEGORY_LABELS[category]}</h2>
-        <span class={CARD_RATE}>£{RATES[category].toFixed(2)} / jump</span>
+        <span class={CARD_RATE}>£{rates[category].toFixed(2)} / jump</span>
       </div>
       <button type="button" class="add-jump-btn" style={`--accent: var(--${category})`} onclick={() => (pendingCategory = category)}>
         &plus; Add {CATEGORY_LABELS[category].toLowerCase()} jump
@@ -83,7 +90,7 @@
           {/each}
         {/if}
       </ul>
-      <div class={CARD_SUBTOTAL}>£{(tandemState.counts[category] * RATES[category]).toFixed(2)}</div>
+      <div class={CARD_SUBTOTAL}>£{(tandemState.counts[category] * rates[category]).toFixed(2)}</div>
     </section>
   {/each}
 </section>

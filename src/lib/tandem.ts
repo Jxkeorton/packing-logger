@@ -80,15 +80,20 @@ export function totalJumps(counts: Counts): number {
   return CATEGORIES.reduce((sum, c) => sum + counts[c], 0);
 }
 
-export function totalEarnings(counts: Counts): number {
-  return CATEGORIES.reduce((sum, c) => sum + counts[c] * RATES[c], 0);
+// `rates` defaults to the hardcoded RATES above — see $lib/packing.ts's
+// identical totalEarnings for why: real callers always pass the actual
+// settings-backed rates explicitly (rate-settings.ts), this default is
+// for callers deliberately exercising the hardcoded values (this file's
+// own tests, tandem-invoice.test.ts).
+export function totalEarnings(counts: Counts, rates: Record<Category, number> = RATES): number {
+  return CATEGORIES.reduce((sum, c) => sum + counts[c] * rates[c], 0);
 }
 
-export function toHistoryRow(state: DayState): HistoryRow {
+export function toHistoryRow(state: DayState, rates: Record<Category, number> = RATES): HistoryRow {
   return {
     date: state.date,
     counts: state.counts,
     totalJumps: totalJumps(state.counts),
-    totalEarnings: totalEarnings(state.counts),
+    totalEarnings: totalEarnings(state.counts, rates),
   };
 }

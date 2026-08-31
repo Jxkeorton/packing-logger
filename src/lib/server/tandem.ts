@@ -6,9 +6,9 @@
 import { readText, writeText } from './storage';
 import { todayKey } from '../packing';
 import { csvEscape, parseCsvRows } from './csv';
+import { readRateSettings } from './rate-settings';
 import {
   CATEGORIES,
-  RATES,
   totalEarnings,
   totalJumps,
   zeroCounts,
@@ -124,13 +124,20 @@ export async function setDayEntries(date: string, names: Record<Category, string
   return stateFor(remaining, date);
 }
 
-/** The raw jump ledger as a CSV, for download/export — this is the invoice source. */
+/**
+ * The raw jump ledger as a CSV, for download/export — this is the
+ * invoice source. `amount` is each jump's category rate as it stands
+ * right now, not whatever it was on the day the jump happened — the
+ * same "always current, no historical snapshot" rate model this app
+ * already used before rates were editable (see rate-settings.ts).
+ */
 export async function readCsvFile(): Promise<string> {
   const jumps = await readJumps();
+  const rates = await readRateSettings();
   const sorted = [...jumps].sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0));
   const header = 'date,category,name,amount,at';
   const body = sorted
-    .map((j) => [j.date, j.category, csvEscape(j.name), RATES[j.category].toFixed(2), j.at].join(','))
+    .map((j) => [j.date, j.category, csvEscape(j.name), rates.tandem[j.category].toFixed(2), j.at].join(','))
     .join('\n');
   return `${header}\n${body}\n`;
 }
@@ -138,6 +145,7 @@ export async function readCsvFile(): Promise<string> {
 /** Most recent history rows (excluding today), newest first, one per day. */
 export async function readHistory(limit = 14): Promise<HistoryRow[]> {
   const jumps = await readJumps();
+  const rates = await readRateSettings();
   const today = todayKey();
 
   const byDate = new Map<string, Counts>();
@@ -155,7 +163,7 @@ export async function readHistory(limit = 14): Promise<HistoryRow[]> {
       date,
       counts,
       totalJumps: totalJumps(counts),
-      totalEarnings: totalEarnings(counts),
+      totalEarnings: totalEarnings(counts, rates.tandem),
     };
   });
 }

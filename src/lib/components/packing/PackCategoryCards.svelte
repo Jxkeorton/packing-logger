@@ -8,10 +8,13 @@
   // panel's current week/month row) updates from the same `use:enhance`
   // round trip via the page's `load` re-running, not a bespoke patch.
   import { enhance } from '$app/forms';
-  import { CATEGORIES, CATEGORY_LABELS, RATES, type Category, type Counts } from '$lib/packing';
+  import { CATEGORIES, CATEGORY_LABELS, type Category, type Counts } from '$lib/packing';
   import { CARD, CARD_TOP, CARD_LABEL, CARD_RATE, CARD_SUBTOTAL, CATEGORIES_LIST } from '$lib/ui-classes';
 
-  let { counts }: { counts: Counts } = $props();
+  // `rates` comes from data.rateSettings.packing (Settings > Work jumps
+  // > Rates), not the RATES this module used to import directly — see
+  // rate-settings.ts for why display now always needs the live value.
+  let { counts, rates }: { counts: Counts; rates: Record<Category, number> } = $props();
 
   let pending = $state<Partial<Record<Category, boolean>>>({});
   let bumpVersion = $state<Record<Category, number>>(
@@ -35,7 +38,7 @@
     <section class={CARD} data-category={category} style={`--accent: var(--${category})`}>
       <div class={CARD_TOP}>
         <h2 class={CARD_LABEL}>{CATEGORY_LABELS[category]}</h2>
-        <span class={CARD_RATE}>£{RATES[category].toFixed(2)} / pack</span>
+        <span class={CARD_RATE}>£{rates[category].toFixed(2)} / pack</span>
       </div>
       <div class="grid grid-cols-[64px_1fr_64px] items-center gap-3 mt-2.5">
         <form method="POST" action="?/adjust" use:enhance={adjust(category)}>
@@ -77,7 +80,7 @@
         </form>
       </div>
       <div class={CARD_SUBTOTAL} data-subtotal={category}>
-        £{(counts[category] * RATES[category]).toFixed(2)}
+        £{(counts[category] * rates[category]).toFixed(2)}
       </div>
     </section>
   {/each}

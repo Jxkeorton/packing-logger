@@ -1,7 +1,15 @@
 // Groups daily tandem-jump history into weeks and invoice months — same
 // period math as the pack-job log (see ./periods), just bucketing tandem's
 // own counts/rates instead.
-import { CATEGORIES, totalEarnings, totalJumps, type Counts, type HistoryRow } from '../tandem';
+import {
+  CATEGORIES,
+  RATES as DEFAULT_RATES,
+  totalEarnings,
+  totalJumps,
+  type Category,
+  type Counts,
+  type HistoryRow,
+} from '../tandem';
 import {
   addDays,
   formatDateKey,
@@ -34,6 +42,7 @@ function addCounts(a: Counts, b: Counts): Counts {
 
 function toBuckets<K extends string>(
   rows: HistoryRow[],
+  rates: Record<Category, number>,
   keyOf: (d: Date) => K,
   rangeOf: (key: K) => { start: Date; end: Date },
 ): AggregateRow[] {
@@ -56,15 +65,22 @@ function toBuckets<K extends string>(
         rangeLabel: rangeLabel(start, end),
         counts,
         totalJumps: totalJumps(counts),
-        totalEarnings: totalEarnings(counts),
+        totalEarnings: totalEarnings(counts, rates),
       };
     });
 }
 
-/** Group daily rows into Monday–Sunday weeks, most recent first. */
-export function groupByWeek(rows: HistoryRow[]): AggregateRow[] {
+/**
+ * Group daily rows into Monday–Sunday weeks, most recent first. `rates`
+ * defaults to $lib/tandem.ts's hardcoded RATES — real callers pass the
+ * actual settings-backed rates (rate-settings.ts) explicitly; this
+ * default is for this file's own tests, which exercise the hardcoded
+ * values on purpose.
+ */
+export function groupByWeek(rows: HistoryRow[], rates?: Record<Category, number>): AggregateRow[] {
   return toBuckets(
     rows,
+    rates ?? DEFAULT_RATES,
     (d) => formatDateKey(mondayOf(d)) as `${string}`,
     (key) => {
       const start = parseDateKey(key);
@@ -84,10 +100,11 @@ export function invoiceMonthDateRange(key: string): { start: Date; end: Date } {
   return { start, end };
 }
 
-/** Group daily rows into invoice months (cutoff-to-cutoff), most recent first. */
-export function groupByInvoiceMonth(rows: HistoryRow[]): AggregateRow[] {
+/** Group daily rows into invoice months (cutoff-to-cutoff), most recent first. Same `rates` default as groupByWeek. */
+export function groupByInvoiceMonth(rows: HistoryRow[], rates?: Record<Category, number>): AggregateRow[] {
   return toBuckets(
     rows,
+    rates ?? DEFAULT_RATES,
     (d) => {
       const { year, month } = invoiceMonthOf(d);
       return `${year}-${String(month + 1).padStart(2, '0')}` as `${string}`;

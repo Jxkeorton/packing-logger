@@ -3,6 +3,7 @@ import { jumpsInRange } from '$lib/server/tandem';
 import { invoiceMonthDateRange } from '$lib/server/tandem-invoice';
 import { formatDateKey, rangeLabel } from '$lib/server/periods';
 import { claimInvoiceRef, readInvoiceSettings } from '$lib/server/invoice-settings';
+import { readRateSettings } from '$lib/server/rate-settings';
 import { buildTandemInvoicePdf } from '$lib/server/invoice-pdf';
 
 const MONTH_KEY_RE = /^\d{4}-\d{2}$/;
@@ -32,9 +33,10 @@ export const GET: RequestHandler = async ({ url }) => {
   const startKey = formatDateKey(start);
   const endKey = formatDateKey(end);
 
-  const [jumpsByCategory, settings, ref] = await Promise.all([
+  const [jumpsByCategory, settings, rateSettings, ref] = await Promise.all([
     jumpsInRange(startKey, endKey),
     readInvoiceSettings(),
+    readRateSettings(),
     claimInvoiceRef(),
   ]);
 
@@ -44,6 +46,8 @@ export const GET: RequestHandler = async ({ url }) => {
     periodLabel: `${rangeLabel(start, end)} (${monthLabel(month)})`,
     settings,
     jumpsByCategory,
+    rates: rateSettings.tandem,
+    videographerPackageRate: rateSettings.videographerPackageRate,
   });
 
   const filenameSafeName = settings.fromName.trim().replace(/\s+/g, '_') || 'Tandem';

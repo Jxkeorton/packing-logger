@@ -56,15 +56,21 @@ export function totalPacks(counts: Counts): number {
   return CATEGORIES.reduce((sum, c) => sum + counts[c], 0);
 }
 
-export function totalEarnings(counts: Counts): number {
-  return CATEGORIES.reduce((sum, c) => sum + counts[c] * RATES[c], 0);
+// `rates` defaults to the hardcoded RATES above rather than requiring
+// every caller to pass them — server code always passes the actual
+// settings-backed rates explicitly (see rate-settings.ts), so this
+// default only ever matters for a caller (chiefly this file's own
+// tests, and invoice.test.ts/tandem-invoice.test.ts's tandem
+// equivalent) that's deliberately exercising the hardcoded values.
+export function totalEarnings(counts: Counts, rates: Record<Category, number> = RATES): number {
+  return CATEGORIES.reduce((sum, c) => sum + counts[c] * rates[c], 0);
 }
 
-export function toHistoryRow(state: DayState): HistoryRow {
+export function toHistoryRow(state: DayState, rates: Record<Category, number> = RATES): HistoryRow {
   return {
     date: state.date,
     counts: state.counts,
     totalPacks: totalPacks(state.counts),
-    totalEarnings: totalEarnings(state.counts),
+    totalEarnings: totalEarnings(state.counts, rates),
   };
 }
