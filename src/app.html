@@ -14,6 +14,14 @@
 		<link rel="apple-touch-icon" href="/apple-touch-icon.png" />
 		<!-- Short label shown under the icon on the home screen. -->
 		<meta name="apple-mobile-web-app-title" content="Packing Log" />
+		<!--
+			Android's equivalent of the two tags above: Chrome's "Add to Home
+			screen" reads the icon and name from the manifest rather than a
+			link/meta pair. See static/manifest.webmanifest and
+			static/apple-touch-icon.svg (the shared master artwork for both
+			platforms' icons).
+		-->
+		<link rel="manifest" href="/manifest.webmanifest" />
 		<title>Packing Log</title>
 		<meta name="description" content="Daily pack job and tandem jump counter and earnings log for a skydive rigger." />
 		<link rel="preconnect" href="https://fonts.googleapis.com" />

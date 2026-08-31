@@ -1,0 +1,13 @@
+{
+  "name": "Packing Log",
+  "short_name": "Packing Log",
+  "description": "Daily pack job and tandem jump counter and earnings log for a skydive rigger.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#122c41",
+  "theme_color": "#122c41",
+  "icons": [
+    { "src": "/android-chrome-192x192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/android-chrome-512x512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

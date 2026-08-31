@@ -1,12 +1,23 @@
 <!--
-  Master artwork for static/apple-touch-icon.png — keep them in sync; the
-  PNG is what iOS actually uses (it does not accept SVG touch icons).
-  Regenerate with:
+  Master artwork for static/apple-touch-icon.png AND the two Android home
+  -screen sizes (static/android-chrome-{192x192,512x512}.png, referenced
+  from static/manifest.webmanifest) — keep all three PNGs in sync with
+  this file. Neither platform accepts an SVG icon directly. Regenerate:
     qlmanage -t -s 180 -o /tmp static/apple-touch-icon.svg
+    cp /tmp/apple-touch-icon.svg.png static/apple-touch-icon.png
+  Then upscale that PNG for Android rather than re-running qlmanage at
+  192/512 — past 180px its SVG thumbnailer stops filling the frame and
+  pads the canvas with white instead (a quirk of qlmanage, not of this
+  artwork):
+    sips -z 192 192 static/apple-touch-icon.png --out static/android-chrome-192x192.png
+    sips -z 512 512 static/apple-touch-icon.png --out static/android-chrome-512x512.png
 
-  Same parachute as favicon.svg, adapted for an iOS home-screen tile:
-   - Opaque background. iOS composites transparency onto black, so a
-     transparent icon would render as a black square.
+  Same parachute as favicon.svg, adapted for a home-screen tile:
+   - Opaque background. iOS composites transparency onto black (a
+     transparent icon would render as a black square), and this shape
+     was never redrawn as a maskable icon for Android's adaptive-icon
+     safe zone, so it stays opaque and un-masked there too — Chrome
+     falls back to showing it as a plain square/rounded-square tile.
    - Square corners, drawn full-bleed. iOS applies its own squircle mask;
      pre-rounding the corners would double up and look wrong.
    - Artwork inset to the middle ~68%, so that mask never clips it.
