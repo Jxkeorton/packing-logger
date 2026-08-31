@@ -116,6 +116,8 @@ async function addUser(username) {
 
   await writeUsers([...users, record]);
   console.log(`Added ${username} to ${bucket}. They can sign in now.`);
+  console.log(`id: ${record.id}`);
+  console.log(`(their ledgers will live at packing-logger/users/${record.id}/... in this bucket)`);
 }
 
 async function listUsers() {
@@ -126,7 +128,11 @@ async function listUsers() {
     return;
   }
   for (const u of users) {
-    console.log(`  ${(u.username ?? '?').padEnd(20)} ${u.createdAt ?? ''}`);
+    // The id is what actually matters here: it's the storage.ts key
+    // segment (users/<id>/logbook.csv, ...), so it's what you copy data
+    // into and what a support question about "whose bucket folder is
+    // this" gets answered with — not the username, which is just display.
+    console.log(`  ${(u.username ?? '?').padEnd(20)} ${(u.id ?? '?').padEnd(38)} ${u.createdAt ?? ''}`);
   }
 }
 

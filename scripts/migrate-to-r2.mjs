@@ -2,6 +2,7 @@
 //
 //   node --env-file=.env.migrate scripts/migrate-to-r2.mjs --list
 //   node --env-file=.env.migrate scripts/migrate-to-r2.mjs --cat=logbook.csv
+//   node --env-file=.env.migrate scripts/migrate-to-r2.mjs --user=<id>
 //   node --env-file=.env.migrate scripts/migrate-to-r2.mjs
 //   node --env-file=.env.migrate scripts/migrate-to-r2.mjs --force
 //
@@ -14,7 +15,9 @@
 // Without --list it copies ./data/*.{csv,json} into the bucket. That was
 // the Vercel Blob migration route (download from the Blob dashboard into
 // data/, copy up) and is now the way to restore a backup into a fresh
-// bucket. The direct Blob reader was dropped with the @vercel/blob
+// bucket, or to seed a friend's folder on a shared multi-user deployment
+// — add --user=<id> and every key lands under users/<id>/ instead of the
+// bucket root. The direct Blob reader was dropped with the @vercel/blob
 // dependency once the migration was done — `git log -- scripts/` has it
 // if it's ever needed again.
 //
@@ -30,12 +33,20 @@ import path from 'node:path';
 import { AwsClient } from 'aws4fetch';
 
 const PREFIX = 'packing-logger';
+
+function key(name) {
+  return userId ? `${PREFIX}/users/${userId}/${name}` : `${PREFIX}/${name}`;
+}
 const DATA_DIR = path.join(process.cwd(), 'data');
 
 const args = process.argv.slice(2);
 const force = args.includes('--force');
 const listOnly = args.includes('--list');
 const catKey = (args.find((a) => a.startsWith('--cat=')) ?? '').slice('--cat='.length);
+// Nests every key under users/<id>/ instead of the bucket root — the same
+// shape src/lib/server/storage.ts uses for a signed-in user on a shared,
+// multi-user deployment. Get the id from add-user.mjs's --add or --list.
+const userId = (args.find((a) => a.startsWith('--user=')) ?? '').slice('--user='.length);
 
 function required(name) {
   const value = process.env[name];
@@ -89,7 +100,7 @@ async function readFromData() {
 }
 
 async function r2Get(name) {
-  const response = await r2.fetch(`${baseUrl}/${PREFIX}/${name}`, { method: 'GET' });
+  const response = await r2.fetch(`${baseUrl}/${key(name)}`, { method: 'GET' });
   if (response.status === 404) return null;
   if (!response.ok) throw new Error(`R2 GET ${name}: ${response.status} ${response.statusText}`);
   return response.text();
@@ -97,20 +108,21 @@ async function r2Get(name) {
 
 /** One page of the bucket's contents is plenty: this app stores eight files. */
 async function r2List() {
-  const url = `${baseUrl}?list-type=2&prefix=${encodeURIComponent(`${PREFIX}/`)}`;
+  const prefix = userId ? `${PREFIX}/users/${userId}/` : `${PREFIX}/`;
+  const url = `${baseUrl}?list-type=2&prefix=${encodeURIComponent(prefix)}`;
   const response = await r2.fetch(url, { method: 'GET' });
   if (!response.ok) throw new Error(`R2 LIST: ${response.status} ${response.statusText}`);
   const xml = await response.text();
   // Parsing S3's XML with a regex is fine for a listing of eight keys and
   // avoids an XML dependency for one call.
   return [...xml.matchAll(/<Contents>[\s\S]*?<\/Contents>/g)].map((match) => ({
-    key: (match[0].match(/<Key>([^<]*)<\/Key>/) ?? [, ''])[1].slice(`${PREFIX}/`.length),
+    key: (match[0].match(/<Key>([^<]*)<\/Key>/) ?? [, ''])[1].slice(prefix.length),
     size: Number((match[0].match(/<Size>(\d+)<\/Size>/) ?? [, '0'])[1]),
   }));
 }
 
 async function r2Put(name, body) {
-  const response = await r2.fetch(`${baseUrl}/${PREFIX}/${name}`, {
+  const response = await r2.fetch(`${baseUrl}/${key(name)}`, {
     method: 'PUT',
     body,
     headers: { 'content-type': contentTypeFor(name) },
@@ -119,7 +131,7 @@ async function r2Put(name, body) {
 }
 
 async function listBucket() {
-  console.log(`Bucket: ${bucket}/${PREFIX}/ on account ${accountId}\n`);
+  console.log(`Bucket: ${bucket}/${userId ? `${PREFIX}/users/${userId}/` : `${PREFIX}/`} on account ${accountId}\n`);
   const objects = await r2List();
   if (objects.length === 0) {
     console.log('  (empty)');
@@ -154,7 +166,7 @@ async function main() {
   if (listOnly) return listBucket();
 
   console.log(`Source: ${DATA_DIR}`);
-  console.log(`Target: ${bucket}/${PREFIX}/ on account ${accountId}\n`);
+  console.log(`Target: ${bucket}/${userId ? `${PREFIX}/users/${userId}/` : `${PREFIX}/`} on account ${accountId}\n`);
 
   const source = await readFromData();
   if (source.size === 0) {
