@@ -38,6 +38,18 @@ export const RATES: Record<Category, number> = {
   videographer: 42,
 };
 
+/**
+ * What a customer is actually billed for a videographer jump's video &
+ * photos package — higher than RATES.videographer because the invoice
+ * itemises it as a gross package charge with a separate "flight ticket"
+ * deduction beneath it (see invoice-pdf.ts), rather than a single net
+ * line. The deduction isn't its own constant: it's derived as
+ * VIDEOGRAPHER_PACKAGE_RATE - RATES.videographer, so the two invoice
+ * lines always net out to the same per-jump figure this app pays out
+ * and totals everywhere else, even if either rate above changes later.
+ */
+export const VIDEOGRAPHER_PACKAGE_RATE = 92;
+
 export type Counts = Record<Category, number>;
 
 export interface Jump {

@@ -25,7 +25,7 @@
 // time — no filesystem access, no adapter-specific config, works
 // identically wherever the function actually runs.
 import PDFDocument from 'pdfkit';
-import { CATEGORIES, CATEGORY_LABELS, RATES, type Category, type Jump } from '../tandem';
+import { CATEGORIES, CATEGORY_LABELS, RATES, VIDEOGRAPHER_PACKAGE_RATE, type Category, type Jump } from '../tandem';
 import type { InvoiceSettings } from './invoice-settings';
 import robotoRegularBase64 from './fonts/roboto-regular.base64.txt?raw';
 import robotoMediumBase64 from './fonts/roboto-medium.base64.txt?raw';
@@ -149,30 +149,61 @@ export async function buildTandemInvoicePdf(opts: InvoicePdfOptions): Promise<Bu
     y += 16;
 
     doc.font('Body').fontSize(9.5);
-    for (const jump of jumps) {
-      if (y > doc.page.height - MARGIN - 60) {
-        doc.addPage();
-        y = MARGIN;
-      }
-      doc.text(formatJumpDate(jump.date), MARGIN, y, { width: dateColW, lineBreak: false });
-      doc.text(jump.name, MARGIN + dateColW, y, { width: nameColW - 8, lineBreak: false });
-      doc.text(money(RATES[category]), MARGIN + dateColW + nameColW, y, { width: amountColW, align: 'right', lineBreak: false });
+
+    if (category === 'videographer') {
+      // Billed as a gross video & photos package with a flight-ticket
+      // deduction beneath it, rather than one line per jump — a
+      // dropzone paperwork convention, not a different rate: the two
+      // amounts below always net to RATES.videographer per jump (see
+      // VIDEOGRAPHER_PACKAGE_RATE's own comment), so `total` further
+      // down doesn't need to know any of this happened.
+      const qtyColW = 50;
+      const labelW = pageWidth - amountColW - qtyColW;
+      const flightDeduction = VIDEOGRAPHER_PACKAGE_RATE - RATES.videographer;
+
+      doc.text('CASH CALL - Video & photos package', MARGIN, y, { width: labelW, lineBreak: false });
+      doc.text(`${jumps.length} @`, MARGIN + labelW, y, { width: qtyColW, align: 'right', lineBreak: false });
+      doc.text(money(VIDEOGRAPHER_PACKAGE_RATE), MARGIN + pageWidth - amountColW, y, {
+        width: amountColW,
+        align: 'right',
+        lineBreak: false,
+      });
       y += 14;
+
+      doc.text('Less Videographer Flight Ticket', MARGIN, y, { width: labelW, lineBreak: false });
+      doc.text(`${-jumps.length} @`, MARGIN + labelW, y, { width: qtyColW, align: 'right', lineBreak: false });
+      doc.text(money(flightDeduction), MARGIN + pageWidth - amountColW, y, {
+        width: amountColW,
+        align: 'right',
+        lineBreak: false,
+      });
+      y += 24;
+    } else {
+      for (const jump of jumps) {
+        if (y > doc.page.height - MARGIN - 60) {
+          doc.addPage();
+          y = MARGIN;
+        }
+        doc.text(formatJumpDate(jump.date), MARGIN, y, { width: dateColW, lineBreak: false });
+        doc.text(jump.name, MARGIN + dateColW, y, { width: nameColW - 8, lineBreak: false });
+        doc.text(money(RATES[category]), MARGIN + dateColW + nameColW, y, { width: amountColW, align: 'right', lineBreak: false });
+        y += 14;
+      }
+
+      const subtotal = jumps.length * RATES[category];
+      y += 2;
+      doc.font('Body-Bold');
+      doc.text(`${jumps.length} @ ${money(RATES[category])}`, MARGIN, y, {
+        width: pageWidth - amountColW,
+        align: 'right',
+        lineBreak: false,
+      });
+      doc.text(money(subtotal), MARGIN + pageWidth - amountColW, y, { width: amountColW, align: 'right', lineBreak: false });
+      doc.font('Body');
+      y += 24;
     }
 
-    const subtotal = jumps.length * RATES[category];
-    total += subtotal;
-
-    y += 2;
-    doc.font('Body-Bold');
-    doc.text(`${jumps.length} @ ${money(RATES[category])}`, MARGIN, y, {
-      width: pageWidth - amountColW,
-      align: 'right',
-      lineBreak: false,
-    });
-    doc.text(money(subtotal), MARGIN + pageWidth - amountColW, y, { width: amountColW, align: 'right', lineBreak: false });
-    doc.font('Body');
-    y += 24;
+    total += jumps.length * RATES[category];
   }
 
   if (!anyJumps) {
