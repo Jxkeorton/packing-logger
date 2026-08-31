@@ -310,6 +310,30 @@ export async function dismissMatch(slotId: string): Promise<void> {
   await writeSyncState({ ...state, pending });
 }
 
+/**
+ * Called when a jump is deleted elsewhere — the Tandems tab, or the
+ * logbook directly — so that if it was originally synced from the
+ * manifest, the slot stops being "already logged" against an `at` that no
+ * longer exists anywhere.
+ *
+ * Without this, `committed` is permanent: syncOnce skips any slot it
+ * already covers (see the loop above), so a deleted jump would never be
+ * offered again even though the load might still be sitting on the
+ * board. Clearing it here is what lets the next sync treat the slot as
+ * unconfirmed again, same as if it had never been committed.
+ *
+ * A no-op for most deletions, since most jumps are logged by hand and
+ * were never in `committed` to begin with.
+ */
+export async function forgetCommitted(at: string): Promise<void> {
+  const state = await readSyncState();
+  const slotId = Object.entries(state.committed).find(([, committedAt]) => committedAt === at)?.[0];
+  if (!slotId) return;
+  const committed = { ...state.committed };
+  delete committed[slotId];
+  await writeSyncState({ ...state, committed });
+}
+
 /** Clear the "unmapped codes" list once they've been dealt with. */
 export async function clearUnmappedCodes(): Promise<void> {
   const state = await readSyncState();

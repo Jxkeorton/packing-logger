@@ -5,6 +5,7 @@
 // nothing here changed for the full migration.
 import { fail, type Action } from '@sveltejs/kit';
 import { addEntry, readLogbook, removeEntry, updateEntry, type EntryInput } from '$lib/server/logbook';
+import { forgetCommitted } from '$lib/server/burble/sync';
 import {
   addAircraft,
   addCanopy,
@@ -119,6 +120,17 @@ export const logbookActions: Record<string, Action> = {
     if (!at) return fail(400, { error: 'at is required' });
     const settings = await readLogbookSettings();
     await removeEntry(at, settings.baseJumps);
+    // Same id as the manifest sync's committed record, if this jump came
+    // from there rather than being logged by hand — a no-op otherwise.
+    // A solo synced jump only ever exists in the logbook (no matching
+    // tandem-ledger row), so this is the only delete path that can clear
+    // it; without it the slot would stay permanently "already logged"
+    // even though the entry itself is gone.
+    try {
+      await forgetCommitted(at);
+    } catch (err) {
+      console.error('Failed to clear the manifest sync record for a deleted jump', err);
+    }
   },
 
   addPlace: async ({ request }) => {

@@ -8,6 +8,7 @@ import { addJump, removeJump } from '$lib/server/tandem';
 import { removeEntry as removeLogbookEntry } from '$lib/server/logbook';
 import { readLogbookSettings } from '$lib/server/logbook-settings';
 import { autoLogJump } from '$lib/server/auto-log';
+import { forgetCommitted } from '$lib/server/burble/sync';
 import { readInvoiceSettings, writeInvoiceSettings, type InvoiceSettings } from '$lib/server/invoice-settings';
 import { oneLine, multiLine } from '$lib/server/form-utils';
 
@@ -87,6 +88,16 @@ export const tandemActions: Record<string, Action> = {
       await removeLogbookEntry(at, settings.baseJumps);
     } catch (err) {
       console.error('Failed to remove auto-logged logbook entry', err);
+    }
+    // Same id again, if this jump came from the manifest sync rather than
+    // being tapped in by hand — a no-op otherwise. Without this, deleting
+    // a synced jump leaves it permanently "already logged" as far as the
+    // sync state is concerned, even though nothing about it exists any
+    // more, and the next sync would never offer it again.
+    try {
+      await forgetCommitted(at);
+    } catch (err) {
+      console.error('Failed to clear the manifest sync record for a deleted jump', err);
     }
   },
 

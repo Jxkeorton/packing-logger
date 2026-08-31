@@ -36,9 +36,9 @@ vi.mock('./client', () => ({
   },
 }));
 
-const { syncOnce, readSyncState, pendingJumps, flightHint, commitMatches, dismissMatch } = await import('./sync');
-const { readLogbook } = await import('../logbook');
-const { loadTodayState } = await import('../tandem');
+const { syncOnce, readSyncState, pendingJumps, flightHint, commitMatches, dismissMatch, forgetCommitted } = await import('./sync');
+const { readLogbook, removeEntry } = await import('../logbook');
+const { loadTodayState, removeJump } = await import('../tandem');
 
 function fixture(name: string): BurbleLoadsResponse {
   return JSON.parse(readFileSync(path.join(process.cwd(), 'src/lib/server/burble/fixtures', name), 'utf-8'));
@@ -241,6 +241,39 @@ describe('confirming a tandem jump', () => {
     await syncOnce(TI);
     expect(pendingJumps(await readSyncState())).toHaveLength(0);
     expect(await readLogbook(0)).toHaveLength(1);
+  });
+
+  it('offers the slot again once its committed jump is deleted', async () => {
+    // The exact scenario reported: sync finds a match, it's confirmed, and
+    // then deleted again — all before the board itself has changed. A
+    // second sync (once the board *does* change, per the version-caching
+    // note above) should treat the slot as unconfirmed again, not as
+    // permanently "already logged" against an `at` that no longer exists
+    // anywhere.
+    script(at(ON_CALL, 1), at(ON_CALL, 2));
+    await syncOnce(TI);
+    const [jump] = pendingJumps(await readSyncState());
+    await commitMatches([jump.slotId]);
+
+    const tandemState = await loadTodayState();
+    const loggedAt = tandemState.entries.instructor[0].at;
+    await removeJump(loggedAt);
+    await removeEntry(loggedAt, 0);
+    // These three calls are what deleteTandemJump does, in
+    // actions/tandem.ts — exercised directly here since this suite tests
+    // sync.ts's state machine, not the SvelteKit action layer around it.
+    await forgetCommitted(loggedAt);
+
+    await syncOnce(TI);
+    const pendingAfterDelete = pendingJumps(await readSyncState());
+    expect(pendingAfterDelete).toHaveLength(1);
+    expect(pendingAfterDelete[0].slotId).toBe(jump.slotId);
+  });
+
+  it('forgetCommitted is a no-op for an `at` that was never synced from the manifest', async () => {
+    // Most deleted jumps were logged by hand from the Tandems tab, not
+    // synced — this must not throw or touch state that isn't there.
+    await expect(forgetCommitted('2026-01-01T00:00:00.000Z')).resolves.toBeUndefined();
   });
 
   it('leaves unconfirmed jumps alone when only one is confirmed', async () => {
