@@ -3,11 +3,13 @@
   import { CATEGORIES, CATEGORY_LABELS, OTHER_STAFF_LABELS, RATES, type Category, type DayState } from '$lib/tandem';
   import { CARD, CARD_TOP, CARD_LABEL, CARD_RATE, CARD_SUBTOTAL, CATEGORIES_LIST } from '$lib/ui-classes';
   import TandemNameModal from './TandemNameModal.svelte';
+  import Spinner from '../Spinner.svelte';
 
   let { tandemState }: { tandemState: DayState } = $props();
 
   let pendingCategory = $state<Category | null>(null);
   let deletingAt = $state<string | null>(null);
+  let addingJump = $state(false);
 
   const modalSubtitle = $derived(
     pendingCategory ? `${CATEGORY_LABELS[pendingCategory]} jump — £${RATES[pendingCategory].toFixed(2)}` : '',
@@ -15,14 +17,19 @@
 
   async function addJump(name: string, staff: string) {
     const category = pendingCategory;
-    if (!category) return;
-    const formData = new FormData();
-    formData.set('category', category);
-    formData.set('name', name);
-    formData.set('staff', staff);
-    await fetch('?/addTandemJump', { method: 'POST', body: formData });
-    pendingCategory = null;
-    await invalidateAll();
+    if (!category || addingJump) return;
+    addingJump = true;
+    try {
+      const formData = new FormData();
+      formData.set('category', category);
+      formData.set('name', name);
+      formData.set('staff', staff);
+      await fetch('?/addTandemJump', { method: 'POST', body: formData });
+      pendingCategory = null;
+      await invalidateAll();
+    } finally {
+      addingJump = false;
+    }
   }
 
   async function deleteJump(at: string) {
@@ -59,7 +66,7 @@
                 aria-label={`Remove ${jump.name}`}
                 onclick={() => deleteJump(jump.at)}
               >
-                &times;
+                {#if deletingAt === jump.at}<Spinner size={13} />{:else}&times;{/if}
               </button>
             </li>
           {/each}
@@ -74,6 +81,7 @@
   open={pendingCategory !== null}
   subtitle={modalSubtitle}
   staffLabel={pendingCategory ? OTHER_STAFF_LABELS[pendingCategory] : ''}
+  submitting={addingJump}
   onSubmit={addJump}
   onClose={() => (pendingCategory = null)}
 />
@@ -134,9 +142,17 @@
     width: 26px;
     height: 26px;
     flex: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     border-radius: 8px;
     cursor: pointer;
     touch-action: manipulation;
+  }
+
+  .tandem-jump-delete:disabled {
+    opacity: 0.5;
+    cursor: default;
   }
 
   .tandem-jump-delete:hover,

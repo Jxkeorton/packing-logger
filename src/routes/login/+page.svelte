@@ -1,8 +1,18 @@
 <script lang="ts">
   import type { ActionData, PageData } from './$types';
+  import Spinner from '$lib/components/Spinner.svelte';
 
   let { data, form }: { data: PageData; form: ActionData } = $props();
   const multi = $derived(data.mode === 'multi');
+
+  // This form is a plain native POST, not use:enhance — no per-request
+  // JS lifecycle to hook a reset into, since a successful submit
+  // navigates away entirely. `submitting` only ever needs to go one way:
+  // true from the moment it's clicked so a second tap while the request
+  // is in flight can't fire another login attempt. A wrong-password
+  // response re-renders this page fresh from the server, which
+  // re-initialises this state to false again on its own.
+  let submitting = $state(false);
 </script>
 
 <svelte:head>
@@ -11,7 +21,7 @@
 </svelte:head>
 
 <main class="wrap">
-  <form class="card" method="POST">
+  <form class="card" method="POST" onsubmit={() => (submitting = true)}>
     <h1 class="title">Packing Log</h1>
     <p class="subtitle">{multi ? 'Sign in to continue.' : 'Enter the password to continue.'}</p>
     {#if multi}
@@ -23,6 +33,7 @@
         autocomplete="username"
         autofocus
         required
+        disabled={submitting}
       />
     {/if}
     <input
@@ -33,9 +44,12 @@
       autocomplete="current-password"
       autofocus={!multi}
       required
+      disabled={submitting}
     />
     {#if form?.error}<p class="error">{multi ? 'Wrong username or password — try again.' : 'Wrong password — try again.'}</p>{/if}
-    <button class="submit" type="submit">Sign in</button>
+    <button class="submit" type="submit" disabled={submitting}>
+      {#if submitting}<Spinner size={16} />{:else}Sign in{/if}
+    </button>
   </form>
 </main>
 
@@ -110,9 +124,21 @@
     background: var(--gold);
     cursor: pointer;
     touch-action: manipulation;
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
 
   .submit:active {
     transform: scale(0.97);
+  }
+
+  .submit:disabled {
+    opacity: 0.7;
+    cursor: default;
+  }
+
+  .field:disabled {
+    opacity: 0.7;
   }
 </style>

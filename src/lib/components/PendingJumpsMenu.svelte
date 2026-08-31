@@ -8,6 +8,7 @@
   import { enhance } from '$app/forms';
   import { BURBLE_ROLE_LABELS } from '$lib/burble';
   import type { BurbleRole } from '$lib/burble';
+  import Spinner from './Spinner.svelte';
 
   interface PendingJump {
     slotId: string;
@@ -24,6 +25,12 @@
   let { pending }: { pending: PendingJump[] } = $props();
 
   let open = $state(false);
+  let committing = $state(false);
+  // Which slot's "Remove …" button was tapped — that form has one submit
+  // button per pending jump, so unlike committing there's no single
+  // whole-form flag; `submitter` (the actual button clicked) tells them
+  // apart.
+  let dismissingSlotId = $state<string | null>(null);
 
   const loadLabel = (jump: PendingJump) =>
     jump.loadNumber ? `${jump.plate} load ${jump.loadNumber}` : jump.loadName;
@@ -60,7 +67,13 @@
         <form
           method="POST"
           action="?/commitManifestJumps"
-          use:enhance={() => async ({ update }) => await update({ reset: false })}
+          use:enhance={() => {
+            committing = true;
+            return async ({ update }) => {
+              await update({ reset: false });
+              committing = false;
+            };
+          }}
         >
           <ul class="m-0 mb-3 list-none p-0">
             {#each pending as jump (jump.slotId)}
@@ -85,8 +98,9 @@
           </ul>
           <button
             type="submit"
-            class="appearance-none border-0 rounded-[10px] h-10.5 px-5 font-display font-bold text-sm text-white bg-gold cursor-pointer touch-manipulation"
-            >Log selected</button
+            class="appearance-none border-0 rounded-[10px] h-10.5 px-5 font-display font-bold text-sm text-white bg-gold cursor-pointer touch-manipulation disabled:opacity-60 disabled:cursor-default inline-flex items-center gap-2"
+            disabled={committing}
+            >{#if committing}<Spinner size={14} />{/if}Log selected</button
           >
         </form>
 
@@ -94,7 +108,13 @@
           method="POST"
           action="?/dismissManifestJump"
           class="mt-3"
-          use:enhance={() => async ({ update }) => await update({ reset: false })}
+          use:enhance={({ submitter }) => {
+            dismissingSlotId = submitter instanceof HTMLButtonElement ? submitter.value : null;
+            return async ({ update }) => {
+              await update({ reset: false });
+              dismissingSlotId = null;
+            };
+          }}
         >
           <p class="mt-0 mb-1.5 text-[12.5px] text-ink-soft">Didn't jump one of these?</p>
           {#each pending as jump (jump.slotId)}
@@ -102,8 +122,10 @@
               type="submit"
               name="slotId"
               value={jump.slotId}
-              class="mr-2 mb-1 appearance-none rounded-full border border-line bg-transparent px-2.5 py-1 text-[11.5px] text-ink-soft"
+              disabled={dismissingSlotId === jump.slotId}
+              class="mr-2 mb-1 appearance-none rounded-full border border-line bg-transparent px-2.5 py-1 text-[11.5px] text-ink-soft disabled:opacity-50 disabled:cursor-default inline-flex items-center gap-1.5"
             >
+              {#if dismissingSlotId === jump.slotId}<Spinner size={11} />{/if}
               Remove {loadLabel(jump)}
             </button>
           {/each}

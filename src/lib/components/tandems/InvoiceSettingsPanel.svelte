@@ -13,10 +13,12 @@
     FORM_STATUS,
     PANEL_HINT,
   } from '$lib/ui-classes';
+  import Spinner from '../Spinner.svelte';
 
   let { invoiceSettings }: { invoiceSettings: InvoiceSettings } = $props();
 
   let status = $state<{ text: string; kind?: 'ok' | 'error' }>({ text: '' });
+  let submitting = $state(false);
 </script>
 
 <div>
@@ -27,6 +29,7 @@
         method="POST"
         action="?/saveInvoiceSettings"
         use:enhance={() => {
+          submitting = true;
           status = { text: 'Saving…' };
           return async ({ result, update }) => {
             status =
@@ -39,6 +42,7 @@
             // (its only source of a defaultValue), not just leave them —
             // same root cause as LogForm.svelte's, different field kind.
             await update({ reset: false });
+            submitting = false;
           };
         }}
       >
@@ -71,7 +75,9 @@
           />
         </label>
         <div class={FORM_ACTIONS}>
-          <button type="submit" class={FORM_SAVE_BUTTON}>Save details</button>
+          <button type="submit" class="{FORM_SAVE_BUTTON} flex items-center justify-center gap-2" disabled={submitting}>
+            {#if submitting}<Spinner size={14} />{/if}Save details
+          </button>
           <span class={FORM_STATUS} data-state={status.kind} role="status">{status.text}</span>
         </div>
       </form>

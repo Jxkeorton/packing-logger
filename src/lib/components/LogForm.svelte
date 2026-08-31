@@ -8,6 +8,7 @@
   // replace the DOM reads, and use:enhance replaces the fetch/JSON handlers.
   import { enhance } from '$app/forms';
   import { exitAltitudeDigits, formatExitAltitude } from '$lib/format';
+  import Spinner from './Spinner.svelte';
   import { TANDEM_JUMP_TYPES } from '$lib/tandem';
   import type { NumberedEntry } from '$lib/server/logbook';
   import type { LogbookSettings } from '$lib/server/logbook-settings';
@@ -105,6 +106,7 @@
   let form = $state<FormFields>(emptyForm());
   let status = $state<{ text: string; kind?: 'ok' | 'error' }>({ text: '' });
   let saving = $state(false);
+  let deletingAt = $state<string | null>(null);
   let modalOpen = $state(false);
   let dialogEl: HTMLDivElement | undefined = $state();
 
@@ -383,7 +385,8 @@
       ></textarea>
     </label>
           <div class={FORM_ACTIONS}>
-            <button type="submit" class={FORM_SAVE_BUTTON} disabled={saving}>
+            <button type="submit" class="{FORM_SAVE_BUTTON} flex items-center justify-center gap-2" disabled={saving}>
+              {#if saving}<Spinner size={15} />{/if}
               {editingAt ? 'Save changes' : 'Log jump'}
             </button>
             <button
@@ -432,20 +435,25 @@
             </dl>
             {#if entry.description}<p class="logbook-details-description">{entry.description}</p>{/if}
             <div class="logbook-details-actions">
-              <button type="button" class="logbook-edit" onclick={() => openEdit(entry)}>Edit</button>
+              <button type="button" class="logbook-edit" disabled={deletingAt === entry.at} onclick={() => openEdit(entry)}>Edit</button>
               <form
                 method="POST"
                 action="?/deleteJump"
                 use:enhance={() => {
+                  deletingAt = entry.at;
                   const wasEditing = entry.at === editingAt;
                   return async ({ update }) => {
                     if (wasEditing) closeModal();
                     await update();
+                    deletingAt = null;
                   };
                 }}
               >
                 <input type="hidden" name="at" value={entry.at} />
-                <button type="submit" class="logbook-delete">Delete</button>
+                <button type="submit" class="logbook-delete flex items-center gap-1.5" disabled={deletingAt === entry.at}>
+                  {#if deletingAt === entry.at}<Spinner size={12} />{/if}
+                  Delete
+                </button>
               </form>
             </div>
           </div>
@@ -651,6 +659,12 @@
     padding: 4px 0;
     cursor: pointer;
     touch-action: manipulation;
+  }
+
+  .logbook-edit:disabled,
+  .logbook-delete:disabled {
+    opacity: 0.5;
+    cursor: default;
   }
 
   .logbook-edit {

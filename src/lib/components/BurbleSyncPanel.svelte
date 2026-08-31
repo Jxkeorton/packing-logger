@@ -19,6 +19,7 @@
     FORM_SAVE_BUTTON,
     FORM_STATUS,
   } from '$lib/ui-classes';
+  import Spinner from './Spinner.svelte';
 
   let {
     enabled,
@@ -121,8 +122,8 @@
         </p>
       {:else}
         <div class={FORM_ACTIONS}>
-          <button type="button" class={FORM_SAVE_BUTTON} onclick={syncNow} disabled={syncing}>
-            {syncing ? 'Checking…' : 'Check the board'}
+          <button type="button" class="{FORM_SAVE_BUTTON} flex items-center justify-center gap-2" onclick={syncNow} disabled={syncing}>
+            {#if syncing}<Spinner size={14} />{/if}{syncing ? 'Checking…' : 'Check the board'}
           </button>
           <span class={FORM_STATUS} data-state={status.kind} role="status">{status.text}</span>
         </div>

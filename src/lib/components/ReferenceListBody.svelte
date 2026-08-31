@@ -8,6 +8,7 @@
   import { enhance } from '$app/forms';
   import type { Snippet } from 'svelte';
   import { FORM_ACTIONS, FORM_SAVE_BUTTON, PANEL_HINT } from '$lib/ui-classes';
+  import Spinner from './Spinner.svelte';
 
   interface Item {
     id: string;
@@ -42,6 +43,16 @@
   } = $props();
 
   let addFormEl: HTMLFormElement | undefined = $state();
+
+  // Which row's star/delete form is currently in flight, if any — a
+  // plain `use:enhance` with no options (what these two forms had
+  // before) doesn't disable its button, so a double-tap fired the same
+  // setDefault/remove twice before the first response came back. Only
+  // one row can plausibly be mid-submit at a time, so a single id per
+  // form is enough rather than a whole pending-set.
+  let settingDefaultId = $state<string | null>(null);
+  let removingId = $state<string | null>(null);
+  let adding = $state(false);
 </script>
 
 {#if hint}<p class={PANEL_HINT}>{hint}</p>{/if}
@@ -54,22 +65,48 @@
         {#if item.detail}<span class="reference-row-detail">{item.detail}</span>{/if}
       </div>
       {#if allowDefault}
-        <form method="POST" action="?/setDefault" use:enhance>
+        <form
+          method="POST"
+          action="?/setDefault"
+          use:enhance={() => {
+            settingDefaultId = item.id;
+            return async ({ update }) => {
+              // Reset after the refreshed list lands, not before — the
+              // star would otherwise be clickable again for the instant
+              // between the response arriving and `items` catching up.
+              await update();
+              settingDefaultId = null;
+            };
+          }}
+        >
           <input type="hidden" name="category" value={category} />
           <input type="hidden" name="id" value={item.id === defaultId ? '' : item.id} />
           <button
             type="submit"
             class="default-star"
+            disabled={settingDefaultId === item.id}
             aria-pressed={item.id === defaultId}
             aria-label={`Set ${item.name} as the default ${categoryLabel}`}
           >
-            &#9733;
+            {#if settingDefaultId === item.id}<Spinner size={13} />{:else}&#9733;{/if}
           </button>
         </form>
       {/if}
-      <form method="POST" action={removeAction} use:enhance>
+      <form
+        method="POST"
+        action={removeAction}
+        use:enhance={() => {
+          removingId = item.id;
+          return async ({ update }) => {
+            await update();
+            removingId = null;
+          };
+        }}
+      >
         <input type="hidden" name="id" value={item.id} />
-        <button type="submit" class="reference-delete" aria-label={`Remove ${item.name}`}>&times;</button>
+        <button type="submit" class="reference-delete" disabled={removingId === item.id} aria-label={`Remove ${item.name}`}>
+          {#if removingId === item.id}<Spinner size={14} />{:else}&times;{/if}
+        </button>
       </form>
     </li>
   {:else}
@@ -83,15 +120,19 @@
   action={addAction}
   class="pt-1 border-t border-line"
   use:enhance={() => {
+    adding = true;
     return async ({ update }) => {
       await update();
       addFormEl?.reset();
+      adding = false;
     };
   }}
 >
   {@render fields()}
   <div class={FORM_ACTIONS}>
-    <button type="submit" class={FORM_SAVE_BUTTON}>{submitLabel}</button>
+    <button type="submit" class={FORM_SAVE_BUTTON} disabled={adding}>
+      {#if adding}<Spinner size={14} />{:else}{submitLabel}{/if}
+    </button>
   </div>
 </form>
 
@@ -153,6 +194,9 @@
     width: 26px;
     height: 26px;
     flex: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     border-radius: var(--radius-control);
     cursor: pointer;
     touch-action: manipulation;
@@ -165,6 +209,12 @@
     outline: none;
   }
 
+  .reference-delete:disabled,
+  .default-star:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
+
   .default-star {
     appearance: none;
     border: none;
@@ -175,6 +225,9 @@
     width: 26px;
     height: 26px;
     flex: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     border-radius: var(--radius-control);
     cursor: pointer;
     touch-action: manipulation;

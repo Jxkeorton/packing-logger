@@ -19,6 +19,7 @@
     FORM_SAVE_BUTTON,
     FORM_STATUS,
   } from '$lib/ui-classes';
+  import Spinner from './Spinner.svelte';
 
   let {
     enabled,
@@ -37,6 +38,9 @@
   } = $props();
 
   let status = $state<{ text: string; kind?: 'ok' | 'error' }>({ text: '' });
+  let savingSettings = $state(false);
+  let removingCode = $state<string | null>(null);
+  let addingCode = $state(false);
 
   const roles = Object.entries(BURBLE_ROLE_LABELS) as [keyof typeof BURBLE_ROLE_LABELS, string][];
 </script>
@@ -52,6 +56,7 @@
         method="POST"
         action="?/saveBurbleSettings"
         use:enhance={() => {
+          savingSettings = true;
           status = { text: 'Saving…' };
           return async ({ result, update }) => {
             status =
@@ -59,6 +64,7 @@
                 ? { text: 'Saved', kind: 'ok' }
                 : { text: (result as { data?: { error?: string } }).data?.error ?? 'Failed to save', kind: 'error' };
             await update({ reset: false });
+            savingSettings = false;
           };
         }}
       >
@@ -108,7 +114,9 @@
         </p>
 
         <div class={FORM_ACTIONS}>
-          <button type="submit" class={FORM_SAVE_BUTTON}>Save</button>
+          <button type="submit" class="{FORM_SAVE_BUTTON} flex items-center justify-center gap-2" disabled={savingSettings}>
+            {#if savingSettings}<Spinner size={14} />{/if}Save
+          </button>
           <span class={FORM_STATUS} data-state={status.kind} role="status">{status.text}</span>
         </div>
       </form>
@@ -133,12 +141,24 @@
                 <span class="font-mono font-semibold">{mapping.code}</span>
                 <span class="text-ink-soft"> → {BURBLE_ROLE_LABELS[mapping.role]} · {mapping.jumpTypeName}</span>
               </span>
-              <form method="POST" action="?/removeBurbleCode" use:enhance={() => async ({ update }) => await update({ reset: false })}>
+              <form
+                method="POST"
+                action="?/removeBurbleCode"
+                use:enhance={() => {
+                  removingCode = mapping.code;
+                  return async ({ update }) => {
+                    await update({ reset: false });
+                    removingCode = null;
+                  };
+                }}
+              >
                 <input type="hidden" name="code" value={mapping.code} />
                 <button
                   type="submit"
-                  class="appearance-none rounded-full border border-line bg-transparent px-2.5 py-1 text-[11.5px] text-ink-soft"
-                  aria-label={`Remove ${mapping.code}`}>Remove</button
+                  disabled={removingCode === mapping.code}
+                  class="appearance-none rounded-full border border-line bg-transparent px-2.5 py-1 text-[11.5px] text-ink-soft disabled:opacity-50 disabled:cursor-default inline-flex items-center gap-1"
+                  aria-label={`Remove ${mapping.code}`}
+                  >{#if removingCode === mapping.code}<Spinner size={11} />{:else}Remove{/if}</button
                 >
               </form>
             </li>
@@ -149,7 +169,13 @@
       <form
         method="POST"
         action="?/mapBurbleCode"
-        use:enhance={() => async ({ update }) => await update({ reset: true })}
+        use:enhance={() => {
+          addingCode = true;
+          return async ({ update }) => {
+            await update({ reset: true });
+            addingCode = false;
+          };
+        }}
       >
         <label class="{FIELD_LABEL} mb-2">
           <span>Code on the board</span>
@@ -176,7 +202,9 @@
           />
         </label>
       <div class={FORM_ACTIONS}>
-        <button type="submit" class={FORM_SAVE_BUTTON}>Save code</button>
+        <button type="submit" class="{FORM_SAVE_BUTTON} flex items-center justify-center gap-2" disabled={addingCode}>
+          {#if addingCode}<Spinner size={14} />{/if}Save code
+        </button>
       </div>
     </form>
 </div>

@@ -3,10 +3,13 @@
   // half of lib/client/tandems-jump-log.ts (openNameModal/closeNameModal,
   // the Escape-key and backdrop-click listeners) — as component state and
   // effects instead of manual getElementById + addEventListener wiring.
+  import Spinner from '../Spinner.svelte';
+
   let {
     open,
     subtitle,
     staffLabel,
+    submitting = false,
     onSubmit,
     onClose,
   }: {
@@ -14,6 +17,15 @@
     subtitle: string;
     /** What the other staff member on this jump is called — see OTHER_STAFF_LABELS. */
     staffLabel: string;
+    /**
+     * True while the caller's own onSubmit is still in flight — this
+     * component doesn't own that request (TandemCategoryCards does, via
+     * a plain fetch rather than a form), so it can't derive this itself
+     * the way a `use:enhance` callback would. Without it, tapping "Add
+     * jump" twice before the first request's `invalidateAll()` came back
+     * logged the same jump twice.
+     */
+    submitting?: boolean;
     onSubmit: (name: string, staff: string) => void;
     onClose: () => void;
   } = $props();
@@ -32,6 +44,7 @@
 
   function handleSubmit(event: SubmitEvent) {
     event.preventDefault();
+    if (submitting) return; // belt-and-braces alongside the disabled button below
     const trimmed = name.trim();
     if (!trimmed) return;
     // The other staff member stays optional — plenty of jumps go up without
@@ -89,15 +102,18 @@
         <div class="flex gap-2.5 mt-3.5">
           <button
             type="button"
-            class="flex-1 appearance-none border border-line-strong rounded-[10px] h-11.5 font-display font-bold text-[15px] cursor-pointer touch-manipulation bg-transparent text-ink-soft"
+            class="flex-1 appearance-none border border-line-strong rounded-[10px] h-11.5 font-display font-bold text-[15px] cursor-pointer touch-manipulation bg-transparent text-ink-soft disabled:opacity-60 disabled:cursor-default"
+            disabled={submitting}
             onclick={onClose}
           >
             Cancel
           </button>
           <button
             type="submit"
-            class="flex-1 appearance-none border-0 rounded-[10px] h-11.5 font-display font-bold text-[15px] cursor-pointer touch-manipulation bg-gold text-white disabled:opacity-60 disabled:cursor-default"
+            class="flex-1 appearance-none border-0 rounded-[10px] h-11.5 font-display font-bold text-[15px] cursor-pointer touch-manipulation bg-gold text-white disabled:opacity-60 disabled:cursor-default flex items-center justify-center gap-2"
+            disabled={submitting}
           >
+            {#if submitting}<Spinner size={15} />{/if}
             Add jump
           </button>
         </div>
