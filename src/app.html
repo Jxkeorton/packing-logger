@@ -15,6 +15,15 @@
 		<!-- Short label shown under the icon on the home screen. -->
 		<meta name="apple-mobile-web-app-title" content="Packing Log" />
 		<!--
+			Tells iOS to treat the Home Screen icon as a real standalone app
+			rather than a lightweight bookmark shortcut. Without this, the
+			login cookie has been reported not to survive being closed and
+			reopened from the Home Screen — the icon needs to be removed and
+			re-added after this change for it to take effect; it's read only
+			at "Add to Home Screen" time, not retroactively.
+		-->
+		<meta name="apple-mobile-web-app-capable" content="yes" />
+		<!--
 			Android's equivalent of the two tags above: Chrome's "Add to Home
 			screen" reads the icon and name from the manifest rather than a
 			link/meta pair. See static/manifest.webmanifest and
