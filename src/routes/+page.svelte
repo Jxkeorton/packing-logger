@@ -1,7 +1,9 @@
 <script lang="ts">
   // Full port of index.astro + AppTabs.astro + the three tabs/*.astro
-  // files. One root route, one client-side tab switch (Packing / Tandems
-  // / Logbook) — deliberately not three SvelteKit routes, to keep this a
+  // files. One root route, one client-side tab switch (Packing / Work
+  // jumps / Logbook — "Work jumps" is AppTabs' display label for what's
+  // still the 'tandems' tab everywhere else) — deliberately not three
+  // SvelteKit routes, to keep this a
   // faithful migration of the existing UX rather than a redesign. Packing
   // still has its own Pack/Timer sub-tabs, the same pattern one level down.
   //
@@ -271,7 +273,7 @@
         {/snippet}
         {#snippet children()}
           <ReferenceListBody
-            hint={`The starred one is pre-selected whenever you start a new jump. "Tandem Instructor" and "Tandem Camera" are added here automatically the first time you log one from the Tandems tab.`}
+            hint={`The starred one is pre-selected whenever you start a new jump. "Tandem Instructor" and "Tandem Camera" are added here automatically the first time you log one from the Work jumps tab.`}
             items={jumpTypes}
             emptyText="No jump types saved yet."
             category="jumpType"

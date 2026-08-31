@@ -1,6 +1,9 @@
 <script lang="ts">
-  // Port of AppTabs.astro — the top-level Packing / Tandems / Logbook
-  // switcher. There, this owned only the buttons and wired them up to
+  // Port of AppTabs.astro — the top-level Packing / Work jumps / Logbook
+  // switcher ("Work jumps" is the display label; the tab's internal id
+  // stays 'tandems', same as the module and route it renders — this is
+  // a display-only rename). There, this owned only the buttons and wired
+  // them up to
   // sibling [data-app-view] sections via a shared dom.ts helper; here the
   // active tab is just $state owned by +page.svelte and passed down
   // $bindable, and the views it controls are `{#if}`s in the same file.
@@ -29,7 +32,7 @@
     aria-selected={activeTab === 'tandems'}
     onclick={() => (activeTab = 'tandems')}
   >
-    Tandems
+    Work jumps
   </button>
   <button
     type="button"
