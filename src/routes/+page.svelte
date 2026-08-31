@@ -13,8 +13,9 @@
   // change a default. It's now one place, reached the same way from
   // every tab: the cog button next to AppTabs toggles `settingsOpen`,
   // which swaps out whichever tab's content is showing for the settings
-  // view below, grouped as "Logbook options", "Work jumps", then
-  // "Invoice details".
+  // view below, grouped as "Logbook options" then "Work jumps" — the
+  // latter now holds both the section-visibility toggles and invoice
+  // details, since both are about that one tab.
   import AppTabs from '$lib/components/AppTabs.svelte';
   import PackCategoryCards from '$lib/components/packing/PackCategoryCards.svelte';
   import PackHistoryPanel from '$lib/components/packing/PackHistoryPanel.svelte';
@@ -327,10 +328,7 @@
           <WorkJumpsSettingsPanel visibility={data.tandemVisibility} />
         {/snippet}
       </SettingsRow>
-    </div>
 
-    <h2 class={SETTINGS_GROUP_LABEL}>Invoice details</h2>
-    <div class={SETTINGS_GROUP}>
       <SettingsRow label="Invoice details" iconColor="var(--student)">
         {#snippet icon()}
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
