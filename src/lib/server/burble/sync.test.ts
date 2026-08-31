@@ -3,7 +3,7 @@
 // exactly one jump comes out, with the right role and customer.
 //
 // Storage is mocked with an in-memory Map — sync.ts, logbook.ts and
-// tandem.ts otherwise read/write real files under data/ (or Vercel Blob),
+// tandem.ts otherwise read/write real files under data/ (or R2, in production),
 // and this suite must never touch that, since it's the user's actual saved
 // data during local dev.
 import { readFileSync } from 'node:fs';

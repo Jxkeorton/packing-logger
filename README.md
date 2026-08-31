@@ -121,25 +121,33 @@ npm run build   # production build (adapter-vercel)
 ## Deploying to Vercel
 
 Because Vercel's functions don't have a persistent local disk, the same
-read/write calls that hit `data/` locally are backed by
-[Vercel Blob](https://vercel.com/docs/vercel-blob) in production instead
-— see [`src/lib/server/storage.ts`](src/lib/server/storage.ts). No code
-changes are needed to switch between the two; it's picked automatically
-based on whether `BLOB_READ_WRITE_TOKEN` / `BLOB_STORE_ID` is set.
+read/write calls that hit `data/` locally are backed by a
+[Cloudflare R2](https://developers.cloudflare.com/r2/) bucket in production
+instead — see [`src/lib/server/storage.ts`](src/lib/server/storage.ts). No
+code changes are needed to switch between the two; it's picked automatically
+based on whether `R2_ACCOUNT_ID` / `R2_BUCKET` / `R2_ACCESS_KEY_ID` /
+`R2_SECRET_ACCESS_KEY` are all set. A deployed instance with none of them set
+refuses to run, rather than silently treating its own ephemeral,
+per-invocation filesystem as if it were real storage.
 
 To deploy:
 
 1. Push this repo to GitHub and import it in Vercel, or run `vercel link`
    from this folder.
-2. In the project's **Storage** tab on vercel.com, create a Blob store
-   and connect it to the project (this wires up the Blob env vars for
-   you).
+2. Create an R2 bucket in the Cloudflare dashboard, and an API token
+   (Object Read & Write) scoped to it. Add its four `R2_*` values above to
+   the Vercel project's **Settings → Environment Variables** — see
+   `.env.example`.
 3. Deploy with `vercel --prod`, or just push to the connected GitHub
    repo's production branch.
 
 You can always download the full CSV log from the app itself via the
 "Download full log (.csv)" link at the bottom of each tab — this works
-the same way whether the log lives in `data/` or in Blob storage.
+the same way whether the log lives in `data/` or in R2.
+
+This project previously ran on Vercel Blob; it was dropped once its Hobby
+plan's op limits (2,000 writes/month) turned out to be easy to exhaust —
+see git history if you need the old backend's shape back.
 
 ## Locking it down with a password
 

@@ -2,8 +2,8 @@
 
 A mobile-first work log for a skydive rigger / tandem instructor: three tabs
 (Packing, Tandems, Logbook) on one SvelteKit route, deployed to Vercel with
-Vercel Blob for storage. See `README.md` for what the app *does* — this file
-is about how code in it is expected to be written.
+Cloudflare R2 for storage. See `README.md` for what the app *does* — this
+file is about how code in it is expected to be written.
 
 These conventions were arrived at deliberately (several of them the hard way,
 after a bug). Follow them, and when you deviate, say why in a comment.
@@ -163,9 +163,18 @@ track a small `touched` object and only overwrite untouched fields (see
 
 ## 7. Persistence and data safety
 
-`src/lib/server/storage.ts` abstracts Vercel Blob (production) and the local
-`data/` folder (dev), selected by env var. Everything goes through
-`readText` / `writeText` — don't reach for `fs` directly.
+`src/lib/server/storage.ts` abstracts Cloudflare R2 (production) and the
+local `data/` folder (dev), selected by whether the four `R2_*` env vars are
+set. Everything goes through `readText` / `writeText` — don't reach for `fs`
+directly. (Previously Vercel Blob; dropped once its Hobby plan's 2,000
+writes/month turned out to be easy to exhaust — see git history.)
+
+A deployment can also be multi-user (`AUTH_SECRET` set instead of
+`APP_PASSWORD` — see `src/lib/server/auth.ts` and `users.ts`). When it is,
+every `readText`/`writeText` call is transparently rescoped to the signed-in
+user's own `users/<id>/` prefix via an `AsyncLocalStorage` set in
+`hooks.server.ts` (`storage.ts`'s `runAsUser`) — no other module needs to
+know a user id exists.
 
 **CSV schema changes must stay backward compatible.** New columns are
 **appended at the end** of the row; older rows simply come up short and the
@@ -208,14 +217,25 @@ in the compiled output. A `process.cwd()` file read will work in dev and fail
 in production — this exact bug shipped once and went unnoticed because local
 testing passed.
 
-Vercel Blob stores must be **private access** for this app, and must be
-*connected to the project* — setting `BLOB_STORE_ID` alone is not enough.
-
 Env vars are baked in at build time; changing one requires a redeploy.
 
-There are two Vercel projects on this repo: the author's (tracks `main`) and a
-second instance for a friend (intended to track `release`). To ship to the
-second: `git checkout release && git merge main && git push && git checkout main`.
+Every single-tenant deployment gets its own R2 bucket — one person, one
+bucket, keys unprefixed by user (`packing-logger/logbook.csv`, not
+`packing-logger/users/<id>/logbook.csv`). There are several such projects on
+this repo, each tracking `main` or `release` for a different person (Aimee,
+Mila). To ship an update to one: `git checkout release && git merge main &&
+git push && git checkout main` — but confirm which branch you're actually
+on before committing (`git branch --show-current`); it's easy to drift onto
+the wrong one mid-session and not notice until a push goes to the wrong
+place.
+
+A separate, additive deployment shape exists for several people sharing one
+project: set `AUTH_SECRET` instead of `APP_PASSWORD`, and see
+`scripts/add-user.mjs` for creating accounts. It's a different bucket
+layout (`users/<id>/` prefix), not a migration path for an existing
+single-tenant bucket's data — moving someone from their own bucket into a
+shared one is a manual copy (`scripts/migrate-to-r2.mjs --user=<id>`), not
+something either script does automatically.
 
 ---
 

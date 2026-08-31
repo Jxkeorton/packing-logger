@@ -1,6 +1,6 @@
 // Characterization tests for the personal logbook ledger. `./storage` is
 // mocked with an in-memory Map — logbook.ts otherwise reads/writes real
-// files under data/ (or Vercel Blob), and this suite must never touch
+// files under data/ (or R2, in production), and this suite must never touch
 // that, since it's the user's actual saved data during local dev.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { EntryInput } from './logbook';
