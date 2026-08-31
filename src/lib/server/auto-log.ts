@@ -8,6 +8,7 @@
 // drifts from the other.
 import { addEntry as addLogbookEntry } from './logbook';
 import { ensureJumpType, readLogbookSettings, resolveRigComponents } from './logbook-settings';
+import { TANDEM_JUMP_TYPES } from '../tandem';
 
 export interface AutoLogJump {
   /** Logbook jump type to file this under — added to the saved list if new. */
@@ -36,14 +37,22 @@ export async function autoLogJump(jump: AutoLogJump): Promise<void> {
     const settings = await readLogbookSettings();
 
     const place = settings.places.find((p) => p.id === settings.defaultPlaceId);
-    const rig = resolveRigComponents(settings, settings.defaultRigId);
 
-    // Note this applies the default rig to instructor jumps too. So if the
-    // starred rig is your own sport rig, its components accrue jumps from
-    // tandem instructing as well — star the rig you actually jump on
-    // tandems, or clear the default, if you're tracking component wear
-    // closely. (Carried over from actions/tandem.ts, where this was first
-    // written; unchanged so behaviour there stays identical.)
+    // A tandem instructor jumps the dropzone's shared tandem system, never
+    // their own gear — so it gets a fixed "Tandem Rig" label rather than
+    // whatever's starred as the personal default, and no component names,
+    // rather than looking one up (there's nothing to look up: nobody saves
+    // a Rig called that, and even if they did, its components would start
+    // silently accruing every tandem instructing jump as wear on gear that
+    // was never actually on that jump — this is what applying the starred
+    // default here used to do, and it's wrong for the instructing case
+    // specifically. A camera flyer, unlike the instructor, does jump their
+    // own rig — that path is untouched.
+    const rig =
+      jump.jumpTypeName === TANDEM_JUMP_TYPES.instructor
+        ? { rig: 'Tandem Rig', canopy: '', lineset: '', pilotChute: '', container: '' }
+        : resolveRigComponents(settings, settings.defaultRigId);
+
     const matchedByPlate = jump.aircraftPlate
       ? settings.aircraft.find((a) => a.plate.trim().toLowerCase() === jump.aircraftPlate!.trim().toLowerCase())
       : undefined;

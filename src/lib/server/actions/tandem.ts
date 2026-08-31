@@ -21,7 +21,10 @@ const MAX_NAME_LENGTH = 80;
 // The jump type has to stay the tandem one ("Tandem Instructor"/"Tandem
 // Camera") rather than the starred default, since that's the whole point
 // of auto-logging it from this tab. Everything else comes from the saved
-// defaults — see $lib/server/auto-log.ts, which the manifest sync shares.
+// defaults — except an instructor jump's rig, which is a fixed "Tandem
+// Rig" label rather than the starred one (an instructor jumps the
+// dropzone's shared tandem rig, never their own gear) — see
+// $lib/server/auto-log.ts, which the manifest sync shares.
 async function autoLogTandemJump(
   category: Category,
   name: string,
