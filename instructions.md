@@ -234,8 +234,8 @@ project: set `AUTH_SECRET` instead of `APP_PASSWORD`, and see
 `scripts/add-user.mjs` for creating accounts. It's a different bucket
 layout (`users/<id>/` prefix), not a migration path for an existing
 single-tenant bucket's data — moving someone from their own bucket into a
-shared one is a manual copy (`scripts/migrate-to-r2.mjs --user=<id>`), not
-something either script does automatically.
+shared one is a manual copy via the R2 dashboard (upload into
+`packing-logger/users/<id>/`), not something the script does.
 
 ---
 
