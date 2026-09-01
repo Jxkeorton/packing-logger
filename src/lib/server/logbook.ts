@@ -122,6 +122,24 @@ export async function nextJumpNumber(baseJumps: number): Promise<number> {
   return baseJumps + entries.length + 1;
 }
 
+/**
+ * readLogbook() + nextJumpNumber() in one read of logbook.csv instead
+ * of two — both were independently calling readEntries() on every page
+ * load (the whole ledger, re-parsed twice, for what's the same entry
+ * list either way). Used by +page.server.ts, which needs both;
+ * readLogbook()/nextJumpNumber() stay as their own functions for other
+ * callers that only need one.
+ */
+export async function readLogbookAndNextNumber(
+  baseJumps: number,
+): Promise<{ entries: NumberedEntry[]; nextNumber: number }> {
+  const entries = await readEntries();
+  return {
+    entries: withNumbers(entries, baseJumps).reverse(),
+    nextNumber: baseJumps + entries.length + 1,
+  };
+}
+
 export type EntryInput = Omit<LogbookEntry, 'at'>;
 
 /**

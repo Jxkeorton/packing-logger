@@ -142,12 +142,9 @@ export async function readCsvFile(): Promise<string> {
   return `${header}\n${body}\n`;
 }
 
-/** Most recent history rows (excluding today), newest first, one per day. */
-export async function readHistory(limit = 14): Promise<HistoryRow[]> {
-  const jumps = await readJumps();
-  const rates = await readRateSettings();
+/** Shared by readHistory() and loadTodayStateAndHistory() — both derive this from the same jump list, just from different reads of it. */
+function historyFromJumps(jumps: Jump[], rates: Record<Category, number>, limit: number): HistoryRow[] {
   const today = todayKey();
-
   const byDate = new Map<string, Counts>();
   for (const j of jumps) {
     if (j.date === today) continue;
@@ -163,9 +160,31 @@ export async function readHistory(limit = 14): Promise<HistoryRow[]> {
       date,
       counts,
       totalJumps: totalJumps(counts),
-      totalEarnings: totalEarnings(counts, rates.tandem),
+      totalEarnings: totalEarnings(counts, rates),
     };
   });
+}
+
+/** Most recent history rows (excluding today), newest first, one per day. */
+export async function readHistory(limit = 14): Promise<HistoryRow[]> {
+  const [jumps, rates] = await Promise.all([readJumps(), readRateSettings()]);
+  return historyFromJumps(jumps, rates.tandem, limit);
+}
+
+/**
+ * loadTodayState() + readHistory() in one read of tandem-jumps.csv
+ * instead of two — both were independently calling readJumps() on
+ * every page load (the whole file, re-parsed twice, for what's the
+ * same jump list either way). Used by +page.server.ts, which needs
+ * both; loadTodayState()/readHistory() stay as their own functions for
+ * the callers (actions, mostly) that only ever need one of them.
+ */
+export async function loadTodayStateAndHistory(limit = 14): Promise<{ state: DayState; history: HistoryRow[] }> {
+  const [jumps, rates] = await Promise.all([readJumps(), readRateSettings()]);
+  return {
+    state: stateFor(jumps, todayKey()),
+    history: historyFromJumps(jumps, rates.tandem, limit),
+  };
 }
 
 /**

@@ -9,17 +9,14 @@ import type { Actions, PageServerLoad } from './$types';
 import { toHistoryRow, todayKey, type DayState } from '$lib/packing';
 import { loadTodayState, readHistory } from '$lib/server/packing';
 import { groupByInvoiceMonth, groupByWeek } from '$lib/server/invoice';
-import {
-  loadTodayState as loadTodayTandemState,
-  readHistory as readTandemHistory,
-} from '$lib/server/tandem';
+import { loadTodayStateAndHistory as loadTandemStateAndHistory } from '$lib/server/tandem';
 import { toHistoryRow as toTandemHistoryRow } from '$lib/tandem';
 import { groupByInvoiceMonth as groupTandemByInvoiceMonth, groupByWeek as groupTandemByWeek } from '$lib/server/tandem-invoice';
 import { readInvoiceSettings } from '$lib/server/invoice-settings';
 import { readTandemVisibility } from '$lib/server/tandem-visibility';
 import { readTabVisibility } from '$lib/server/tab-visibility';
 import { readRateSettings } from '$lib/server/rate-settings';
-import { readLogbook, nextJumpNumber } from '$lib/server/logbook';
+import { readLogbookAndNextNumber } from '$lib/server/logbook';
 import { readLogbookSettings } from '$lib/server/logbook-settings';
 import { flightHint, pendingJumps, readSyncState } from '$lib/server/burble/sync';
 import { readFastestFive } from '$lib/server/times';
@@ -46,9 +43,9 @@ export const load: PageServerLoad = async () => {
   const weekRows = groupByWeek(combined, rateSettings.packing).slice(0, 12);
   const monthRows = groupByInvoiceMonth(combined, rateSettings.packing).slice(0, 12);
 
-  // Same shape again, for the separate tandem-jump log.
-  const tandemState = await loadTodayTandemState();
-  const tandemFullHistory = await readTandemHistory(400);
+  // Same shape again, for the separate tandem-jump log — one read of
+  // tandem-jumps.csv for both state and history, not two.
+  const { state: tandemState, history: tandemFullHistory } = await loadTandemStateAndHistory(400);
   const tandemDayRows = tandemFullHistory.slice(0, 14);
   const tandemCombined = [...tandemFullHistory, toTandemHistoryRow(tandemState, rateSettings.tandem)];
   const tandemWeekRows = groupTandemByWeek(tandemCombined, rateSettings.tandem).slice(0, 12);
@@ -59,10 +56,12 @@ export const load: PageServerLoad = async () => {
   const tabVisibility = await readTabVisibility();
 
   // The personal jump logbook — a separate ledger again, numbered from a
-  // configurable starting offset rather than a running daily count.
+  // configurable starting offset rather than a running daily count. One
+  // read of logbook.csv for both the entries and the next number, not two.
   const logbookSettings = await readLogbookSettings();
-  const logbookEntries = await readLogbook(logbookSettings.baseJumps);
-  const nextLogbookNumber = await nextJumpNumber(logbookSettings.baseJumps);
+  const { entries: logbookEntries, nextNumber: nextLogbookNumber } = await readLogbookAndNextNumber(
+    logbookSettings.baseJumps,
+  );
 
   // Manifest sync state is *read* here, never polled — a page load must
   // not reach out to Burble. Checking the board is an explicit action.
