@@ -35,8 +35,8 @@
   --danger: #b3423a;
   --danger-soft: #f1dedc;
 
-  --radius: 14px;
-  --radius-control: 10px;
+  --radius: 9px;
+  --radius-control: 7px;
   --shadow: 0 1px 0 rgba(20, 32, 43, 0.05), 0 6px 16px -8px rgba(20, 32, 43, 0.22);
 
   /*

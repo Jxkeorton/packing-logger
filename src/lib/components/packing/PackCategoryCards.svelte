@@ -133,7 +133,7 @@
           <span class={CARD_RATE}>£{rates[category].toFixed(2)} / pack</span>
         </span>
       </div>
-      <div class="grid grid-cols-[64px_1fr_64px] items-center gap-3 mt-2.5">
+      <div class="grid grid-cols-[52px_1fr_52px] items-center gap-2.5 mt-1.5">
         <button
           class="counter-btn counter-btn-minus"
           style={`--accent: var(--${category})`}
@@ -145,7 +145,7 @@
         </button>
         {#key bumpVersion[category]}
           <span
-            class="text-center font-display font-bold text-[40px] [font-variant-numeric:tabular-nums] {bumpVersion[
+            class="text-center font-display font-bold text-[32px] [font-variant-numeric:tabular-nums] {bumpVersion[
               category
             ]
               ? 'bump'
@@ -177,10 +177,10 @@
 <style>
   .counter-btn {
     appearance: none;
-    border-radius: 0.75rem;
+    border-radius: var(--radius-control);
     width: 100%;
-    height: 3.5rem;
-    font-size: 28px;
+    height: 2.75rem;
+    font-size: 22px;
     line-height: 1;
     font-family: var(--font-display);
     font-weight: 700;

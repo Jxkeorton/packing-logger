@@ -98,7 +98,7 @@
           </ul>
           <button
             type="submit"
-            class="appearance-none border-0 rounded-[10px] h-10.5 px-5 font-display font-bold text-sm text-white bg-gold cursor-pointer touch-manipulation disabled:opacity-60 disabled:cursor-default inline-flex items-center gap-2"
+            class="appearance-none border-0 rounded-[var(--radius-control)] h-10.5 px-5 font-display font-bold text-sm text-white bg-gold cursor-pointer touch-manipulation disabled:opacity-60 disabled:cursor-default inline-flex items-center gap-2"
             disabled={committing}
             >{#if committing}<Spinner size={14} />{/if}Log selected</button
           >

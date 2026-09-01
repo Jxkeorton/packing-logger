@@ -145,7 +145,7 @@
     {/if}
 
     {#if unmappedCodes.length > 0}
-      <p class="mt-0 mb-0 rounded-[10px] border border-line-strong px-3 py-2.5 text-[12.5px] text-ink-soft">
+      <p class="mt-0 mb-0 rounded-[var(--radius-control)] border border-line-strong px-3 py-2.5 text-[12.5px] text-ink-soft">
         Your name appeared with {unmappedCodes.length === 1 ? 'a jump code' : 'jump codes'} this app doesn't know:
         <strong class="text-ink">{unmappedCodes.join(', ')}</strong>. Add {unmappedCodes.length === 1
           ? 'it'

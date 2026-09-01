@@ -485,7 +485,7 @@
   .log-jump-trigger {
     appearance: none;
     border: 0;
-    border-radius: 0.75rem;
+    border-radius: var(--radius-control);
     width: 100%;
     height: 46px;
     font-family: var(--font-display);

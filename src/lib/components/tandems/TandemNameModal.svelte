@@ -54,7 +54,7 @@
 
   // Both inputs are styled identically; named once so they stay that way.
   const FIELD =
-    'w-full h-12 px-3.5 rounded-[10px] border border-line-strong bg-canvas text-ink font-sans text-base focus-visible:outline-3 focus-visible:outline-gold focus-visible:outline-offset-1';
+    'w-full h-12 px-3.5 rounded-[var(--radius-control)] border border-line-strong bg-canvas text-ink font-sans text-base focus-visible:outline-3 focus-visible:outline-gold focus-visible:outline-offset-1';
 
   function handleKeydown(event: KeyboardEvent) {
     if (event.key === 'Escape' && open) onClose();
@@ -102,7 +102,7 @@
         <div class="flex gap-2.5 mt-3.5">
           <button
             type="button"
-            class="flex-1 appearance-none border border-line-strong rounded-[10px] h-11.5 font-display font-bold text-[15px] cursor-pointer touch-manipulation bg-transparent text-ink-soft disabled:opacity-60 disabled:cursor-default"
+            class="flex-1 appearance-none border border-line-strong rounded-[var(--radius-control)] h-11.5 font-display font-bold text-[15px] cursor-pointer touch-manipulation bg-transparent text-ink-soft disabled:opacity-60 disabled:cursor-default"
             disabled={submitting}
             onclick={onClose}
           >
@@ -110,7 +110,7 @@
           </button>
           <button
             type="submit"
-            class="flex-1 appearance-none border-0 rounded-[10px] h-11.5 font-display font-bold text-[15px] cursor-pointer touch-manipulation bg-gold text-white disabled:opacity-60 disabled:cursor-default flex items-center justify-center gap-2"
+            class="flex-1 appearance-none border-0 rounded-[var(--radius-control)] h-11.5 font-display font-bold text-[15px] cursor-pointer touch-manipulation bg-gold text-white disabled:opacity-60 disabled:cursor-default flex items-center justify-center gap-2"
             disabled={submitting}
           >
             {#if submitting}<Spinner size={15} />{/if}

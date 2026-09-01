@@ -41,6 +41,7 @@
   import { totalEarnings as tandemTotalEarnings, totalJumps } from '$lib/tandem';
   import {
     APP_VIEW,
+    APP_VIEW_COMPACT,
     MASTHEAD,
     STAMP,
     STAMP_LABEL,
@@ -179,7 +180,7 @@
 </script>
 
 <div
-  class="max-w-140 mx-auto px-4 pt-5 [padding-bottom:calc(40px+env(safe-area-inset-bottom))] flex flex-col gap-5.5"
+  class="max-w-140 mx-auto px-4 pt-4 [padding-bottom:calc(40px+env(safe-area-inset-bottom))] flex flex-col gap-5.5"
 >
   <PendingJumpsMenu pending={data.burblePending} />
 
@@ -436,12 +437,16 @@
   </div>
 
   <!-- Packing -->
-  <div class={APP_VIEW} hidden={activeAppTab !== 'packing' || settingsOpen}>
-    <!-- Same sticky glass treatment as the app tab bar above, stacked
-         flush beneath it (top: var(--app-header-h)) rather than the two
-         overlapping once both are stuck. -->
+  <div class={APP_VIEW_COMPACT} hidden={activeAppTab !== 'packing' || settingsOpen}>
+    <!--
+      Same sticky glass treatment as the app tab bar above, stacked flush
+      beneath it (top: var(--app-header-h)) once both are stuck. -mt-3.5
+      pulls it up out of APP_VIEW's own gap-5.5 before that point — the
+      two glass bars read as one connected unit rather than leaving the
+      full standard gap between them like every other pair of sections.
+    -->
     <div
-      class="header-scope sticky top-[var(--app-header-h)] z-10 flex items-center gap-1 p-1 rounded-[var(--radius-control)] bg-panel/75 backdrop-blur-md border border-line shadow-card"
+      class="header-scope sticky top-[var(--app-header-h)] z-10 -mt-3.5 flex items-center gap-1 p-1 rounded-[var(--radius-control)] bg-panel/75 backdrop-blur-md border border-line shadow-card"
       role="tablist"
       aria-label="Packing view"
     >

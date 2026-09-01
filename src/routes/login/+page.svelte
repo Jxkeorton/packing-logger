@@ -103,7 +103,7 @@
   .field {
     appearance: none;
     border: 1px solid var(--line);
-    border-radius: 10px;
+    border-radius: var(--radius-control);
     padding: 14px 14px;
     font-size: 16px;
     font-family: inherit;

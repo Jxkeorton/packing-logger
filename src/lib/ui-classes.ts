@@ -20,20 +20,25 @@
 // ---- App shell ----
 
 export const APP_VIEW = 'flex flex-col gap-5.5 [&[hidden]]:hidden';
+// Same shape, tighter gap — for the Packing view specifically, so its
+// four category cards fit on one screen without scrolling on most
+// phones. Not just APP_VIEW with a smaller --spacing at :root: nothing
+// else on the page needs its sections pulled this close together.
+export const APP_VIEW_COMPACT = 'flex flex-col gap-4 [&[hidden]]:hidden';
 
 // ---- Masthead (date stamp + totals strip) ----
 
-export const MASTHEAD = 'flex flex-col gap-4';
+export const MASTHEAD = 'flex flex-col gap-2.5';
 export const STAMP =
-  'self-start flex flex-col gap-0.5 px-4 py-2 border-2 border-dashed border-line-strong rounded-[10px] -rotate-[1.5deg] text-ink';
-export const STAMP_LABEL = 'font-mono text-[11px] tracking-[0.14em] uppercase text-gold';
-export const STAMP_DATE = 'font-display font-bold text-[19px] tracking-[-0.01em]';
+  'self-start flex flex-col gap-0.5 px-3 py-1.5 border border-dashed border-line-strong rounded-[var(--radius-control)] -rotate-[1.5deg] text-ink';
+export const STAMP_LABEL = 'font-mono text-[10px] tracking-[0.14em] uppercase text-gold';
+export const STAMP_DATE = 'font-display font-bold text-[16px] tracking-[-0.01em]';
 
-export const TOTALS = 'flex items-center gap-4 px-4.5 py-4 bg-panel border border-line rounded-card shadow-card';
+export const TOTALS = 'flex items-center gap-4 px-4.5 py-2.5 bg-panel border border-line rounded-card shadow-card';
 export const TOTALS_BLOCK = 'flex flex-col gap-0.5';
 export const TOTALS_BLOCK_FLEX = `${TOTALS_BLOCK} flex-1`;
 export const TOTALS_VALUE =
-  'font-display font-bold text-[34px] leading-none tracking-[-0.02em] [font-variant-numeric:tabular-nums]';
+  'font-display font-bold text-[28px] leading-none tracking-[-0.02em] [font-variant-numeric:tabular-nums]';
 export const TOTALS_VALUE_GOLD = `${TOTALS_VALUE} text-gold`;
 export const TOTALS_VALUE_INK = `${TOTALS_VALUE} text-ink`;
 export const TOTALS_LABEL = 'text-xs text-ink-soft uppercase tracking-[0.08em]';
@@ -72,13 +77,13 @@ export const SETTINGS_ROW_PANEL = 'border-t border-line px-3.5 pt-3.5 pb-4';
 
 // ---- Category cards ----
 
-export const CATEGORIES_LIST = 'flex flex-col gap-3 min-[480px]:gap-3.5';
+export const CATEGORIES_LIST = 'flex flex-col gap-1.5 min-[480px]:gap-2';
 export const CARD =
-  'bg-panel border border-line rounded-card px-4 pt-3.5 pb-4 shadow-card border-l-5 border-l-[var(--accent,var(--line-strong))]';
+  'bg-panel border border-line rounded-card px-4 pt-2.5 pb-3 shadow-card border-l-5 border-l-[var(--accent,var(--line-strong))]';
 export const CARD_TOP = 'flex items-baseline justify-between gap-2';
 export const CARD_LABEL = 'm-0 text-[17px] font-bold tracking-[-0.01em]';
 export const CARD_RATE = 'font-mono text-xs text-ink-soft';
-export const CARD_SUBTOTAL = 'mt-2 text-right font-mono text-[13px] text-ink-soft';
+export const CARD_SUBTOTAL = 'mt-1 text-right font-mono text-[13px] text-ink-soft';
 
 // ---- Collapsible toggle-panel (History, Invoice details, Places, ...) ----
 
