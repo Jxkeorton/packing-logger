@@ -33,23 +33,47 @@ export const load: PageServerLoad = async () => {
   const rateSettings = await readRateSettings();
 
   // A wider window of history feeds the week/month rollups; the
-  // day-by-day table only shows the most recent slice of it.
-  const fullHistory = await readHistory(400);
+  // day-by-day table only shows the most recent slice of it. A day
+  // nothing was packed on is noise, not history — day rollover writes a
+  // zero row for whatever day the app is next opened on regardless of
+  // whether anything actually happened, so these do turn up for real,
+  // not just in theory. Filtered here rather than in PackHistoryPanel
+  // so it never has to think about it.
+  const fullHistory = (await readHistory(400)).filter((r) => r.totalPacks > 0);
   const dayRows = fullHistory.slice(0, 14);
 
   // Today isn't in the CSV-backed history yet (it's still being logged),
-  // but it belongs in this week's and this invoice month's running totals.
+  // but it belongs in this week's and this invoice month's running
+  // totals. Same zero filter as above, except for the current
+  // (isCurrent) bucket — that one stays visible even at 0 so far, as a
+  // live "nothing yet this week" indicator rather than a historical
+  // record of an empty one; the day table has no equivalent "still
+  // filling" row to protect, since today's own entry is never in
+  // fullHistory to begin with (readHistory excludes it outright).
   const combined = [...fullHistory, toHistoryRow(state, rateSettings.packing)];
-  const weekRows = groupByWeek(combined, rateSettings.packing).slice(0, 12);
-  const monthRows = groupByInvoiceMonth(combined, rateSettings.packing).slice(0, 12);
+  const weekRows = groupByWeek(combined, rateSettings.packing)
+    .filter((r) => r.isCurrent || r.totalPacks > 0)
+    .slice(0, 12);
+  const monthRows = groupByInvoiceMonth(combined, rateSettings.packing)
+    .filter((r) => r.isCurrent || r.totalPacks > 0)
+    .slice(0, 12);
 
   // Same shape again, for the separate tandem-jump log — one read of
-  // tandem-jumps.csv for both state and history, not two.
+  // tandem-jumps.csv for both state and history, not two. A day/week/
+  // month with zero jumps can't actually occur here the way it can for
+  // packing (tandem-jumps.csv only ever gets a row when a jump is
+  // logged, no day-rollover phantom entry) — the filter's just here for
+  // symmetry with packing and as a no-cost guard if that ever changes.
   const { state: tandemState, history: tandemFullHistory } = await loadTandemStateAndHistory(400);
-  const tandemDayRows = tandemFullHistory.slice(0, 14);
-  const tandemCombined = [...tandemFullHistory, toTandemHistoryRow(tandemState, rateSettings.tandem)];
-  const tandemWeekRows = groupTandemByWeek(tandemCombined, rateSettings.tandem).slice(0, 12);
-  const tandemMonthRows = groupTandemByInvoiceMonth(tandemCombined, rateSettings.tandem).slice(0, 12);
+  const tandemNonEmptyHistory = tandemFullHistory.filter((r) => r.totalJumps > 0);
+  const tandemDayRows = tandemNonEmptyHistory.slice(0, 14);
+  const tandemCombined = [...tandemNonEmptyHistory, toTandemHistoryRow(tandemState, rateSettings.tandem)];
+  const tandemWeekRows = groupTandemByWeek(tandemCombined, rateSettings.tandem)
+    .filter((r) => r.isCurrent || r.totalJumps > 0)
+    .slice(0, 12);
+  const tandemMonthRows = groupTandemByInvoiceMonth(tandemCombined, rateSettings.tandem)
+    .filter((r) => r.isCurrent || r.totalJumps > 0)
+    .slice(0, 12);
 
   const invoiceSettings = await readInvoiceSettings();
   const tandemVisibility = await readTandemVisibility();
