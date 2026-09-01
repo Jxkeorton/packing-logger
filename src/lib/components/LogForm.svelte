@@ -213,9 +213,15 @@
 
 <svelte:window onkeydown={handleKeydown} />
 
-<button type="button" class="log-jump-trigger" onclick={openAdd}>&plus; Log a jump</button>
+<!--
+  Wrapped so the gap to "Check the board" (belowTrigger) can be tighter
+  than APP_VIEW's own gap between this and the entries list below —
+  the two buttons read as one stacked action pair.
+-->
+<div class="flex flex-col gap-2">
+  <button type="button" class="log-jump-trigger" onclick={openAdd}>&plus; Log a jump</button>
 
-{#if modalOpen}
+  {#if modalOpen}
   <!--
     Backdrop scrolls rather than the panel: the form is tall enough to
     exceed a phone viewport, and an inner scroll area would strand the
@@ -406,9 +412,10 @@
       </div>
     </div>
   </div>
-{/if}
+  {/if}
 
-{@render belowTrigger?.()}
+  {@render belowTrigger?.()}
+</div>
 
 <section class="bg-panel border border-line rounded-card shadow-card overflow-hidden">
   <ul class="list-none m-0 p-0">

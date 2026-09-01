@@ -109,7 +109,7 @@
   should need opening first. The button matches "+ Log a jump" for width
   since the two sit stacked as the tab's two primary actions.
 -->
-<div class="flex flex-col gap-2 mt-2.5">
+<div class="flex flex-col gap-2">
   <button
     type="button"
     class="{FORM_SAVE_BUTTON_SECONDARY} w-full flex items-center justify-center gap-2"
