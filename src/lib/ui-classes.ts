@@ -113,6 +113,12 @@ export const FIELD_SELECT = `${FIELD_INPUT} h-10`;
 export const FORM_ACTIONS = 'flex items-center gap-3 mt-1';
 export const FORM_SAVE_BUTTON =
   'appearance-none border-0 rounded-[var(--radius-control)] h-10.5 px-5 font-display font-bold text-sm text-white bg-gold cursor-pointer touch-manipulation disabled:opacity-60 disabled:cursor-default';
+// Same shape as FORM_SAVE_BUTTON, but bordered/muted rather than solid
+// gold — for an action that sits next to a true primary (gold) button
+// and shouldn't compete with it for attention, e.g. "Check the board"
+// next to "+ Log a jump".
+export const FORM_SAVE_BUTTON_SECONDARY =
+  'appearance-none border border-line-strong rounded-[var(--radius-control)] h-10.5 px-5 font-display font-bold text-sm text-ink bg-panel cursor-pointer touch-manipulation disabled:opacity-60 disabled:cursor-default';
 export const FORM_STATUS = 'text-[12.5px] text-ink-soft data-[state=ok]:text-student data-[state=error]:text-danger';
 export const PANEL_HINT = 'mt-0 mb-3.5 text-[12.5px] text-ink-soft';
 

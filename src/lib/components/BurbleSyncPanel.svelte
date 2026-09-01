@@ -8,7 +8,7 @@
   // on any tab. Nothing here writes a jump.
   import { enhance, deserialize } from '$app/forms';
   import { invalidateAll } from '$app/navigation';
-  import { FORM_SAVE_BUTTON, FORM_STATUS, PANEL_HINT } from '$lib/ui-classes';
+  import { FORM_SAVE_BUTTON_SECONDARY, FORM_STATUS, PANEL_HINT } from '$lib/ui-classes';
   import Spinner from './Spinner.svelte';
 
   let {
@@ -112,7 +112,7 @@
 <div class="flex flex-col gap-2 mt-2.5">
   <button
     type="button"
-    class="{FORM_SAVE_BUTTON} w-full flex items-center justify-center gap-2"
+    class="{FORM_SAVE_BUTTON_SECONDARY} w-full flex items-center justify-center gap-2"
     onclick={syncNow}
     disabled={syncing || !ready}
   >
@@ -139,10 +139,6 @@
         <span>Keep checking every {pollSeconds}s while this screen is open</span>
       </label>
     </form>
-    <p class="{PANEL_HINT} mt-0 mb-0">
-      Only runs with the app open and the screen awake — iOS stops it when the phone locks. Check the board by hand
-      after a load if you've had it in your pocket.
-    </p>
 
     {#if lastSyncAt}
       <p class="{PANEL_HINT} mt-0 mb-0">Last checked {clockOf(lastSyncAt)}.</p>
