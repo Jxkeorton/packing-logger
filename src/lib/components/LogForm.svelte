@@ -7,6 +7,7 @@
   // exists here — {#each} replaces the row-template function, $state/$derived
   // replace the DOM reads, and use:enhance replaces the fetch/JSON handlers.
   import { enhance } from '$app/forms';
+  import type { Snippet } from 'svelte';
   import { exitAltitudeDigits, formatExitAltitude } from '$lib/format';
   import Spinner from './Spinner.svelte';
   import { TANDEM_JUMP_TYPES } from '$lib/tandem';
@@ -35,12 +36,15 @@
     settings,
     today,
     dateDisplay,
+    belowTrigger,
   }: {
     entries: NumberedEntry[];
     nextNumber: number;
     settings: LogbookSettings;
     today: string;
     dateDisplay: string;
+    /** Rendered right after the "+ Log a jump" trigger (and its modal), before the entries list — where +page.svelte puts the manifest sync "Check the board" button. */
+    belowTrigger?: Snippet;
   } = $props();
 
   interface FormFields {
@@ -403,6 +407,8 @@
     </div>
   </div>
 {/if}
+
+{@render belowTrigger?.()}
 
 <section class="bg-panel border border-line rounded-card shadow-card overflow-hidden">
   <ul class="list-none m-0 p-0">

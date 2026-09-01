@@ -512,22 +512,25 @@
 
   <!-- Logbook -->
   <div class={APP_VIEW} hidden={activeAppTab !== 'logbook' || settingsOpen}>
-    <BurbleSyncPanel
-      enabled={data.logbookSettings.burble.enabled}
-      autoPoll={data.logbookSettings.burble.autoPoll}
-      pollSeconds={data.logbookSettings.burble.pollSeconds}
-      pendingCount={data.burblePending.length}
-      unmappedCodes={data.burbleUnmappedCodes}
-      lastSyncAt={data.burbleLastSyncAt}
-    />
-
     <LogForm
       entries={data.logbookEntries}
       nextNumber={data.nextLogbookNumber}
       settings={data.logbookSettings}
       today={data.today}
       dateDisplay={data.dateDisplay}
-    />
+    >
+      {#snippet belowTrigger()}
+        <BurbleSyncPanel
+          enabled={data.logbookSettings.burble.enabled}
+          autoPoll={data.logbookSettings.burble.autoPoll}
+          pollSeconds={data.logbookSettings.burble.pollSeconds}
+          pendingCount={data.burblePending.length}
+          unmappedCodes={data.burbleUnmappedCodes}
+          lastSyncAt={data.burbleLastSyncAt}
+          myNames={data.logbookSettings.burble.myNames}
+        />
+      {/snippet}
+    </LogForm>
 
     <footer class={FOOT}>
       <DownloadButton href="/api/logbook-export.csv" filename="logbook.csv" label="Download full logbook (.csv)" />

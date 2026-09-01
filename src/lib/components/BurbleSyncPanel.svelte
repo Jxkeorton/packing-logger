@@ -8,17 +8,7 @@
   // on any tab. Nothing here writes a jump.
   import { enhance, deserialize } from '$app/forms';
   import { invalidateAll } from '$app/navigation';
-  import {
-    TOGGLE_SECTION,
-    TOGGLE_BUTTON,
-    TOGGLE_ICON,
-    TOGGLE_PANEL,
-    TOGGLE_PANEL_PADDED,
-    PANEL_HINT,
-    FORM_ACTIONS,
-    FORM_SAVE_BUTTON,
-    FORM_STATUS,
-  } from '$lib/ui-classes';
+  import { FORM_SAVE_BUTTON, FORM_STATUS, PANEL_HINT } from '$lib/ui-classes';
   import Spinner from './Spinner.svelte';
 
   let {
@@ -28,6 +18,7 @@
     pendingCount,
     unmappedCodes,
     lastSyncAt,
+    myNames,
   }: {
     enabled: boolean;
     autoPoll: boolean;
@@ -35,9 +26,16 @@
     pendingCount: number;
     unmappedCodes: string[];
     lastSyncAt: string | null;
+    myNames: string[];
   } = $props();
 
-  let open = $state(true);
+  // "Check the board" needs both the toggle on *and* a name to look
+  // for — syncManifest would just fail server-side without either, but
+  // disabling it here (and saying why) beats letting someone tap it and
+  // get back a generic error for something Settings can tell them about
+  // up front.
+  const ready = $derived(enabled && myNames.length > 0);
+
   let status = $state<{ text: string; kind?: 'ok' | 'error' }>({ text: '' });
   let syncing = $state(false);
 
@@ -105,73 +103,67 @@
   });
 </script>
 
-<section class={TOGGLE_SECTION}>
-  <button type="button" class={TOGGLE_BUTTON} aria-expanded={open} onclick={() => (open = !open)}>
-    <span>
-      Manifest
-    </span>
-    <span class={TOGGLE_ICON} class:rotate-90={open}>&rsaquo;</span>
+<!--
+  Flat, always-visible block — no accordion. This is the thing you
+  actually tap before boarding, every time, so nothing about reaching it
+  should need opening first. The button matches "+ Log a jump" for width
+  since the two sit stacked as the tab's two primary actions.
+-->
+<div class="flex flex-col gap-2 mt-2.5">
+  <button
+    type="button"
+    class="{FORM_SAVE_BUTTON} w-full flex items-center justify-center gap-2"
+    onclick={syncNow}
+    disabled={syncing || !ready}
+  >
+    {#if syncing}<Spinner size={14} />{/if}{syncing ? 'Checking…' : 'Check the board'}
   </button>
+  <span class={FORM_STATUS} data-state={ready ? status.kind : 'error'} role="status">
+    {ready ? status.text : 'Add your name and turn on manifest sync under Settings → Manifest sync first.'}
+  </span>
 
-  {#if open}
-    <div class="{TOGGLE_PANEL} {TOGGLE_PANEL_PADDED}">
-      {#if !enabled}
-        <p class={PANEL_HINT}>
-          Manifest sync is off. Turn it on under Settings &rarr; Manifest sync, with your dropzone id and the name that
-          appears on the board.
-        </p>
-      {:else}
-        <div class={FORM_ACTIONS}>
-          <button type="button" class="{FORM_SAVE_BUTTON} flex items-center justify-center gap-2" onclick={syncNow} disabled={syncing}>
-            {#if syncing}<Spinner size={14} />{/if}{syncing ? 'Checking…' : 'Check the board'}
-          </button>
-          <span class={FORM_STATUS} data-state={status.kind} role="status">{status.text}</span>
-        </div>
+  {#if ready}
+    <form
+      method="POST"
+      action="?/setBurbleAutoPoll"
+      use:enhance={() => async ({ update }) => await update({ reset: false })}
+    >
+      <label class="flex items-center gap-2 text-[12.5px] font-semibold text-ink-soft">
+        <input
+          type="checkbox"
+          name="autoPoll"
+          checked={autoPoll}
+          onchange={(e) => e.currentTarget.form?.requestSubmit()}
+          class="size-4"
+        />
+        <span>Keep checking every {pollSeconds}s while this screen is open</span>
+      </label>
+    </form>
+    <p class="{PANEL_HINT} mt-0 mb-0">
+      Only runs with the app open and the screen awake — iOS stops it when the phone locks. Check the board by hand
+      after a load if you've had it in your pocket.
+    </p>
 
-        <form
-          method="POST"
-          action="?/setBurbleAutoPoll"
-          class="mt-3.5"
-          use:enhance={() => async ({ update }) => await update({ reset: false })}
-        >
-          <label class="flex items-center gap-2 text-[12.5px] font-semibold text-ink-soft">
-            <input
-              type="checkbox"
-              name="autoPoll"
-              checked={autoPoll}
-              onchange={(e) => e.currentTarget.form?.requestSubmit()}
-              class="size-4"
-            />
-            <span>Keep checking every {pollSeconds}s while this screen is open</span>
-          </label>
-        </form>
-        <p class="{PANEL_HINT} mt-1.5">
-          Only runs with the app open and the screen awake — iOS stops it when the phone locks. Check the board by hand
-          after a load if you've had it in your pocket.
-        </p>
+    {#if lastSyncAt}
+      <p class="{PANEL_HINT} mt-0 mb-0">Last checked {clockOf(lastSyncAt)}.</p>
+    {/if}
 
-        {#if lastSyncAt}
-          <p class="{PANEL_HINT} mb-0">Last checked {clockOf(lastSyncAt)}.</p>
-        {/if}
+    {#if unmappedCodes.length > 0}
+      <p class="mt-0 mb-0 rounded-[10px] border border-line-strong px-3 py-2.5 text-[12.5px] text-ink-soft">
+        Your name appeared with {unmappedCodes.length === 1 ? 'a jump code' : 'jump codes'} this app doesn't know:
+        <strong class="text-ink">{unmappedCodes.join(', ')}</strong>. Add {unmappedCodes.length === 1
+          ? 'it'
+          : 'them'} under Settings &rarr; Manifest sync and they'll be logged next time.
+      </p>
+    {/if}
 
-        {#if unmappedCodes.length > 0}
-          <p class="mt-3.5 mb-0 rounded-[10px] border border-line-strong px-3 py-2.5 text-[12.5px] text-ink-soft">
-            Your name appeared with {unmappedCodes.length === 1 ? 'a jump code' : 'jump codes'} this app doesn't know:
-            <strong class="text-ink">{unmappedCodes.join(', ')}</strong>. Add {unmappedCodes.length === 1
-              ? 'it'
-              : 'them'} under Settings &rarr; Manifest sync and they'll be logged next time.
-          </p>
-        {/if}
-
-        {#if pendingCount > 0}
-          <p class="{PANEL_HINT} mt-3.5 mb-0">
-            {pendingCount === 1 ? '1 jump is' : `${pendingCount} jumps are`} waiting to be confirmed — see
-            <strong class="text-ink">Jumps to confirm</strong> at the top of the screen.
-          </p>
-        {:else if lastSyncAt}
-          <p class="{PANEL_HINT} mt-3.5 mb-0">Nothing with your name on it right now.</p>
-        {/if}
-      {/if}
-    </div>
+    {#if pendingCount > 0}
+      <p class="{PANEL_HINT} mt-0 mb-0">
+        {pendingCount === 1 ? '1 jump is' : `${pendingCount} jumps are`} waiting to be confirmed — see
+        <strong class="text-ink">Jumps to confirm</strong> at the top of the screen.
+      </p>
+    {:else if lastSyncAt}
+      <p class="{PANEL_HINT} mt-0 mb-0">Nothing with your name on it right now.</p>
+    {/if}
   {/if}
-</section>
+</div>
