@@ -70,10 +70,26 @@ function csvLineFor(state: DayState, rates: Record<Category, number>): string {
   ].join(',');
 }
 
-/** Insert or update the CSV row for a given day's totals, keeping dates in order. */
+/**
+ * Sync one day's row in the CSV to `state.counts` — set it if there's
+ * anything to record, remove it (or simply never add it) if the day is
+ * all zeros. A day nothing was packed on — the app opened but nothing
+ * tapped, or a correction that zeroes a day back out via setDayCounts —
+ * never gets a "0,0,0,0" row at all, rather than a permanent one that
+ * only the History panels' own filtering used to hide (+page.server.ts
+ * still does that filtering, for rows already written before this
+ * existed — this is what stops new ones from being written to begin
+ * with). Every call site just calls this the same way regardless of
+ * whether the day turned out to be empty; the zero check lives here
+ * once instead of at each caller.
+ */
 async function upsertCsvRow(state: DayState): Promise<void> {
   const [rows, rates] = await Promise.all([readCsvRows(), readRateSettings()]);
-  rows.set(state.date, csvLineFor(state, rates.packing));
+  if (totalPacks(state.counts) > 0) {
+    rows.set(state.date, csvLineFor(state, rates.packing));
+  } else {
+    rows.delete(state.date);
+  }
 
   const sortedDates = [...rows.keys()].sort();
   const body = sortedDates.map((d) => rows.get(d)).join('\n');
@@ -97,14 +113,21 @@ export async function loadTodayState(): Promise<DayState> {
   }
 
   // New day (or first run ever). Make sure the previous day's totals are
-  // flushed to the CSV before starting a fresh count at zero.
+  // flushed to the CSV before starting a fresh count at zero — upsertCsvRow
+  // itself skips writing anything if that day turned out to be all zeros
+  // (nobody packed, they just had the app open), rather than persisting a
+  // "0,0,0,0" row for it.
   if (existing) {
     await upsertCsvRow(existing);
   }
 
+  // No matching upsertCsvRow(fresh) here: a freshly-zeroed day can never
+  // have anything worth writing yet (upsertCsvRow would just no-op on
+  // it), so skip the extra CSV read+write and let the first real
+  // adjustCount() — or tomorrow's rollover, if today ends up empty too —
+  // be what actually touches the file.
   const fresh: DayState = { date: today, counts: zeroCounts() };
   await writeState(fresh);
-  await upsertCsvRow(fresh);
   return fresh;
 }
 
