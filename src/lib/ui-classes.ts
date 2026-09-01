@@ -41,13 +41,17 @@ export const TOTALS_DIVIDER = 'w-px self-stretch bg-line';
 
 // ---- Settings entry point (cog button + the Settings view it opens) ----
 
-// Square icon button — the header's cog toggle, and (via the same class)
-// the Settings view's own back button. Both read border-radius from
-// --radius-control, so the cog stays in step with the tab bar's own
-// rounding out here, while the back button picks up the tighter value
+// Square icon button — the Settings view's own back button. Reads
+// border-radius from --radius-control, so it picks up the tighter value
 // .settings-scope sets once it's rendered inside that view.
 export const ICON_BUTTON =
   'appearance-none shrink-0 flex items-center justify-center size-10.5 border border-line bg-panel text-ink-soft rounded-[var(--radius-control)] cursor-pointer aria-pressed:bg-ink aria-pressed:border-ink aria-pressed:text-canvas';
+// Same shape as ICON_BUTTON, but borderless/transparent and a size step
+// down — for the Settings cog once it moved inside the sticky glass tab
+// bar (+page.svelte), where the bar itself supplies the border/background
+// and a full-size button would sit taller than the tabs beside it.
+export const ICON_BUTTON_GHOST =
+  'appearance-none shrink-0 flex items-center justify-center size-9 border-0 bg-transparent text-ink-soft rounded-[var(--radius-control)] cursor-pointer aria-pressed:bg-ink aria-pressed:text-canvas';
 export const SETTINGS_TITLE = 'm-0 font-display text-[19px] font-bold tracking-[-0.01em]';
 export const SETTINGS_GROUP_LABEL = 'text-xs font-bold text-ink-soft uppercase tracking-[0.08em]';
 

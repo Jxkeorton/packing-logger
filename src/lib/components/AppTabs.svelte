@@ -30,11 +30,19 @@
     onSelect?: () => void;
   } = $props();
 
+  // Ghost segments on the glass bar +page.svelte wraps this in, not
+  // bordered cards of their own — the bar supplies the background/border,
+  // this just needs the selected pill. min-w-0 lets a flex-1 button
+  // shrink below its content's natural width instead of forcing the row
+  // to grow; whitespace-nowrap + text-ellipsis turn "not enough room" into
+  // a clipped label as a last resort instead of a second line, which used
+  // to make the whole bar (and its siblings) taller on narrower phones —
+  // "Work jumps" was the label that first hit this.
   const tabClass =
-    'flex-1 appearance-none border border-line bg-panel text-ink-soft font-sans font-bold text-sm p-2.5 rounded-[10px] cursor-pointer aria-selected:bg-ink aria-selected:border-ink aria-selected:text-canvas';
+    'flex-1 min-w-0 appearance-none border-0 bg-transparent text-ink-soft font-sans font-bold text-[12.5px] tracking-[-0.01em] whitespace-nowrap overflow-hidden text-ellipsis px-2.5 py-1.5 rounded-[var(--radius-control)] cursor-pointer aria-selected:bg-ink aria-selected:text-canvas';
 </script>
 
-<div class="flex gap-2" role="tablist" aria-label="Section">
+<div class="flex-1 flex gap-1 min-w-0" role="tablist" aria-label="Section">
   {#if visibility.packing}
     <button
       type="button"

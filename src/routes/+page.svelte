@@ -57,6 +57,7 @@
     FIELD_LABEL_NARROW,
     FIELD_INPUT,
     ICON_BUTTON,
+    ICON_BUTTON_GHOST,
     SETTINGS_TITLE,
     SETTINGS_GROUP_LABEL,
     SETTINGS_GROUP,
@@ -181,13 +182,21 @@
 >
   <PendingJumpsMenu pending={data.burblePending} />
 
-  <div class="flex gap-2">
-    <div class="flex-1">
-      <AppTabs bind:activeTab={activeAppTab} visibility={data.tabVisibility} onSelect={() => (settingsOpen = false)} />
-    </div>
+  <!--
+    Sticky so the tabs (and Settings) stay reachable while a long history
+    table or logbook list scrolls underneath — glassy rather than solid so
+    it still reads as chrome floating over content, not another content
+    card. header-scope tightens the radius the same way settings-scope
+    does for the Settings view, since this is app chrome too.
+  -->
+  <div
+    class="header-scope sticky top-0 z-10 flex items-center gap-1 p-1 rounded-[var(--radius-control)] bg-panel/75 backdrop-blur-md border border-line shadow-card"
+  >
+    <AppTabs bind:activeTab={activeAppTab} visibility={data.tabVisibility} onSelect={() => (settingsOpen = false)} />
+    <div class="w-px self-stretch bg-line-strong/50" aria-hidden="true"></div>
     <button
       type="button"
-      class={ICON_BUTTON}
+      class={ICON_BUTTON_GHOST}
       aria-label="Settings"
       aria-pressed={settingsOpen}
       onclick={() => (settingsOpen = !settingsOpen)}

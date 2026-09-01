@@ -124,3 +124,13 @@ body {
   --radius: 5px;
   --radius-control: 5px;
 }
+
+/*
+ * The sticky tab bar (AppTabs + the Settings cog, in +page.svelte) —
+ * same tighter radius as .settings-scope, for the same reason: it's app
+ * chrome, not a content card, so it reads better tighter than the
+ * --radius-control every other button on Packing/Tandems/Logbook uses.
+ */
+.header-scope {
+  --radius-control: 5px;
+}
