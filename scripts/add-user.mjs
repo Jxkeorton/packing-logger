@@ -4,13 +4,18 @@
 //
 //   node --env-file=.env.friends scripts/add-user.mjs --add jane
 //   node --env-file=.env.friends scripts/add-user.mjs --reset jane
+//   node --env-file=.env.friends scripts/add-user.mjs --check jane
 //   node --env-file=.env.friends scripts/add-user.mjs --list
 //
-// --add and --reset both prompt for a password on the terminal rather
-// than taking it as an argument, so it never ends up sitting in shell
-// history. --reset is for "I forgot it" / "it's not working" — it keeps
-// the account's id (and so its existing ledgers) and only replaces the
-// password.
+// --add, --reset, and --check all prompt for a password on the terminal
+// rather than taking it as an argument, so it never ends up sitting in
+// shell history. --reset is for "I forgot it" / "it's not working" — it
+// keeps the account's id (and so its existing ledgers) and only replaces
+// the password. --check is read-only: it hashes what you type against
+// the stored salt and says whether it matches, without changing
+// anything — use it to tell "the password really doesn't match what's
+// stored" apart from "something else is wrong" before reaching for
+// --reset.
 //
 // Env it needs: R2_ACCOUNT_ID, R2_BUCKET, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY
 // — the shared deployment's bucket, not any one person's. AUTH_SECRET
@@ -124,6 +129,25 @@ async function addUser(username) {
   console.log(`(their ledgers will live at packing-logger/users/${record.id}/... in this bucket)`);
 }
 
+async function checkPassword(username) {
+  if (!username) {
+    console.error('Usage: --check <username>');
+    process.exit(1);
+  }
+
+  const users = await readUsers();
+  const clean = username.trim().toLowerCase();
+  const match = users.find((u) => u.username?.trim().toLowerCase() === clean);
+  if (!match) {
+    console.error(`No account for "${username}". Bucket: ${bucket}.`);
+    process.exit(1);
+  }
+
+  const password = await promptPassword(`Password to check for ${match.username}: `);
+  const candidateHash = hashPassword(password, match.salt);
+  console.log(candidateHash === match.hash ? '✓ Matches what is stored.' : '✗ Does NOT match what is stored.');
+}
+
 async function resetPassword(username) {
   if (!username) {
     console.error('Usage: --reset <username>');
@@ -185,7 +209,10 @@ async function main() {
   const resetIndex = args.indexOf('--reset');
   if (resetIndex !== -1) return resetPassword(args[resetIndex + 1]);
 
-  console.error('Usage:\n  --add <username>\n  --reset <username>\n  --list');
+  const checkIndex = args.indexOf('--check');
+  if (checkIndex !== -1) return checkPassword(args[checkIndex + 1]);
+
+  console.error('Usage:\n  --add <username>\n  --reset <username>\n  --check <username>\n  --list');
   process.exit(1);
 }
 
