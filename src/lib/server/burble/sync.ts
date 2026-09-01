@@ -33,6 +33,7 @@ import { fetchLoads, BurbleError } from './client';
 import {
   FLOWN_STATUSES,
   matchSlots,
+  normaliseCode,
   realLoads,
   describeMatch,
   type BurbleMatch,
@@ -60,6 +61,22 @@ export interface SyncState {
   sessionId: number | null;
   /** Absent on a cache miss, so `null` means "unknown" and forces a full pass. */
   lastVersion: number | null;
+  /**
+   * Fingerprint of whatever settings the last *real* (non-skipped) pass
+   * matched against — myNames and codeMap, the two that decide whether a
+   * slot matches at all. `null` (never set, or an older saved state from
+   * before this existed) means "unknown", same treatment as lastVersion:
+   * forces a full pass rather than risking a wrong skip.
+   *
+   * Needed because the version short-circuit below is otherwise blind to
+   * a settings change: the board can be genuinely unchanged (same
+   * version) while the reason a slot didn't match last time — a jump
+   * code with no mapping yet — has just been fixed in Settings. Without
+   * this, mapping a code that's already on the board does nothing until
+   * the board itself changes, which "manifest sync ignored it
+   * completely" is exactly what that looks like.
+   */
+  lastMatchSettingsKey: string | null;
   pending: Record<string, PendingJump>;
   /** slot id → the logbook `at` it was committed as. The dedupe ledger. */
   committed: Record<string, string>;
@@ -73,12 +90,18 @@ export interface SyncState {
 const EMPTY_STATE: SyncState = {
   sessionId: null,
   lastVersion: null,
+  lastMatchSettingsKey: null,
   pending: {},
   committed: {},
   unmappedCodes: [],
   lastSyncAt: null,
   lastMatchAt: null,
 };
+
+/** What a match outcome actually depends on — a change here should force a re-match even if the board hasn't moved. */
+function matchSettingsKey(burble: BurbleSettings): string {
+  return JSON.stringify({ myNames: burble.myNames, codeMap: burble.codeMap });
+}
 
 export async function readSyncState(): Promise<SyncState> {
   const raw = await readText(STATE_KEY);
@@ -89,6 +112,7 @@ export async function readSyncState(): Promise<SyncState> {
     return {
       sessionId: typeof parsed.sessionId === 'number' ? parsed.sessionId : null,
       lastVersion: typeof parsed.lastVersion === 'number' ? parsed.lastVersion : null,
+      lastMatchSettingsKey: typeof parsed.lastMatchSettingsKey === 'string' ? parsed.lastMatchSettingsKey : null,
       pending: isRecord(parsed.pending) ? (parsed.pending as Record<string, PendingJump>) : {},
       committed: isRecord(parsed.committed) ? (parsed.committed as Record<string, string>) : {},
       unmappedCodes: Array.isArray(parsed.unmappedCodes)
@@ -183,15 +207,26 @@ export async function syncOnce(settings?: BurbleSettings): Promise<SyncOutcome> 
   }
   if (sessionId !== null) next.sessionId = sessionId;
 
-  // Cheap short-circuit, but only when we positively know the version is
-  // unchanged. A missing version (cache miss) means unknown, so we fall
-  // through and do the full pass — skipping one during a departure window
-  // is exactly how a jump gets lost.
-  if (version !== null && state.lastVersion !== null && version === state.lastVersion) {
+  // Cheap short-circuit, but only when we positively know *both* the
+  // board and whatever settings matching depends on are unchanged since
+  // the last real pass. A missing version (cache miss) means unknown, so
+  // we fall through and do the full pass — skipping one during a
+  // departure window is exactly how a jump gets lost. Checking the
+  // settings key too, not just the version, is what lets mapping a code
+  // that's already on the board take effect on the very next sync
+  // instead of waiting for the board to change on its own.
+  const settingsKey = matchSettingsKey(burble);
+  if (
+    version !== null &&
+    state.lastVersion !== null &&
+    version === state.lastVersion &&
+    state.lastMatchSettingsKey === settingsKey
+  ) {
     await writeSyncState(next);
     return { ok: true, skipped: true, boardLoads: loads.length, state: next };
   }
   next.lastVersion = version;
+  next.lastMatchSettingsKey = settingsKey;
 
   const { matches, unmappedCodes } = matchSlots(loads, burble.myNames, burble.codeMap);
   const onBoardLoadIds = new Set(loads.map((l) => l.id));
@@ -223,7 +258,17 @@ export async function syncOnce(settings?: BurbleSettings): Promise<SyncOutcome> 
   }
 
   next.pending = pending;
-  next.unmappedCodes = [...new Set([...state.unmappedCodes, ...unmappedCodes])];
+  // Additive with the previous list, not a replacement — an unmapped
+  // code seen once should keep surfacing even after the load that
+  // revealed it leaves the board, so there's still something to map it
+  // from. But a code that's *since been mapped* has to actually drop
+  // off here, not just stop being reported by matchSlots this pass —
+  // otherwise it sits in the list forever looking unmapped even though
+  // Settings now has it covered.
+  const mappedCodes = new Set(burble.codeMap.map((m) => normaliseCode(m.code)));
+  next.unmappedCodes = [...new Set([...state.unmappedCodes, ...unmappedCodes])].filter(
+    (code) => !mappedCodes.has(normaliseCode(code)),
+  );
   if (matches.length > 0) next.lastMatchAt = now;
 
   await writeSyncState(next);

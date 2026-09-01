@@ -176,6 +176,41 @@ describe('version short-circuiting', () => {
     expect((await syncOnce(TI)).skipped).toBeFalsy();
     expect(pendingJumps(await readSyncState())[0].leftBoard).toBe(true);
   });
+
+  it('does a full pass — not skipped — when only the code map changed, not the board', async () => {
+    // Reported bug: map a code that's already on the board, sync again
+    // with nothing else different, and it was silently ignored — the
+    // short-circuit above only ever looked at the board's own version,
+    // not at whether *matching itself* had anything new to work with.
+    const withoutTI: BurbleSettings = { ...TI, codeMap: DEFAULT_BURBLE_CODE_MAP.filter((m) => m.code !== 'TI') };
+    script(at(ON_CALL, 7));
+    await syncOnce(withoutTI);
+    expect(pendingJumps(await readSyncState())).toHaveLength(0);
+    expect((await readSyncState()).unmappedCodes).toContain('TI');
+
+    // Same board version as before (7), only the settings passed in changed.
+    script(at(ON_CALL, 7));
+    const outcome = await syncOnce(TI);
+
+    expect(outcome.skipped).toBeFalsy();
+    const pending = pendingJumps(await readSyncState());
+    expect(pending).toHaveLength(1);
+    expect(pending[0]).toMatchObject({ role: 'instructor', customerName: 'Miranda Walfield' });
+  });
+
+  it('drops a code from unmappedCodes once it has a mapping, even without it appearing on the board again', async () => {
+    const withoutTI: BurbleSettings = { ...TI, codeMap: DEFAULT_BURBLE_CODE_MAP.filter((m) => m.code !== 'TI') };
+    script(at(ON_CALL, 7));
+    await syncOnce(withoutTI);
+    expect((await readSyncState()).unmappedCodes).toContain('TI');
+
+    // The board's moved on (empty now) — TI won't be re-seen as unmapped
+    // or otherwise this pass, only the settings say it's covered now.
+    script(at(EMPTY_BOARD, 8));
+    await syncOnce(TI);
+
+    expect((await readSyncState()).unmappedCodes).not.toContain('TI');
+  });
 });
 
 describe('confirming a tandem jump', () => {
