@@ -84,6 +84,28 @@ export async function createUser(username: string, password: string): Promise<Us
   return record;
 }
 
+/**
+ * For scripts/add-user.mjs's --reset. Replaces the password only — id,
+ * username, and createdAt are untouched, so the account keeps the same
+ * storage key (users/<id>/...) and doesn't lose any existing ledgers the
+ * way deleting and re-adding the account would.
+ */
+export async function resetPassword(username: string, newPassword: string): Promise<UserRecord> {
+  if (newPassword.length < 8) throw new Error('Password must be at least 8 characters.');
+
+  const users = await readUsers();
+  const clean = normaliseUsername(username);
+  const index = users.findIndex((u) => normaliseUsername(u.username) === clean);
+  if (index === -1) throw new Error(`No account for "${username}".`);
+
+  const salt = randomBytes(16).toString('hex');
+  const updated: UserRecord = { ...users[index], salt, hash: hashPassword(newPassword, salt) };
+  const next = [...users];
+  next[index] = updated;
+  await writeUsers(next);
+  return updated;
+}
+
 /** For scripts/add-user.mjs's --list. */
 export async function listUsers(): Promise<Pick<UserRecord, 'id' | 'username' | 'createdAt'>[]> {
   return (await readUsers()).map(({ id, username, createdAt }) => ({ id, username, createdAt }));

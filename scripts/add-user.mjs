@@ -3,10 +3,14 @@
 // how an account gets created, run by whoever owns the deployment.
 //
 //   node --env-file=.env.friends scripts/add-user.mjs --add jane
+//   node --env-file=.env.friends scripts/add-user.mjs --reset jane
 //   node --env-file=.env.friends scripts/add-user.mjs --list
 //
-// --add prompts for a password on the terminal rather than taking it as
-// an argument, so it never ends up sitting in shell history.
+// --add and --reset both prompt for a password on the terminal rather
+// than taking it as an argument, so it never ends up sitting in shell
+// history. --reset is for "I forgot it" / "it's not working" — it keeps
+// the account's id (and so its existing ledgers) and only replaces the
+// password.
 //
 // Env it needs: R2_ACCOUNT_ID, R2_BUCKET, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY
 // — the shared deployment's bucket, not any one person's. AUTH_SECRET
@@ -120,6 +124,42 @@ async function addUser(username) {
   console.log(`(their ledgers will live at packing-logger/users/${record.id}/... in this bucket)`);
 }
 
+async function resetPassword(username) {
+  if (!username) {
+    console.error('Usage: --reset <username>');
+    process.exit(1);
+  }
+
+  const users = await readUsers();
+  const clean = username.trim().toLowerCase();
+  const index = users.findIndex((u) => u.username?.trim().toLowerCase() === clean);
+  if (index === -1) {
+    console.error(`No account for "${username}". Bucket: ${bucket}.`);
+    process.exit(1);
+  }
+
+  const password = await promptPassword(`New password for ${users[index].username} (min 8 characters): `);
+  if (password.length < 8) {
+    console.error('Password must be at least 8 characters.');
+    process.exit(1);
+  }
+  const confirm = await promptPassword('Confirm password: ');
+  if (confirm !== password) {
+    console.error('Passwords did not match — nothing saved.');
+    process.exit(1);
+  }
+
+  // Same id, username, and createdAt — only the salt/hash change, so the
+  // account keeps the same storage key and doesn't lose its ledgers the
+  // way deleting and re-adding it would.
+  const salt = randomBytes(16).toString('hex');
+  const next = [...users];
+  next[index] = { ...users[index], salt, hash: hashPassword(password, salt) };
+
+  await writeUsers(next);
+  console.log(`Reset ${users[index].username}'s password. They can sign in with it now.`);
+}
+
 async function listUsers() {
   const users = await readUsers();
   console.log(`Bucket: ${bucket}\n`);
@@ -142,7 +182,10 @@ async function main() {
   const addIndex = args.indexOf('--add');
   if (addIndex !== -1) return addUser(args[addIndex + 1]);
 
-  console.error('Usage:\n  --add <username>\n  --list');
+  const resetIndex = args.indexOf('--reset');
+  if (resetIndex !== -1) return resetPassword(args[resetIndex + 1]);
+
+  console.error('Usage:\n  --add <username>\n  --reset <username>\n  --list');
   process.exit(1);
 }
 

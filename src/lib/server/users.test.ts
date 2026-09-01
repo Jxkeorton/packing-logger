@@ -12,7 +12,7 @@ vi.mock('./storage', () => ({
   },
 }));
 
-const { createUser, listUsers, verifyCredentials } = await import('./users');
+const { createUser, listUsers, resetPassword, verifyCredentials } = await import('./users');
 
 beforeEach(() => {
   store.clear();
@@ -59,6 +59,36 @@ describe('verifyCredentials', () => {
   it('never stores or returns the plaintext password', async () => {
     await createUser('Jane', 'correct-horse');
     expect(store.get('users.json')).not.toContain('correct-horse');
+  });
+});
+
+describe('resetPassword', () => {
+  it('accepts the new password afterward and rejects the old one', async () => {
+    await createUser('Jane', 'correct-horse');
+    await resetPassword('Jane', 'new-password');
+    expect(await verifyCredentials('Jane', 'correct-horse')).toBeNull();
+    expect(await verifyCredentials('Jane', 'new-password')).not.toBeNull();
+  });
+
+  it('keeps the same id, so existing ledgers stay reachable', async () => {
+    const original = await createUser('Jane', 'correct-horse');
+    const updated = await resetPassword('Jane', 'new-password');
+    expect(updated.id).toBe(original.id);
+  });
+
+  it('matches the username case- and whitespace-insensitively', async () => {
+    await createUser('Jane', 'correct-horse');
+    await resetPassword('  JANE ', 'new-password');
+    expect(await verifyCredentials('Jane', 'new-password')).not.toBeNull();
+  });
+
+  it('rejects a username with no account', async () => {
+    await expect(resetPassword('nobody', 'new-password')).rejects.toThrow(/no account/i);
+  });
+
+  it('refuses a password under 8 characters', async () => {
+    await createUser('Jane', 'correct-horse');
+    await expect(resetPassword('Jane', 'short')).rejects.toThrow(/at least 8 characters/);
   });
 });
 
