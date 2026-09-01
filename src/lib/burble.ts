@@ -90,11 +90,16 @@ export interface BurbleCodeMapping {
  */
 export const DEFAULT_BURBLE_CODE_MAP: BurbleCodeMapping[] = [
   // Skydive Langar (dz_id 531) — the DZ this app is used at. TAN/VID
-  // confirmed by the jumper; EXP seen on the live board.
+  // confirmed by the jumper; EXP and STA seen on the live board. STA is
+  // its own jump type rather than folded into EXP/EXP+KIT's "Sport" —
+  // rostered staff duty (manifesting, currency, whatever else "Staff"
+  // covers) isn't a sport jump, it just deserves the same solo
+  // treatment: logbook only, no Work jumps tab entry.
   { code: 'TAN', role: 'instructor', jumpTypeName: 'Tandem Instructor' },
   { code: 'VID', role: 'videographer', jumpTypeName: 'Tandem Camera' },
   { code: 'EXP', role: 'solo', jumpTypeName: 'Sport' },
   { code: 'EXP+KIT', role: 'solo', jumpTypeName: 'Sport' },
+  { code: 'STA', role: 'solo', jumpTypeName: 'Staff' },
   // Beccles (8494) shorthand, kept so a visit or a boogie there still logs
   // rather than piling up unmapped codes. Harmless where unused.
   { code: 'TI', role: 'instructor', jumpTypeName: 'Tandem Instructor' },
