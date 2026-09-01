@@ -12,6 +12,17 @@
   // is in flight can't fire another login attempt. A wrong-password
   // response re-renders this page fresh from the server, which
   // re-initialises this state to false again on its own.
+  //
+  // The username/password fields use `readonly`, not `disabled`, once
+  // submitting: a *disabled* form control's value is dropped from the
+  // browser's own submission entirely, per spec — fine for use:enhance
+  // forms elsewhere (their fetch reads FormData before this ever
+  // renders), but this is a genuine native submit, so disabling these
+  // two fields the instant they're clicked could race the browser's own
+  // form-serialisation step and submit an empty field on some browsers
+  // (reported by a user on iOS Safari as "definitely correct password"
+  // still getting a 401). `readonly` still submits the field's current
+  // value and still stops it being edited mid-submit.
   let submitting = $state(false);
 </script>
 
@@ -33,7 +44,7 @@
         autocomplete="username"
         autofocus
         required
-        disabled={submitting}
+        readonly={submitting}
       />
     {/if}
     <input
@@ -44,7 +55,7 @@
       autocomplete="current-password"
       autofocus={!multi}
       required
-      disabled={submitting}
+      readonly={submitting}
     />
     {#if form?.error}<p class="error">{multi ? 'Wrong username or password — try again.' : 'Wrong password — try again.'}</p>{/if}
     <button class="submit" type="submit" disabled={submitting}>
@@ -138,7 +149,8 @@
     cursor: default;
   }
 
-  .field:disabled {
+  .field:disabled,
+  .field:read-only {
     opacity: 0.7;
   }
 </style>
