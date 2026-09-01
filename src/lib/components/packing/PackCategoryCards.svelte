@@ -35,7 +35,19 @@
   }: {
     counts: Counts;
     rates: Record<Category, number>;
-    /** Fired once per tap (not on any later correction) — +page.svelte uses this to know the packing tab is active and schedule a background refresh of history/rollups once tapping actually pauses. */
+    /**
+     * Fired on every tap, and again every time a background save
+     * resolves — +page.svelte uses this to (re)schedule a debounced
+     * refresh of history/rollups once things actually go quiet. It has
+     * to fire on save-resolve too, not just on tap: a burst of taps
+     * finishes tapping well before its queued saves finish draining
+     * (each one a couple of storage round trips), and a refresh landing
+     * while any of them are still in flight would resync `counts` from
+     * a server state that doesn't reflect them yet — a visible flash
+     * back to a stale number, "corrected" a moment later when the
+     * in-flight request finally lands. Firing this from drain() too
+     * keeps pushing the schedule out until nothing's left outstanding.
+     */
     onAdjust?: () => void;
   } = $props();
 
@@ -93,6 +105,7 @@
         showError[category] = true;
         setTimeout(() => (showError[category] = false), 3000);
       }
+      onAdjust?.(); // push the parent's refresh schedule out — see the prop's own comment for why
     }
 
     clearTimeout(busyTimer);

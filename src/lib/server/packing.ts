@@ -58,22 +58,22 @@ async function readCsvRows(): Promise<Map<string, string>> {
   return rows;
 }
 
-/** Insert or update the CSV row for a given day's totals, keeping dates in order. */
-async function upsertCsvRow(state: DayState): Promise<void> {
-  const rows = await readCsvRows();
-  const rates = await readRateSettings();
-  const packs = totalPacks(state.counts);
-  const earnings = totalEarnings(state.counts, rates.packing);
-  const line = [
+function csvLineFor(state: DayState, rates: Record<Category, number>): string {
+  return [
     csvEscapeDate(state.date),
     state.counts.tandem,
     state.counts.instructor,
     state.counts.student,
     state.counts.sport,
-    packs,
-    formatMoney(earnings),
+    totalPacks(state.counts),
+    formatMoney(totalEarnings(state.counts, rates)),
   ].join(',');
-  rows.set(state.date, line);
+}
+
+/** Insert or update the CSV row for a given day's totals, keeping dates in order. */
+async function upsertCsvRow(state: DayState): Promise<void> {
+  const [rows, rates] = await Promise.all([readCsvRows(), readRateSettings()]);
+  rows.set(state.date, csvLineFor(state, rates.packing));
 
   const sortedDates = [...rows.keys()].sort();
   const body = sortedDates.map((d) => rows.get(d)).join('\n');
@@ -82,8 +82,11 @@ async function upsertCsvRow(state: DayState): Promise<void> {
 
 /**
  * Load today's state, rolling over from a previous day if needed.
- * The outgoing day's totals are guaranteed to already be in the CSV
- * (every mutation upserts its row), so rollover just resets counts to zero.
+ * The outgoing day's totals get flushed to the CSV here, at rollover —
+ * *not* on every adjustCount() in between (see that function's own
+ * comment for why) — so the CSV can be a beat behind the live count for
+ * whatever's still today, made whole again by readCsvFile() merging the
+ * live state in on demand rather than trusting the file alone.
  */
 export async function loadTodayState(): Promise<DayState> {
   const today = todayKey();
@@ -105,7 +108,21 @@ export async function loadTodayState(): Promise<DayState> {
   return fresh;
 }
 
-/** Adjust today's count for a category by `delta` (can be negative), floored at 0. */
+/**
+ * Adjust today's count for a category by `delta` (can be negative),
+ * floored at 0. Deliberately just the two smallest possible storage
+ * round trips — read state.json, write state.json — since this is the
+ * hot path a rapid burst of +/- taps drives directly: it used to also
+ * re-read and rewrite the *entire* packing-log.csv and re-read rate
+ * settings on every single tap (upsertCsvRow, now confined to day
+ * rollover and the explicit setDayCounts backfill, both far rarer and
+ * fine to pay the extra round trips for). Every network hop here costs
+ * a full request to wherever storage.ts is actually pointed — R2 in
+ * production — so cutting 5 round trips down to 2 is the real fix for
+ * "this should be very quick", not something a different framework
+ * would do for free: nothing about Next.js changes how many times this
+ * function talks to R2.
+ */
 export async function adjustCount(category: Category, delta: number): Promise<DayState> {
   const state = await loadTodayState();
   const next: DayState = {
@@ -113,7 +130,6 @@ export async function adjustCount(category: Category, delta: number): Promise<Da
     counts: { ...state.counts, [category]: Math.max(0, state.counts[category] + delta) },
   };
   await writeState(next);
-  await upsertCsvRow(next);
   return next;
 }
 
@@ -133,9 +149,21 @@ export async function setDayCounts(date: string, counts: Counts): Promise<DaySta
   return dayState;
 }
 
-/** The raw CSV log, for download/export. */
+/**
+ * The raw CSV log, for download/export. Merges in today's live counts
+ * on the fly rather than reading the file verbatim — adjustCount() no
+ * longer keeps today's row in the file up to date tap-by-tap, so
+ * without this an export taken mid-day would show today as 0 (or
+ * whatever it was at the last rollover) instead of what's actually been
+ * packed so far.
+ */
 export async function readCsvFile(): Promise<string> {
-  return (await readText(CSV_KEY)) ?? `${CSV_HEADER}\n`;
+  const [rows, state, rates] = await Promise.all([readCsvRows(), readState(), readRateSettings()]);
+  if (state) rows.set(state.date, csvLineFor(state, rates.packing));
+  if (rows.size === 0) return `${CSV_HEADER}\n`;
+  const sortedDates = [...rows.keys()].sort();
+  const body = sortedDates.map((d) => rows.get(d)).join('\n');
+  return `${CSV_HEADER}\n${body}\n`;
 }
 
 /** Most recent history rows (excluding today), newest first. */
