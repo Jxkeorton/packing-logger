@@ -39,6 +39,15 @@
   --radius-control: 10px;
   --shadow: 0 1px 0 rgba(20, 32, 43, 0.05), 0 6px 16px -8px rgba(20, 32, 43, 0.22);
 
+  /*
+   * Rendered height of the sticky app-tab bar (+page.svelte's
+   * .header-scope), so the Packing tab's own sticky Pack/Timer bar can
+   * sit flush beneath it (top: var(--app-header-h)) instead of the two
+   * overlapping once both are stuck. Keep this in sync with that bar's
+   * padding/font if either changes — nothing computes it automatically.
+   */
+  --app-header-h: 46px;
+
   color-scheme: light;
 }
 

@@ -117,8 +117,9 @@
     historyRefreshTimer = setTimeout(() => invalidateAll(), 1500);
   }
 
+  // Same ghost-segments-on-a-glass-bar treatment as AppTabs.svelte.
   const subTabClass =
-    'flex-1 appearance-none border border-line bg-panel text-ink-soft font-sans font-bold text-sm p-2.5 rounded-[10px] cursor-pointer aria-selected:bg-ink aria-selected:border-ink aria-selected:text-canvas';
+    'flex-1 min-w-0 appearance-none border-0 bg-transparent text-ink-soft font-sans font-bold text-[12.5px] tracking-[-0.01em] whitespace-nowrap overflow-hidden text-ellipsis px-2.5 py-1.5 rounded-[var(--radius-control)] cursor-pointer aria-selected:bg-ink aria-selected:text-canvas';
 
   const money = (n: number) => `£${n.toFixed(2)}`;
 
@@ -436,7 +437,14 @@
 
   <!-- Packing -->
   <div class={APP_VIEW} hidden={activeAppTab !== 'packing' || settingsOpen}>
-    <div class="flex gap-2 mb-0.5" role="tablist" aria-label="Packing view">
+    <!-- Same sticky glass treatment as the app tab bar above, stacked
+         flush beneath it (top: var(--app-header-h)) rather than the two
+         overlapping once both are stuck. -->
+    <div
+      class="header-scope sticky top-[var(--app-header-h)] z-10 flex items-center gap-1 p-1 rounded-[var(--radius-control)] bg-panel/75 backdrop-blur-md border border-line shadow-card"
+      role="tablist"
+      aria-label="Packing view"
+    >
       <button
         type="button"
         class={subTabClass}
