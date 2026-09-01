@@ -36,7 +36,8 @@
   import PendingJumpsMenu from '$lib/components/PendingJumpsMenu.svelte';
   import BurbleSettingsPanel from '$lib/components/BurbleSettingsPanel.svelte';
   import DownloadButton from '$lib/components/DownloadButton.svelte';
-  import { totalEarnings as packingTotalEarnings, totalPacks } from '$lib/packing';
+  import { totalEarnings as packingTotalEarnings, totalPacks, type Counts as PackingCounts } from '$lib/packing';
+  import { invalidateAll } from '$app/navigation';
   import { totalEarnings as tandemTotalEarnings, totalJumps } from '$lib/tandem';
   import {
     APP_VIEW,
@@ -88,6 +89,32 @@
       activeAppTab = data.tabVisibility.packing ? 'packing' : data.tabVisibility.tandems ? 'tandems' : 'logbook';
     }
   });
+
+  // PackCategoryCards owns this once tapping starts (it's $bindable) —
+  // see that component's own comment for why: taps update it instantly
+  // and confirm against the server in the background, rather than
+  // waiting on the page's whole `load` (which this masthead's totals
+  // used to read straight from data.state.counts) before the number on
+  // screen, or the total here, moved at all.
+  let packingCounts = $state<PackingCounts>({ ...data.state.counts });
+  $effect(() => {
+    packingCounts = { ...data.state.counts };
+  });
+
+  // Re-running the whole page `load` on every tap is exactly what
+  // PackCategoryCards is now avoiding, so nothing does it automatically
+  // any more — this schedules one, but only once tapping actually
+  // pauses, so the history panel's current week/month row and this
+  // masthead's own totals don't drift from what's really been packed
+  // for the rest of the session. Reset on every tap via PackCategoryCards'
+  // onAdjust, not by watching packingCounts itself — that would also
+  // fire from the resync effect above (data.state.counts refreshing
+  // *because* this timer just ran), scheduling another refresh forever.
+  let historyRefreshTimer: ReturnType<typeof setTimeout> | undefined;
+  function scheduleHistoryRefresh() {
+    clearTimeout(historyRefreshTimer);
+    historyRefreshTimer = setTimeout(() => invalidateAll(), 1500);
+  }
 
   const subTabClass =
     'flex-1 appearance-none border border-line bg-panel text-ink-soft font-sans font-bold text-sm p-2.5 rounded-[10px] cursor-pointer aria-selected:bg-ink aria-selected:border-ink aria-selected:text-canvas';
@@ -429,18 +456,18 @@
         </div>
         <div class={TOTALS}>
           <div class={TOTALS_BLOCK}>
-            <span class={TOTALS_VALUE_GOLD}>{money(packingTotalEarnings(data.state.counts, data.rateSettings.packing))}</span>
+            <span class={TOTALS_VALUE_GOLD}>{money(packingTotalEarnings(packingCounts, data.rateSettings.packing))}</span>
             <span class={TOTALS_LABEL}>earned today</span>
           </div>
           <div class={TOTALS_DIVIDER} aria-hidden="true"></div>
           <div class={TOTALS_BLOCK_FLEX}>
-            <span class={TOTALS_VALUE_INK}>{totalPacks(data.state.counts)}</span>
+            <span class={TOTALS_VALUE_INK}>{totalPacks(packingCounts)}</span>
             <span class={TOTALS_LABEL}>packs today</span>
           </div>
         </div>
       </header>
 
-      <PackCategoryCards counts={data.state.counts} rates={data.rateSettings.packing} />
+      <PackCategoryCards bind:counts={packingCounts} rates={data.rateSettings.packing} onAdjust={scheduleHistoryRefresh} />
 
       <PackHistoryPanel dayRows={data.dayRows} weekRows={data.weekRows} monthRows={data.monthRows} />
 

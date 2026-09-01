@@ -1,10 +1,15 @@
-// Packing tab actions. Notably smaller than the main app's
-// pages/api/{adjust,pack-time}.ts: those returned the freshly-recomputed
-// state/totals/currentWeek/currentMonth in the JSON response so the
-// client could patch its own DOM without a round trip. Here, a plain
-// `use:enhance` re-runs the page's `load` after any action succeeds, so
-// state/history/week/month all refresh together from one source — no
-// "recompute just the current bucket" special-casing needed.
+// Packing tab actions. `adjust` used to be a plain `use:enhance` letting
+// SvelteKit re-run the whole page's `load` after every tap — simple, but
+// that `load` reads both jump ledgers, burble sync state, logbook and
+// rate settings and recomputes every week/month rollup, so re-running
+// all of it for a single ±1 tap made rapid packing counting feel
+// noticeably laggy. PackCategoryCards.svelte now calls this directly
+// (bypassing use:enhance's default full-page update) and applies the
+// count optimistically the instant you tap, treating this action's
+// response as a cheap background confirmation rather than something the
+// UI waits on — so `adjust` returns just the day's counts, the smallest
+// thing that lets the client correct any drift, not the fully
+// recomputed page.
 import { fail, type Action } from '@sveltejs/kit';
 import { CATEGORIES, type Category } from '$lib/packing';
 import { adjustCount } from '$lib/server/packing';
@@ -17,7 +22,8 @@ export const packingActions: Record<string, Action> = {
     const delta = Number(formData.get('delta'));
     if (!CATEGORIES.includes(category as Category)) return fail(400, { error: 'Unknown category' });
     if (delta !== 1 && delta !== -1) return fail(400, { error: 'delta must be 1 or -1' });
-    await adjustCount(category as Category, delta);
+    const state = await adjustCount(category as Category, delta);
+    return { counts: state.counts };
   },
 
   recordPackTime: async ({ request }) => {
