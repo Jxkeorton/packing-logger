@@ -1,6 +1,11 @@
 // Pure formatting helpers with no server-only dependencies, so they're safe
 // to import from client-side scripts as well as Astro frontmatter.
 
+/** "£12.00" — a pound amount to two decimal places. The one way money is rendered app-wide. */
+export function formatMoney(n: number): string {
+  return `£${n.toFixed(2)}`;
+}
+
 /** "4:12.3" — minutes:seconds.tenths. Shared by the server render and the live timer. */
 export function formatDuration(ms: number): string {
   const deciseconds = Math.round(ms / 100);

@@ -17,7 +17,7 @@ import {
   VIDEOGRAPHER_PACKAGE_RATE as DEFAULT_VIDEOGRAPHER_PACKAGE_RATE,
   type Category as TandemCategory,
 } from '../tandem';
-import { readText, writeText } from './storage';
+import { readJson, writeJson } from './json-store';
 
 export interface RateSettings {
   packing: Record<PackingCategory, number>;
@@ -39,31 +39,31 @@ function rate(value: unknown, fallback: number): number {
 }
 
 export async function readRateSettings(): Promise<RateSettings> {
-  const raw = await readText(SETTINGS_KEY);
-  if (!raw) return DEFAULTS;
-  try {
-    const parsed = JSON.parse(raw);
-    if (!parsed || typeof parsed !== 'object') return DEFAULTS;
+  return readJson(
+    SETTINGS_KEY,
+    (parsed) => {
+      const storedPacking = (parsed.packing ?? {}) as Record<string, unknown>;
+      const storedTandem = (parsed.tandem ?? {}) as Record<string, unknown>;
 
-    const packing = {} as Record<PackingCategory, number>;
-    for (const category of PACKING_CATEGORIES) {
-      packing[category] = rate(parsed.packing?.[category], DEFAULTS.packing[category]);
-    }
-    const tandem = {} as Record<TandemCategory, number>;
-    for (const category of TANDEM_CATEGORIES) {
-      tandem[category] = rate(parsed.tandem?.[category], DEFAULTS.tandem[category]);
-    }
+      const packing = {} as Record<PackingCategory, number>;
+      for (const category of PACKING_CATEGORIES) {
+        packing[category] = rate(storedPacking[category], DEFAULTS.packing[category]);
+      }
+      const tandem = {} as Record<TandemCategory, number>;
+      for (const category of TANDEM_CATEGORIES) {
+        tandem[category] = rate(storedTandem[category], DEFAULTS.tandem[category]);
+      }
 
-    return {
-      packing,
-      tandem,
-      videographerPackageRate: rate(parsed.videographerPackageRate, DEFAULTS.videographerPackageRate),
-    };
-  } catch {
-    return DEFAULTS;
-  }
+      return {
+        packing,
+        tandem,
+        videographerPackageRate: rate(parsed.videographerPackageRate, DEFAULTS.videographerPackageRate),
+      };
+    },
+    DEFAULTS,
+  );
 }
 
 export async function writeRateSettings(settings: RateSettings): Promise<void> {
-  await writeText(SETTINGS_KEY, JSON.stringify(settings, null, 2));
+  await writeJson(SETTINGS_KEY, settings);
 }

@@ -8,7 +8,7 @@
 // tab doesn't touch anything it tracks, it just can't be reached until
 // switched back on — its own settings row stays reachable regardless,
 // since Settings isn't one of the tabs this hides.
-import { readText, writeText } from './storage';
+import { boolMap, readJson, writeJson } from './json-store';
 
 export type AppTab = 'packing' | 'tandems';
 
@@ -21,24 +21,12 @@ const DEFAULTS: TabVisibility = { packing: true, tandems: true };
 const TABS: AppTab[] = ['packing', 'tandems'];
 
 export async function readTabVisibility(): Promise<TabVisibility> {
-  const raw = await readText(SETTINGS_KEY);
-  if (!raw) return DEFAULTS;
-  try {
-    const parsed = JSON.parse(raw);
-    if (!parsed || typeof parsed !== 'object') return DEFAULTS;
-    const result = {} as TabVisibility;
-    for (const tab of TABS) {
-      result[tab] = typeof parsed[tab] === 'boolean' ? parsed[tab] : DEFAULTS[tab];
-    }
-    return result;
-  } catch {
-    return DEFAULTS;
-  }
+  return readJson(SETTINGS_KEY, boolMap(TABS, DEFAULTS), DEFAULTS);
 }
 
 export async function setTabVisibility(tab: AppTab, visible: boolean): Promise<TabVisibility> {
   const current = await readTabVisibility();
   const next: TabVisibility = { ...current, [tab]: visible };
-  await writeText(SETTINGS_KEY, JSON.stringify(next, null, 2));
+  await writeJson(SETTINGS_KEY, next);
   return next;
 }

@@ -38,6 +38,7 @@
   import BurbleSettingsPanel from '$lib/components/BurbleSettingsPanel.svelte';
   import DownloadButton from '$lib/components/DownloadButton.svelte';
   import { totalEarnings as packingTotalEarnings, totalPacks, type Counts as PackingCounts } from '$lib/packing';
+  import { formatMoney as money } from '$lib/format';
   import { invalidateAll } from '$app/navigation';
   import { totalEarnings as tandemTotalEarnings, totalJumps } from '$lib/tandem';
   import {
@@ -122,8 +123,6 @@
   // Same ghost-segments-on-a-glass-bar treatment as AppTabs.svelte.
   const subTabClass =
     'flex-1 min-w-0 appearance-none border-0 bg-transparent text-ink-soft font-sans font-bold text-[12.5px] tracking-[-0.01em] whitespace-nowrap overflow-hidden text-ellipsis px-2.5 py-1.5 rounded-[var(--radius-control)] cursor-pointer aria-selected:bg-ink aria-selected:text-canvas';
-
-  const money = (n: number) => `£${n.toFixed(2)}`;
 
   // ReferenceListPanel wants each list pre-shaped to a generic
   // {id, name, detail?} row, same as the real app's ReferenceListPanel.astro.

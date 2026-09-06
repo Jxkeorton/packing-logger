@@ -8,6 +8,7 @@
   // invoice-month PDF export used to be a per-row link here; it's now a
   // standalone button below the History panel (MonthlyInvoiceButton).
   import { CATEGORY_TEXT_CLASS } from '$lib/category-colors';
+  import { formatMoney as money } from '$lib/format';
   import { HISTORY_SCROLL, HISTORY_TABLE, HISTORY_THEAD_ROW, HISTORY_TBODY_ROW, HISTORY_CELL_LEFT, HISTORY_CELL_RIGHT } from '$lib/ui-classes';
 
   interface RowView {
@@ -32,8 +33,6 @@
     categoryLabels: Record<string, string>;
     unitLabel: string;
   } = $props();
-
-  const money = (n: number) => `£${n.toFixed(2)}`;
 </script>
 
 <div class={HISTORY_SCROLL}>

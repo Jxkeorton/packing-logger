@@ -32,6 +32,7 @@
 // identically wherever the function actually runs.
 import PDFDocument from 'pdfkit';
 import { CATEGORIES, CATEGORY_LABELS, type Category, type Jump } from '../tandem';
+import { formatMoney as money } from '../format';
 import type { InvoiceSettings } from './invoice-settings';
 import robotoRegularBase64 from './fonts/roboto-regular.base64.txt?raw';
 import robotoMediumBase64 from './fonts/roboto-medium.base64.txt?raw';
@@ -59,10 +60,6 @@ const FONT_BOLD = Buffer.from(robotoMediumBase64, 'base64');
 function formatJumpDate(dateStr: string): string {
   const [y, m, d] = dateStr.split('-');
   return `${d}/${m}/${y}`;
-}
-
-function money(n: number): string {
-  return `£${n.toFixed(2)}`;
 }
 
 export async function buildTandemInvoicePdf(opts: InvoicePdfOptions): Promise<Buffer> {

@@ -2,6 +2,7 @@
   import { CATEGORIES, CATEGORY_LABELS, type HistoryRow } from '$lib/packing';
   import type { AggregateRow } from '$lib/server/invoice';
   import { CATEGORY_TEXT_CLASS } from '$lib/category-colors';
+  import { formatMoney as money } from '$lib/format';
   import {
     TOGGLE_SECTION,
     TOGGLE_BUTTON,
@@ -21,8 +22,6 @@
 
   let { dayRows, weekRows, monthRows }: { dayRows: HistoryRow[]; weekRows: AggregateRow[]; monthRows: AggregateRow[] } =
     $props();
-
-  const money = (n: number) => `£${n.toFixed(2)}`;
 
   let open = $state(false);
   let activeView = $state<'day' | 'week' | 'month'>('day');

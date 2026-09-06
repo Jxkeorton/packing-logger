@@ -6,7 +6,7 @@
 // than a growing ledger, since none of this changes anywhere near as often
 // as the jumps do.
 import { randomUUID } from 'node:crypto';
-import { readText, writeText } from './storage';
+import { readJson, writeJson } from './json-store';
 import {
   BURBLE_CODE_SEED_VERSION,
   BURBLE_ROLES,
@@ -305,53 +305,51 @@ export function resolveRigComponents(
 }
 
 export async function readLogbookSettings(): Promise<LogbookSettings> {
-  const raw = await readText(SETTINGS_KEY);
-  if (!raw) return DEFAULTS;
-  try {
-    const parsed = JSON.parse(raw);
-    if (!parsed || typeof parsed !== 'object') return DEFAULTS;
-    const places = asPlaceList(parsed.places);
-    const canopies = asComponentList(parsed.canopies);
-    const linesets = asComponentList(parsed.linesets);
-    const pilotChutes = asComponentList(parsed.pilotChutes);
-    const containers = asComponentList(parsed.containers);
-    const rigs = asRigList(parsed.rigs);
-    const aircraft = asAircraftList(parsed.aircraft);
-    const jumpTypes = asJumpTypeList(parsed.jumpTypes);
-    const burble = asBurbleSettings(parsed.burble);
-    const defaultPlaceId = asId(parsed.defaultPlaceId);
-    const defaultRigId = asId(parsed.defaultRigId);
-    const defaultAircraftId = asId(parsed.defaultAircraftId);
-    const defaultJumpTypeId = asId(parsed.defaultJumpTypeId);
-    return {
-      baseJumps:
-        typeof parsed.baseJumps === 'number' && Number.isInteger(parsed.baseJumps) && parsed.baseJumps >= 0
-          ? parsed.baseJumps
-          : DEFAULTS.baseJumps,
-      places,
-      canopies,
-      linesets,
-      pilotChutes,
-      containers,
-      rigs,
-      aircraft,
-      jumpTypes,
-      burble,
-      // Guard against a default pointing at an id that's since been deleted
-      // (e.g. the settings file was edited by hand, or a delete raced a
-      // default-set) — fall back to "no default" rather than dangle.
-      defaultPlaceId: places.some((p) => p.id === defaultPlaceId) ? defaultPlaceId : null,
-      defaultRigId: rigs.some((r) => r.id === defaultRigId) ? defaultRigId : null,
-      defaultAircraftId: aircraft.some((a) => a.id === defaultAircraftId) ? defaultAircraftId : null,
-      defaultJumpTypeId: jumpTypes.some((j) => j.id === defaultJumpTypeId) ? defaultJumpTypeId : null,
-    };
-  } catch {
-    return DEFAULTS;
-  }
+  return readJson(
+    SETTINGS_KEY,
+    (parsed) => {
+      const places = asPlaceList(parsed.places);
+      const canopies = asComponentList(parsed.canopies);
+      const linesets = asComponentList(parsed.linesets);
+      const pilotChutes = asComponentList(parsed.pilotChutes);
+      const containers = asComponentList(parsed.containers);
+      const rigs = asRigList(parsed.rigs);
+      const aircraft = asAircraftList(parsed.aircraft);
+      const jumpTypes = asJumpTypeList(parsed.jumpTypes);
+      const burble = asBurbleSettings(parsed.burble);
+      const defaultPlaceId = asId(parsed.defaultPlaceId);
+      const defaultRigId = asId(parsed.defaultRigId);
+      const defaultAircraftId = asId(parsed.defaultAircraftId);
+      const defaultJumpTypeId = asId(parsed.defaultJumpTypeId);
+      return {
+        baseJumps:
+          typeof parsed.baseJumps === 'number' && Number.isInteger(parsed.baseJumps) && parsed.baseJumps >= 0
+            ? parsed.baseJumps
+            : DEFAULTS.baseJumps,
+        places,
+        canopies,
+        linesets,
+        pilotChutes,
+        containers,
+        rigs,
+        aircraft,
+        jumpTypes,
+        burble,
+        // Guard against a default pointing at an id that's since been deleted
+        // (e.g. the settings file was edited by hand, or a delete raced a
+        // default-set) — fall back to "no default" rather than dangle.
+        defaultPlaceId: places.some((p) => p.id === defaultPlaceId) ? defaultPlaceId : null,
+        defaultRigId: rigs.some((r) => r.id === defaultRigId) ? defaultRigId : null,
+        defaultAircraftId: aircraft.some((a) => a.id === defaultAircraftId) ? defaultAircraftId : null,
+        defaultJumpTypeId: jumpTypes.some((j) => j.id === defaultJumpTypeId) ? defaultJumpTypeId : null,
+      };
+    },
+    DEFAULTS,
+  );
 }
 
 async function writeLogbookSettings(settings: LogbookSettings): Promise<void> {
-  await writeText(SETTINGS_KEY, JSON.stringify(settings, null, 2));
+  await writeJson(SETTINGS_KEY, settings);
 }
 
 export async function setBaseJumps(baseJumps: number): Promise<LogbookSettings> {
