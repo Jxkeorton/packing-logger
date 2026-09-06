@@ -19,8 +19,8 @@
 </script>
 
 <p class={PANEL_HINT}>
-  Both appear on the Work jumps tab by default. Hiding one only affects that tab — jumps already logged under it, its
-  history, and its invoice lines are all unaffected.
+  All three appear on the Work jumps tab by default. Hiding one only affects that tab — jumps already logged under
+  it, its history, and its invoice lines are all unaffected.
 </p>
 
 {#each CATEGORIES as category (category)}

@@ -3,7 +3,7 @@
   // SettingsRow.svelte, which wraps this in +page.svelte — this
   // component only ever renders its own content.
   //
-  // One form covering all seven rates, saved together with a single
+  // One form covering all eight rates, saved together with a single
   // Save button — see actions/rates.ts's own comment for why that's a
   // better fit here than the per-field auto-submit
   // ConfigSettingsPanel/WorkJumpsSettingsPanel use.
@@ -108,6 +108,10 @@
         value={rates.tandem.videographer}
         required
       />
+    </label>
+    <label class="{FIELD_LABEL_NARROW} mb-2.5">
+      <span>AFF instructing</span>
+      <input type="number" name="tandem_aff" class={FIELD_INPUT} min="0" step="0.01" value={rates.tandem.aff} required />
     </label>
     <label class="{FIELD_LABEL_NARROW} mb-2.5">
       <span>Videographer cash call</span>

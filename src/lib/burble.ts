@@ -9,14 +9,34 @@
 // endpoint with no history, so everything below is defensive about shapes
 // the DZ's own config can change without warning.
 
-/** What I was doing on a jump, as far as this app cares. */
-export type BurbleRole = 'instructor' | 'videographer' | 'solo';
+/**
+ * What I was doing on a jump, as far as this app cares.
+ *
+ * Every value except 'solo' is also a Work-jumps Category ($lib/tandem.ts),
+ * deliberately: commitMatches files a match straight under `role` as its
+ * category, so the two lists staying in step is what makes a synced jump
+ * land on the right card without a translation table in between.
+ */
+export type BurbleRole = 'instructor' | 'videographer' | 'aff' | 'solo';
 
 export const BURBLE_ROLE_LABELS: Record<BurbleRole, string> = {
   instructor: 'Tandem instructor',
   videographer: 'Tandem camera',
+  aff: 'AFF instructor',
   solo: 'Solo',
 };
+
+/**
+ * Every valid role, for validating a saved or posted code mapping.
+ *
+ * Derived from the labels above rather than written out again: the two
+ * hand-maintained copies of this list (settings parsing and the
+ * mapBurbleCode action) both silently *rejected* a role they hadn't been
+ * told about, so a role added to the type and not to them would fail
+ * closed and invisibly — a saved AFFI mapping dropped on read, and no way
+ * to add one back through the form.
+ */
+export const BURBLE_ROLES = Object.keys(BURBLE_ROLE_LABELS) as BurbleRole[];
 
 /** One manifested person on a load. Extra keys the feed sends are ignored. */
 export interface BurbleSlot {
@@ -62,6 +82,21 @@ export interface BurbleLoadsResponse {
 const TANDEM_CUSTOMER_TT = '11';
 
 /**
+ * Transaction type of an AFF student — the person being taught, whose own
+ * slot carries the level as its jump code (`"Level 6"`, `"Consol"`). Same
+ * `type: "Student"` as the AFF instructor's slot, so as with the tandem
+ * customer above, only the transaction type tells them apart.
+ */
+const AFF_STUDENT_TT = '12';
+
+/**
+ * The slots in a group that are being *taught or taken up*, never working.
+ * Neither can be me, and neither counts as the other staff member on a
+ * jump — see matchSlots and otherStaffName.
+ */
+const PAYING_TTS = new Set([TANDEM_CUSTOMER_TT, AFF_STUDENT_TT]);
+
+/**
  * Statuses that mean the load is definitely off the ground.
  *
  * Treated as a *hint*, never as a precondition for logging. Not every
@@ -88,6 +123,16 @@ export interface BurbleCodeMapping {
  * a synced tandem files under the same type as one logged by hand from the
  * Tandems tab — and picks up the same teal pill in the logbook list.
  */
+/**
+ * Bumped whenever a mapping is *added* to the seed list below, so an
+ * install that saved its code map before that can be topped up with the
+ * new one — see mergeSeededCodes.
+ *
+ * 1 — the original seed set.
+ * 2 — adds AFFI (AFF instructing).
+ */
+export const BURBLE_CODE_SEED_VERSION = 2;
+
 export const DEFAULT_BURBLE_CODE_MAP: BurbleCodeMapping[] = [
   // Skydive Langar (dz_id 531) — the DZ this app is used at. TAN/VID
   // confirmed by the jumper; EXP and STA seen on the live board. STA is
@@ -97,6 +142,12 @@ export const DEFAULT_BURBLE_CODE_MAP: BurbleCodeMapping[] = [
   // treatment: logbook only, no Work jumps tab entry.
   { code: 'TAN', role: 'instructor', jumpTypeName: 'Tandem Instructor' },
   { code: 'VID', role: 'videographer', jumpTypeName: 'Tandem Camera' },
+  // AFF instructing. The student sharing the group is *not* mapped here —
+  // their slot's code is their level, not a role, and it's read off the
+  // group rather than matched (see affStudent). Levels deliberately never
+  // reach the code map: mapping "Level 6" to anything would mean a
+  // same-named student logging me a jump.
+  { code: 'AFFI', role: 'aff', jumpTypeName: 'AFF Instructor' },
   { code: 'EXP', role: 'solo', jumpTypeName: 'Sport' },
   { code: 'EXP+KIT', role: 'solo', jumpTypeName: 'Sport' },
   { code: 'STA', role: 'solo', jumpTypeName: 'Staff' },
@@ -106,6 +157,28 @@ export const DEFAULT_BURBLE_CODE_MAP: BurbleCodeMapping[] = [
   { code: 'CAM PHOTO', role: 'videographer', jumpTypeName: 'Tandem Camera' },
   { code: 'CAM VIDEO', role: 'videographer', jumpTypeName: 'Tandem Camera' },
 ];
+
+/**
+ * Top up a saved code map with any seeded mapping added since it was
+ * written.
+ *
+ * The seed list is only ever a *default*: once anything is saved, that's
+ * what matching uses, so adding AFFI to DEFAULT_BURBLE_CODE_MAP alone
+ * would do nothing at all for an install that already had a map — the
+ * board would keep reporting AFFI as an unmapped code forever.
+ *
+ * Guarded by `savedVersion` rather than merging unconditionally, because
+ * removing a mapping is something the settings screen offers and a blind
+ * merge would undo it on the next read. The version travels with the
+ * settings, so the first write of any kind — including the removal
+ * itself — persists the topped-up map and stops this running again.
+ */
+export function mergeSeededCodes(saved: BurbleCodeMapping[], savedVersion: number): BurbleCodeMapping[] {
+  if (savedVersion >= BURBLE_CODE_SEED_VERSION) return saved;
+  const have = new Set(saved.map((m) => normaliseCode(m.code)));
+  const missing = DEFAULT_BURBLE_CODE_MAP.filter((m) => !have.has(normaliseCode(m.code)));
+  return missing.length > 0 ? [...saved, ...missing] : saved;
+}
 
 /**
  * Fold a name to a comparison key: case, surrounding and doubled spaces,
@@ -182,23 +255,52 @@ export function tandemCustomerName(group: BurbleSlot[]): string {
 }
 
 /**
- * The other staff member on a tandem — the camera flyer alongside the
- * instructor, or the instructor alongside the camera flyer.
+ * The AFF student sharing an instructor's group, and what level they're
+ * jumping.
+ *
+ * The level is the student slot's own *jump code* — Langar manifests a
+ * level 6 as `{ jump: "Level 6", transaction_type_id: "12" }` alongside
+ * the instructor's `{ jump: "AFFI" }`, one booking, one sale_id. So the
+ * level costs nothing to read here and is taken verbatim: it's the DZ's
+ * own wording, printed on the board the jumper is looking at, and
+ * normalising it into some canonical form would only make the app
+ * disagree with the screen next to it. A consolidation jump comes across
+ * as `"Consol"` rather than a number, which is exactly why this is a
+ * string and not a level index.
+ *
+ * Both fields come back empty when the group has no student slot at all —
+ * possible if a booking is manifested oddly, and not worth refusing to
+ * log a jump over.
+ */
+export function affStudent(group: BurbleSlot[]): { name: string; level: string } {
+  const student = group.find((slot) => slot && slot.transaction_type_id === AFF_STUDENT_TT);
+  return {
+    name: typeof student?.name === 'string' ? student.name.trim() : '',
+    level: typeof student?.jump === 'string' ? student.jump.trim() : '',
+  };
+}
+
+/**
+ * The other staff member working the jump — the camera flyer alongside a
+ * tandem instructor, the instructor alongside a camera flyer, or the
+ * second AFF instructor alongside the first.
  *
  * Found by elimination rather than by jump code: a group is one booking
- * (customer + TI + optional camera, see NOTES.md), so anyone in it who
- * isn't the paying customer and isn't me is the other half of the staff on
- * that jump. Going by code would mean a DZ shorthand nobody has mapped yet
- * silently dropping the name, and the name is the whole point here.
+ * (customer + TI + optional camera, or student + one or two AFFIs — see
+ * NOTES.md), so anyone in it who isn't being taught or taken up, and isn't
+ * me, is the other half of the staff on that jump. Going by code would
+ * mean a DZ shorthand nobody has mapped yet silently dropping the name,
+ * and the name is the whole point here.
  *
  * Two of them — a photo *and* a video flyer, which Beccles' two camera
- * codes allow for — are joined rather than picked between. Better a label
- * that reads slightly oddly than a name quietly dropped.
+ * codes allow for, or the two instructors on an AFF level 1 — are joined
+ * rather than picked between. Better a label that reads slightly oddly
+ * than a name quietly dropped.
  */
-export function otherTandemStaffName(group: BurbleSlot[], mySlotId: string): string {
+export function otherStaffName(group: BurbleSlot[], mySlotId: string): string {
   return group
     .filter((slot) => slot && typeof slot.name === 'string')
-    .filter((slot) => slot.transaction_type_id !== TANDEM_CUSTOMER_TT && String(slot.id) !== mySlotId)
+    .filter((slot) => !PAYING_TTS.has(slot.transaction_type_id) && String(slot.id) !== mySlotId)
     .map((slot) => slot.name.trim())
     .filter(Boolean)
     .join(' & ');
@@ -217,10 +319,19 @@ export interface BurbleMatch {
   code: string; // as printed on the board, e.g. "CAM PHOTO"
   role: BurbleRole;
   jumpTypeName: string;
-  customerName: string; // '' for a solo
+  /** Customer on a tandem, student on an AFF jump; '' for a solo. */
+  customerName: string;
   /**
-   * Whoever else was working the jump — '' for a solo, and for a tandem
-   * the manifest showed no camera flyer on.
+   * The AFF student's level as the board words it (`"Level 6"`,
+   * `"Consol"`) — '' on every other role. Carried on the match rather
+   * than looked up again at commit time because the board is the only
+   * place it exists: once the load drops off, nothing can recover it.
+   */
+  studentLevel: string;
+  /**
+   * Whoever else was working the jump — '' for a solo, for a tandem the
+   * manifest showed no camera flyer on, and for a single-instructor AFF
+   * level.
    */
   otherStaffName: string;
 }
@@ -252,8 +363,13 @@ export function matchSlots(loads: BurbleLoad[], myNames: string[], codeMap: Burb
       for (const slot of group) {
         if (!slot || typeof slot.name !== 'string') continue;
         if (!wanted.has(normaliseName(slot.name))) continue;
-        // The paying customer is never me, whatever the name says.
-        if (slot.transaction_type_id === TANDEM_CUSTOMER_TT) continue;
+        // The customer being taken up, or the student being taught, is
+        // never me — whatever the name says. Guarding the student too
+        // (not just the tandem customer) is also what keeps their level
+        // out of the unmapped-codes list: "Level 6" is a level, not a
+        // role, and offering it to be mapped would invite exactly the
+        // mis-log this guard exists to prevent.
+        if (PAYING_TTS.has(slot.transaction_type_id)) continue;
 
         const code = typeof slot.jump === 'string' ? slot.jump.trim() : '';
         const mapping = byCode.get(normaliseCode(code));
@@ -261,6 +377,8 @@ export function matchSlots(loads: BurbleLoad[], myNames: string[], codeMap: Burb
           if (code) unmapped.add(code);
           continue;
         }
+
+        const student = mapping.role === 'aff' ? affStudent(group) : { name: '', level: '' };
 
         matches.push({
           slotId: String(slot.id),
@@ -273,8 +391,14 @@ export function matchSlots(loads: BurbleLoad[], myNames: string[], codeMap: Burb
           code,
           role: mapping.role,
           jumpTypeName: mapping.jumpTypeName,
-          customerName: mapping.role === 'solo' ? '' : tandemCustomerName(group),
-          otherStaffName: mapping.role === 'solo' ? '' : otherTandemStaffName(group, String(slot.id)),
+          // Who the jump was *for*: the paying customer on a tandem, the
+          // student on an AFF jump — different transaction types, same
+          // question, and the answer goes in the same field so everything
+          // downstream (the invoice line, the dedupe key, the logbook
+          // description) works one way for both.
+          customerName: mapping.role === 'aff' ? student.name : mapping.role === 'solo' ? '' : tandemCustomerName(group),
+          studentLevel: mapping.role === 'aff' ? student.level : '',
+          otherStaffName: mapping.role === 'solo' ? '' : otherStaffName(group, String(slot.id)),
         });
       }
     }
@@ -284,7 +408,18 @@ export function matchSlots(loads: BurbleLoad[], myNames: string[], codeMap: Burb
 }
 
 /** A one-line summary of a matched jump, for the review queue and the logbook description. */
-export function describeMatch(match: { role: BurbleRole; loadName: string; customerName: string }): string {
-  const who = match.customerName ? ` with ${match.customerName}` : '';
+export function describeMatch(match: {
+  role: BurbleRole;
+  loadName: string;
+  customerName: string;
+  studentLevel?: string;
+}): string {
+  // The level qualifies the student, so it rides with their name rather
+  // than trailing the load: "AFF instructor with Alex Marsh (Level
+  // 6)". Optional on the parameter type because a sighting captured
+  // before this field existed is still sitting in burble-sync.json
+  // without it.
+  const level = match.studentLevel ? ` (${match.studentLevel})` : '';
+  const who = match.customerName ? ` with ${match.customerName}${level}` : '';
   return `${BURBLE_ROLE_LABELS[match.role]}${who} — ${match.loadName}`;
 }

@@ -9,7 +9,7 @@ import { formatDateKey } from './periods';
 import type { HistoryRow } from '../tandem';
 
 function row(date: string, counts: Partial<HistoryRow['counts']>): HistoryRow {
-  const full = { instructor: 0, videographer: 0, ...counts };
+  const full = { instructor: 0, videographer: 0, aff: 0, ...counts };
   return { date, counts: full, totalJumps: 0, totalEarnings: 0 };
 }
 
@@ -29,12 +29,12 @@ describe('groupByWeek', () => {
 
     expect(result.map((r) => r.key)).toEqual(['2026-08-24', '2026-08-17']);
 
-    expect(result[0].counts).toEqual({ instructor: 1, videographer: 2 });
+    expect(result[0].counts).toEqual({ instructor: 1, videographer: 2, aff: 0 });
     expect(result[0].totalJumps).toBe(3);
     expect(result[0].totalEarnings).toBeCloseTo(1 * 42 + 2 * 42); // 126
     expect(result[0].rangeLabel).toBe('24 Aug – 30 Aug');
 
-    expect(result[1].counts).toEqual({ instructor: 1, videographer: 0 });
+    expect(result[1].counts).toEqual({ instructor: 1, videographer: 0, aff: 0 });
     expect(result[1].totalJumps).toBe(1);
     expect(result[1].totalEarnings).toBeCloseTo(42);
     expect(result[1].rangeLabel).toBe('17 Aug – 23 Aug');
@@ -83,13 +83,13 @@ describe('groupByInvoiceMonth', () => {
     expect(result.map((r) => r.key)).toEqual(['2026-04', '2026-03']); // newest first
 
     const april = result.find((r) => r.key === '2026-04')!;
-    expect(april.counts).toEqual({ instructor: 0, videographer: 2 });
+    expect(april.counts).toEqual({ instructor: 0, videographer: 2, aff: 0 });
     expect(april.totalJumps).toBe(2);
     expect(april.totalEarnings).toBeCloseTo(84); // 2 * 42
     expect(april.rangeLabel).toBe('30 Mar – 26 Apr');
 
     const march = result.find((r) => r.key === '2026-03')!;
-    expect(march.counts).toEqual({ instructor: 1, videographer: 0 });
+    expect(march.counts).toEqual({ instructor: 1, videographer: 0, aff: 0 });
     expect(march.totalJumps).toBe(1);
     expect(march.totalEarnings).toBeCloseTo(42);
     expect(march.rangeLabel).toBe('23 Feb – 29 Mar');

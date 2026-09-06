@@ -1,12 +1,48 @@
 // The universal (client-safe) half of the main app's src/lib/tandem.ts —
 // see $lib/packing.ts for why this split exists.
-export const CATEGORIES = ['instructor', 'videographer'] as const;
+export const CATEGORIES = ['instructor', 'videographer', 'aff'] as const;
 export type Category = (typeof CATEGORIES)[number];
 
 export const CATEGORY_LABELS: Record<Category, string> = {
   instructor: 'Instructor',
   videographer: 'Videographer',
+  aff: 'AFF Instructor',
 };
+
+/**
+ * How each category reads inside the card's "+ Add … jump" button, where
+ * the label is used mid-sentence. Lowercasing CATEGORY_LABELS was fine
+ * while both were ordinary words, but "add aff instructor jump" is not —
+ * AFF is an initialism and has to stay shouting.
+ */
+export const CATEGORY_ACTION_LABELS: Record<Category, string> = {
+  instructor: 'instructor',
+  videographer: 'videographer',
+  aff: 'AFF',
+};
+
+/**
+ * The student levels offered when an AFF jump is added by hand.
+ *
+ * A fixed list rather than free text, because these are the only things
+ * anyone taps in — but *not* a closed set as far as storage is concerned:
+ * a level synced from the manifest is stored verbatim as the board words
+ * it (see burble.ts's affStudent), so a DZ writing something this list
+ * has never heard of still round-trips intact rather than being coerced
+ * or dropped. `Level N` matches Langar's own board wording exactly, which
+ * is what keeps a hand-typed jump and a synced one reading alike.
+ */
+export const AFF_LEVELS = [
+  'Level 1',
+  'Level 2',
+  'Level 3',
+  'Level 4',
+  'Level 5',
+  'Level 6',
+  'Level 7',
+  'Level 8',
+  'Consol',
+] as const;
 
 /**
  * Logbook jump-type names given to jumps auto-logged from the Tandems tab.
@@ -19,6 +55,7 @@ export const CATEGORY_LABELS: Record<Category, string> = {
 export const TANDEM_JUMP_TYPES: Record<Category, string> = {
   instructor: 'Tandem Instructor',
   videographer: 'Tandem Camera',
+  aff: 'AFF Instructor',
 };
 
 /**
@@ -31,11 +68,13 @@ export const TANDEM_JUMP_TYPES: Record<Category, string> = {
 export const OTHER_STAFF_LABELS: Record<Category, string> = {
   instructor: 'Camera flyer',
   videographer: 'Instructor',
+  aff: 'Second instructor',
 };
 
 export const RATES: Record<Category, number> = {
   instructor: 42,
   videographer: 42,
+  aff: 42,
 };
 
 /**
@@ -55,7 +94,14 @@ export type Counts = Record<Category, number>;
 export interface Jump {
   date: string; // YYYY-MM-DD, local time
   category: Category;
-  name: string; // customer's name, for the invoice
+  name: string; // customer's (or, on an AFF jump, the student's) name, for the invoice
+  /**
+   * The AFF student's level — '' on every other category, and on an AFF
+   * jump the manifest showed no student slot for. Free text rather than
+   * a union of AFF_LEVELS on purpose: the board is the source of truth
+   * for a synced jump and its wording is the DZ's, not ours.
+   */
+  level: string;
   at: string; // ISO timestamp — also this jump's id, for deletion
 }
 
@@ -73,7 +119,7 @@ export interface HistoryRow {
 }
 
 export function zeroCounts(): Counts {
-  return { instructor: 0, videographer: 0 };
+  return { instructor: 0, videographer: 0, aff: 0 };
 }
 
 export function totalJumps(counts: Counts): number {

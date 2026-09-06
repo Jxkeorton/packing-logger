@@ -27,6 +27,12 @@
   --sport-soft: #dee7eb;
   --videographer: #6b4f8a;
   --videographer-soft: #e3ddec;
+  /* AFF instructing shares the student green rather than introducing a
+     sixth hue: it *is* student work, and the Work jumps card reads at a
+     glance against the two tandem colours next to it. An alias, not a
+     copy, so the two can never drift apart. */
+  --aff: var(--student);
+  --aff-soft: var(--student-soft);
   /* Flags a jump auto-logged as tandem camera work. Deliberately warm, to
      read as a badge at a glance against the otherwise cool palette. */
   --camera: #a8551f;
@@ -100,6 +106,8 @@
   --color-sport-soft: var(--sport-soft);
   --color-videographer: var(--videographer);
   --color-videographer-soft: var(--videographer-soft);
+  --color-aff: var(--aff);
+  --color-aff-soft: var(--aff-soft);
   --color-camera: var(--camera);
   --color-camera-soft: var(--camera-soft);
 

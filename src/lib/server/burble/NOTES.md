@@ -128,7 +128,7 @@ Per slot (inside a group):
 | `jump` | `"TI"`, `"CAM PHOTO"`, `"Tandem "` (trailing space), `"EXP"`, `"EXP+KIT"` | the DZ's own jump-type codes; free text, needs a configurable mapping. **Trim it.** |
 | `type` | `"Tandem"`, `"Sport Jumper"` | coarse category, also `"Student"` expected |
 | `option_name` | `"PHOTO"`, `""` | add-ons sold with the jump |
-| `transaction_type_id` | `11` (tandem customer), `3` (staff slot), `1` (sport jumper) | |
+| `transaction_type_id` | `11` (tandem customer), `12` (student customer), `3` (staff slot), `1` (sport jumper) | The two *customer* types are the ones that can never be me — see §8 |
 | `sale_id` | `"614062"` | shared by everyone in one tandem booking — this is what ties a customer to their TI and camera flyer |
 | `group_number` | `"14-1"`, `""` | `max_slots`-`group index`; empty for sport jumpers |
 | `handycam_jump`, `team_id`, `team_name`, `rig_id`, `rig_name`, `formation_type_*`, `tribe` | mostly empty here — this DZ has `dzm_jm_show_rig: 0` and `dzm_jm_show_formation: 0` |
@@ -274,9 +274,13 @@ mapping logic is proven.
 | `fixtures/get-setting.json` | `getSetting` response — DZ display config |
 | `fixtures/get-loads-no-session.json` | what the endpoint returns without a session cookie |
 | `fixtures/get-loads-langar-building.json` | **Skydive Langar (531)** — six-column board, four loads all `Building`, one solo jumper |
+| `fixtures/get-loads-langar-aff.json` | **Skydive Langar (531)**, 2026-09-06 — three AFF groups: a level 6 and a level 1 (student + one AFFI each), and a `Consol` student manifested alone. Names pseudonymised, see §8 |
 
-These are real captures and contain real jumper names as shown on the DZ's
-public display. Pseudonymise them if this repo ever goes public.
+These are real captures. `get-loads-langar-aff.json` has had its names
+replaced with pseudonyms; **the rest still contain real jumper names** as
+shown on the DZ's public display, and this repo is public — they are worth
+pseudonymising too. The shapes are what the tests care about, so swapping a
+name costs nothing but the sed.
 
 ---
 
@@ -305,8 +309,16 @@ depends on that status — see `PLAN.md` §3.
 | --- | --- | --- |
 | `TAN` | tandem instructor | confirmed by the jumper |
 | `VID` | tandem camera | confirmed by the jumper |
+| `AFFI` | AFF instructor | seen on the live board, 2026-09-06 — see §8 |
 | `EXP` | solo | seen on the live board |
 | `EXP+KIT` | solo (kit hire) | Beccles; assumed the same here |
+
+A full sweep of one Sunday's board (2026-09-06) also turned up `Coach`,
+`Coached`, `Coached - KIT`, `ORG`, `OTT`, `OTT - KIT`, `Consol` and
+`Level N` — plus `EXP - KIT`, which is *not* the seeded `EXP+KIT`. None of
+those are mapped: they'd each be a judgement call about how the jumper
+wants them logged, and an unmapped code is a five-second fix in Settings
+rather than a wrong entry in the logbook.
 
 Langar's tandem codes are **not** the same as Beccles' `TI` / `CAM PHOTO` —
 worth knowing, since the first version of this shipped with only the Beccles
@@ -316,3 +328,54 @@ seeded map now, so either DZ works.
 Anything unrecognised is still surfaced as "unmapped" for the jumper to map
 rather than guessed at, which is what makes a new code a five-second fix
 instead of a lost jump.
+
+---
+
+## 8. AFF groups
+
+Observed on the live Langar board, 2026-09-06 (`fixtures/get-loads-langar-aff.json`).
+**Names in that fixture are pseudonyms** — unlike the older captures listed
+in §6, it was written knowing this repo is public, and two of the four
+people in it are members of the public partway through an AFF course.
+Nothing about the shapes below depends on the names.
+
+An AFF jump is manifested as one group, one `sale_id`, two slots:
+
+```json
+[
+  { "jump": "Level 6", "name": "Alex Marsh",  "transaction_type_id": "12",
+    "type": "Student", "formation_type_name": "AFF" },
+  { "jump": "AFFI",    "name": "Robin Fielding", "transaction_type_id": "3",
+    "type": "Student", "formation_type_name": "" }
+]
+```
+
+Three things about this shape matter:
+
+- **The student's level is their own jump code.** There is no level field:
+  `jump` on the `transaction_type_id: 12` slot *is* the level, as free
+  text — `"Level 1"` … `"Level 8"`, and `"Consol"` for a consolidation
+  jump, which is why the app stores a level as a string and never a
+  number. Taken verbatim, so what the app shows matches the board the
+  jumper is standing in front of.
+- **`type` is `"Student"` on both slots.** The instructor is not marked as
+  staff by `type` — only `transaction_type_id` separates the two (`3` for
+  the instructor, `12` for the student), exactly as `11` vs `3` separates
+  a tandem customer from their TI.
+- **A consolidation student is manifested alone**, with no instructor slot
+  at all — the third group in the fixture. Nothing may assume an AFF group
+  has two members.
+
+Both customer transaction types (`11` tandem, `12` student) are treated as
+*never me* when matching. That guard is what stops a same-named punter or
+student logging a jump against the app's owner, and it has a second
+effect worth stating: it keeps `Level 6` and friends out of the
+"unmapped codes" list. A level is not a role, and offering it to be
+mapped would invite exactly the mis-log the guard prevents.
+
+**Two instructors on one student:** not seen. Every AFF group across a
+full day's polling — levels 1 and 6 included — carried a single `AFFI`.
+The low levels can be flown with a main and a reserve-side instructor
+though, so the "other staff member" lookup handles it by elimination
+(anyone in the group who isn't being taught and isn't me), and each
+instructor's slot matches independently — so both would be paid.

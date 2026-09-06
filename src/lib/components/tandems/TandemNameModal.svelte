@@ -8,15 +8,28 @@
   let {
     open,
     subtitle,
+    nameLabel,
+    namePlaceholder,
     staffLabel,
+    levelOptions,
     submitting = false,
     onSubmit,
     onClose,
   }: {
     open: boolean;
     subtitle: string;
+    /** Who the jump was for: "Customer name" on a tandem, "Student name" on an AFF jump. */
+    nameLabel: string;
+    namePlaceholder: string;
     /** What the other staff member on this jump is called — see OTHER_STAFF_LABELS. */
     staffLabel: string;
+    /**
+     * The levels to offer, on a category that has them (AFF). Absent
+     * everywhere else, which is what hides the field entirely — a level
+     * means nothing on a tandem, and an always-present control that's
+     * only sometimes meaningful is worse than one that comes and goes.
+     */
+    levelOptions?: readonly string[];
     /**
      * True while the caller's own onSubmit is still in flight — this
      * component doesn't own that request (TandemCategoryCards does, via
@@ -26,18 +39,25 @@
      * logged the same jump twice.
      */
     submitting?: boolean;
-    onSubmit: (name: string, staff: string) => void;
+    onSubmit: (name: string, staff: string, level: string) => void;
     onClose: () => void;
   } = $props();
 
   let name = $state('');
   let staff = $state('');
+  let level = $state('');
   let inputEl: HTMLInputElement | undefined = $state();
 
   $effect(() => {
     if (open) {
       name = '';
       staff = '';
+      // No level is pre-selected: an AFF instructor works through the
+      // levels all day, and defaulting to "Level 1" is exactly the sort
+      // of plausible-looking wrong value that gets tapped past. The
+      // <select> is `required`, so the browser makes it a deliberate
+      // choice instead.
+      level = '';
       inputEl?.focus();
     }
   });
@@ -47,9 +67,10 @@
     if (submitting) return; // belt-and-braces alongside the disabled button below
     const trimmed = name.trim();
     if (!trimmed) return;
+    if (levelOptions && !level) return; // matches the select's own `required`
     // The other staff member stays optional — plenty of jumps go up without
     // a camera, and a solo instructor shouldn't be blocked on filling it in.
-    onSubmit(trimmed, staff.trim());
+    onSubmit(trimmed, staff.trim(), levelOptions ? level : '');
   }
 
   // Both inputs are styled identically; named once so they stay that way.
@@ -75,18 +96,27 @@
       <h2 class="m-0 mb-0.5 text-[17px] font-bold" id="tandemNameModalTitle">Jump details</h2>
       <p class="mt-0 mb-3.5 text-[13px] text-ink-soft">{subtitle}</p>
       <form onsubmit={handleSubmit}>
-        <label class="block mb-1 text-[13px] font-bold" for="tandemCustomerName">Customer name</label>
+        <label class="block mb-1 text-[13px] font-bold" for="tandemCustomerName">{nameLabel}</label>
         <input
           bind:this={inputEl}
           id="tandemCustomerName"
           type="text"
           class={FIELD}
-          placeholder="e.g. Jane Smith"
+          placeholder={namePlaceholder}
           autocomplete="off"
           maxlength="80"
           required
           bind:value={name}
         />
+        {#if levelOptions}
+          <label class="block mt-3.5 mb-1 text-[13px] font-bold" for="tandemStudentLevel">Level</label>
+          <select id="tandemStudentLevel" class={FIELD} required bind:value={level}>
+            <option value="" disabled>Choose a level</option>
+            {#each levelOptions as option (option)}
+              <option value={option}>{option}</option>
+            {/each}
+          </select>
+        {/if}
         <label class="block mt-3.5 mb-1 text-[13px] font-bold" for="tandemStaffName">
           {staffLabel} <span class="font-normal text-ink-soft">(optional)</span>
         </label>

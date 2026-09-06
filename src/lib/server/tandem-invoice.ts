@@ -6,6 +6,7 @@ import {
   RATES as DEFAULT_RATES,
   totalEarnings,
   totalJumps,
+  zeroCounts,
   type Category,
   type Counts,
   type HistoryRow,
@@ -30,10 +31,6 @@ export interface AggregateRow {
   totalEarnings: number;
 }
 
-function emptyCounts(): Counts {
-  return { instructor: 0, videographer: 0 };
-}
-
 function addCounts(a: Counts, b: Counts): Counts {
   const out = { ...a };
   for (const c of CATEGORIES) out[c] += b[c];
@@ -49,7 +46,7 @@ function toBuckets<K extends string>(
   const buckets = new Map<K, Counts>();
   for (const row of rows) {
     const key = keyOf(parseDateKey(row.date));
-    buckets.set(key, addCounts(buckets.get(key) ?? emptyCounts(), row.counts));
+    buckets.set(key, addCounts(buckets.get(key) ?? zeroCounts(), row.counts));
   }
 
   const todayKey = formatDateKey(new Date());

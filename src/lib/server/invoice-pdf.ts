@@ -1,7 +1,13 @@
-// Renders a tandem invoice (letterhead + itemised jumps, split by role) as
-// a PDF, in the same rough layout as the spreadsheet-style invoices this
-// replaces: a coloured header bar, a From/Bill To block, then a
-// description table and a total.
+// Renders a work-jumps invoice (letterhead + itemised jumps, split by
+// role) as a PDF, in the same rough layout as the spreadsheet-style
+// invoices this replaces: a coloured header bar, a From/Bill To block,
+// then a description table and a total.
+//
+// Every category is billed the same way — one dated line per jump at its
+// own rate — except videographer, which the dropzone's paperwork wants as
+// a gross package charge with a flight-ticket deduction beneath it. AFF
+// instructing goes through the ordinary path, so it needs nothing here
+// beyond being in CATEGORIES.
 //
 // Fonts: pdfkit's built-in standard fonts (Helvetica etc.) load via a
 // dynamic module-resolution trick that Vercel's serverless bundler doesn't
@@ -225,7 +231,7 @@ export async function buildTandemInvoicePdf(opts: InvoicePdfOptions): Promise<Bu
   }
 
   if (!anyJumps) {
-    doc.fillColor(MUTED).text('No tandem jumps recorded for this period.', MARGIN, y, { lineBreak: false });
+    doc.fillColor(MUTED).text('No work jumps recorded for this period.', MARGIN, y, { lineBreak: false });
     doc.fillColor(NAVY);
     y += 24;
   }
@@ -239,13 +245,15 @@ export async function buildTandemInvoicePdf(opts: InvoicePdfOptions): Promise<Bu
 
   const instructing = opts.jumpsByCategory.instructor?.length ?? 0;
   const videoing = opts.jumpsByCategory.videographer?.length ?? 0;
-  doc
-    .font('Body')
-    .fontSize(8)
-    .fillColor(MUTED)
-    .text(`${instructing} tandem instructing jump(s) and ${videoing} videographer jump(s) this period.`, MARGIN, y, {
-      lineBreak: false,
-    });
+  const affing = opts.jumpsByCategory.aff?.length ?? 0;
+  // AFF only earns a mention when there were some — an invoice month with
+  // no AFF work on it reads exactly as it always did, rather than growing
+  // a permanent "and 0 AFF instructing jump(s)".
+  const summary =
+    `${instructing} tandem instructing jump(s) and ${videoing} videographer jump(s)` +
+    (affing > 0 ? `, plus ${affing} AFF instructing jump(s),` : '') +
+    ' this period.';
+  doc.font('Body').fontSize(8).fillColor(MUTED).text(summary, MARGIN, y, { lineBreak: false });
 
   doc.end();
   return done;

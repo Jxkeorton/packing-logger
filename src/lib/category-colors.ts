@@ -14,4 +14,5 @@ export const CATEGORY_TEXT_CLASS: Record<string, string> = {
   student: 'text-student',
   sport: 'text-sport',
   videographer: 'text-videographer',
+  aff: 'text-aff',
 };

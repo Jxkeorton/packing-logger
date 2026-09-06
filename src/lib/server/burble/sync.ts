@@ -283,10 +283,10 @@ export interface CommitResult {
 /**
  * Turn confirmed sightings into real records.
  *
- * A tandem role writes twice — an invoiceable jump on the Tandems tab
- * *and* the logbook entry that hangs off it — sharing one `at` id, exactly
- * as tapping the button on that tab does. A solo writes the logbook entry
- * only.
+ * Any working role — tandem instructor, camera, AFF instructor — writes
+ * twice: an invoiceable jump on the Work jumps tab *and* the logbook
+ * entry that hangs off it, sharing one `at` id, exactly as tapping the
+ * button on that tab does. A solo writes the logbook entry only.
  */
 export async function commitMatches(slotIds: string[]): Promise<CommitResult> {
   const state = await readSyncState();
@@ -307,6 +307,9 @@ export async function commitMatches(slotIds: string[]): Promise<CommitResult> {
     // whole load is confirmed in one tap.
     const at = new Date(Date.now() + index).toISOString();
 
+    // 'solo' is the one role with no Work-jumps card behind it (sport,
+    // staff duty) — everything else is paid work and gets a jump on the
+    // tab as well as a logbook entry.
     if (slot.role === 'solo') {
       await autoLogJump({
         jumpTypeName: slot.jumpTypeName,
@@ -327,7 +330,11 @@ export async function commitMatches(slotIds: string[]): Promise<CommitResult> {
         continue;
       }
       existingTandemNames.add(key);
-      await addJump(slot.role, slot.customerName, at);
+      // The level rides along for an AFF jump and is '' for everything
+      // else — addJump drops it on any other category anyway. `?? ''`
+      // rather than a bare read: a sighting captured before this field
+      // existed is still in burble-sync.json without it.
+      await addJump(slot.role, slot.customerName, at, slot.studentLevel ?? '');
       await autoLogJump({
         jumpTypeName: slot.jumpTypeName,
         date,
@@ -412,7 +419,12 @@ async function todayTandemKeys(): Promise<Set<string>> {
 
 function manifestDescription(slot: PendingJump): string {
   const load = slot.loadNumber ? `${slot.plate} load ${slot.loadNumber}` : slot.loadName;
-  const who = slot.customerName ? ` with ${slot.customerName}` : '';
+  // The AFF student's level, worded as the board words it, right after
+  // the name it belongs to: "… with Alex Marsh (Level 6)". Same
+  // truthiness guard as `alongside` below — older sightings predate the
+  // field.
+  const level = slot.studentLevel ? ` (${slot.studentLevel})` : '';
+  const who = slot.customerName ? ` with ${slot.customerName}${level}` : '';
   // The other staff member, when the board showed one — worded exactly as
   // the Tandems tab words the name it asks for by hand, so the two ways of
   // logging the same jump read alike in the logbook. Truthiness, not just

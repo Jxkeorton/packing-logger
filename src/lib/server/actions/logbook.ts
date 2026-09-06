@@ -36,7 +36,7 @@ import {
 } from '$lib/server/logbook-settings';
 import { clearUnmappedCodes, commitMatches, dismissMatch, syncOnce } from '$lib/server/burble/sync';
 import { oneLine, multiLine } from '$lib/server/form-utils';
-import type { BurbleRole } from '$lib/burble';
+import { BURBLE_ROLES, type BurbleRole } from '$lib/burble';
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -312,7 +312,7 @@ export const logbookActions: Record<string, Action> = {
     const role = String(formData.get('role') ?? '') as BurbleRole;
     const jumpTypeName = oneLine(formData.get('jumpTypeName'), 40);
     if (!code) return fail(400, { error: 'code is required' });
-    if (!['instructor', 'videographer', 'solo'].includes(role)) return fail(400, { error: 'Unknown role' });
+    if (!BURBLE_ROLES.includes(role)) return fail(400, { error: 'Unknown role' });
     if (!jumpTypeName) return fail(400, { error: 'jump type is required' });
     await setBurbleCodeMapping({ code, role, jumpTypeName });
     await clearUnmappedCodes();

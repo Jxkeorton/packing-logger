@@ -7,7 +7,13 @@
 // as the jumps do.
 import { randomUUID } from 'node:crypto';
 import { readText, writeText } from './storage';
-import { DEFAULT_BURBLE_CODE_MAP, type BurbleCodeMapping, type BurbleRole } from '../burble';
+import {
+  BURBLE_CODE_SEED_VERSION,
+  BURBLE_ROLES,
+  DEFAULT_BURBLE_CODE_MAP,
+  mergeSeededCodes,
+  type BurbleCodeMapping,
+} from '../burble';
 
 export interface Place {
   id: string;
@@ -81,6 +87,13 @@ export interface BurbleSettings {
   /** Seconds between automatic polls. Kept well inside the ~2m20s departed window. */
   pollSeconds: number;
   codeMap: BurbleCodeMapping[];
+  /**
+   * Which revision of the seeded code map this saved one was last topped
+   * up from — see mergeSeededCodes. Missing on any settings file written
+   * before this existed, which is exactly the case that needs topping up,
+   * so it reads as 1 rather than as the current version.
+   */
+  codeSeedVersion: number;
 }
 
 export type DefaultCategory = 'place' | 'canopy' | 'lineset' | 'pilotChute' | 'container' | 'rig' | 'aircraft' | 'jumpType';
@@ -122,6 +135,8 @@ const DEFAULTS: LogbookSettings = {
     autoPoll: false,
     pollSeconds: 30,
     codeMap: DEFAULT_BURBLE_CODE_MAP,
+    // Nothing saved yet means the map *is* the current seed.
+    codeSeedVersion: BURBLE_CODE_SEED_VERSION,
   },
   defaultPlaceId: null,
   defaultRigId: null,
@@ -222,7 +237,6 @@ function asId(value: unknown): string | null {
 // id. Used both when resolving a fresh jump's rig (actions/logbook.ts)
 // and when auto-logging a tandem jump against the default rig
 // (actions/tandem.ts).
-const BURBLE_ROLES: BurbleRole[] = ['instructor', 'videographer', 'solo'];
 
 function asBurbleCodeMap(value: unknown): BurbleCodeMapping[] {
   if (!Array.isArray(value)) return DEFAULT_BURBLE_CODE_MAP;
@@ -252,6 +266,11 @@ function asBurbleSettings(value: unknown): BurbleSettings {
     typeof raw.pollSeconds === 'number' && Number.isFinite(raw.pollSeconds)
       ? Math.min(300, Math.max(15, Math.round(raw.pollSeconds)))
       : fallback.pollSeconds;
+  // A saved map from before the seed version existed reads as 1, so
+  // anything added to the seed list since gets merged in below.
+  const codeSeedVersion =
+    typeof raw.codeSeedVersion === 'number' && Number.isFinite(raw.codeSeedVersion) ? raw.codeSeedVersion : 1;
+
   return {
     enabled: raw.enabled === true,
     dzId: typeof raw.dzId === 'string' ? raw.dzId.trim() : fallback.dzId,
@@ -260,7 +279,12 @@ function asBurbleSettings(value: unknown): BurbleSettings {
       : fallback.myNames,
     autoPoll: raw.autoPoll === true,
     pollSeconds,
-    codeMap: asBurbleCodeMap(raw.codeMap),
+    codeMap: mergeSeededCodes(asBurbleCodeMap(raw.codeMap), codeSeedVersion),
+    // Reported as current, not as saved: the map handed back above has
+    // already been topped up, so the next write of these settings — a
+    // removal included — persists that fact and stops the merge running
+    // again.
+    codeSeedVersion: BURBLE_CODE_SEED_VERSION,
   };
 }
 

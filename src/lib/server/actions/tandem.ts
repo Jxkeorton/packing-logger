@@ -3,7 +3,7 @@
 // hand-shaped JSON responses (a plain `use:enhance` re-runs the page's
 // `load` after success, so state/history/week/month refresh together).
 import { fail, type Action } from '@sveltejs/kit';
-import { CATEGORIES, OTHER_STAFF_LABELS, TANDEM_JUMP_TYPES, type Category } from '$lib/tandem';
+import { CATEGORIES, CATEGORY_ACTION_LABELS, OTHER_STAFF_LABELS, TANDEM_JUMP_TYPES, type Category } from '$lib/tandem';
 import { addJump, removeJump } from '$lib/server/tandem';
 import { removeEntry as removeLogbookEntry } from '$lib/server/logbook';
 import { readLogbookSettings } from '$lib/server/logbook-settings';
@@ -14,6 +14,8 @@ import { setTandemVisibility } from '$lib/server/tandem-visibility';
 import { oneLine, multiLine } from '$lib/server/form-utils';
 
 const MAX_NAME_LENGTH = 80;
+/** Long enough for anything the board prints ("Level 6", "Consol") with room to spare. */
+const MAX_LEVEL_LENGTH = 40;
 
 // A tandem instructor/camera jump is also a jump in its own right, so
 // logging one here auto-adds a matching entry to the personal logbook —
@@ -31,6 +33,7 @@ async function autoLogTandemJump(
   category: Category,
   name: string,
   staff: string,
+  level: string,
   date: string,
   at: string,
 ): Promise<void> {
@@ -40,10 +43,15 @@ async function autoLogTandemJump(
     at,
     // The other staff member on the jump, when one was given — named by
     // their role ("Camera flyer: …" on an instructor jump, "Instructor: …"
-    // on a camera one) so the description reads the same way round for
-    // both, and stays plain enough to edit by hand afterwards.
+    // on a camera one, "Second instructor: …" on an AFF one) so the
+    // description reads the same way round for all three, and stays plain
+    // enough to edit by hand afterwards. The AFF student's level is
+    // wrapped onto their name the same way the manifest sync words it
+    // (see sync.ts's manifestDescription), so a jump tapped in by hand
+    // and one confirmed off the board read alike in the logbook.
     description:
-      `Auto-logged from the Tandems tab — ${category} jump for ${name}.` +
+      `Auto-logged from the Tandems tab — ${CATEGORY_ACTION_LABELS[category]} jump for ${name}` +
+      (level ? ` (${level}).` : '.') +
       (staff ? ` ${OTHER_STAFF_LABELS[category]}: ${staff}.` : ''),
   });
 }
@@ -71,9 +79,24 @@ export const tandemActions: Record<string, Action> = {
     // Optional: only the customer's name is required to bill the jump.
     const cleanStaff = oneLine(formData.get('staff'), MAX_NAME_LENGTH);
 
+    // The AFF student's level. Not validated against AFF_LEVELS — the
+    // list the modal offers is a convenience, not the set of things that
+    // exist: a level synced from the board is stored as the board words
+    // it, and rejecting anything outside a closed list here would make
+    // hand-entry the stricter of the two paths for no benefit. Dropped
+    // outright on any other category by addJump.
+    const cleanLevel = oneLine(formData.get('level'), MAX_LEVEL_LENGTH);
+
     const at = new Date().toISOString();
-    const state = await addJump(category as Category, cleanName, at);
-    await autoLogTandemJump(category as Category, cleanName, cleanStaff, state.date, at);
+    const state = await addJump(category as Category, cleanName, at, cleanLevel);
+    await autoLogTandemJump(
+      category as Category,
+      cleanName,
+      cleanStaff,
+      category === 'aff' ? cleanLevel : '',
+      state.date,
+      at,
+    );
   },
 
   deleteTandemJump: async ({ request }) => {

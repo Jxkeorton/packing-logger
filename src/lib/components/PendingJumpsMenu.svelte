@@ -18,6 +18,12 @@
     code: string;
     role: BurbleRole;
     customerName: string;
+    /**
+     * The AFF student's level as the board words it; '' on every other
+     * role, and `undefined` on a sighting captured before this field
+     * existed and still sitting in burble-sync.json.
+     */
+    studentLevel?: string;
     hint: string;
     leftBoard: boolean;
   }
@@ -89,6 +95,11 @@
                 <span class="flex-1 text-[13.5px] leading-snug">
                   <span class="font-semibold">{BURBLE_ROLE_LABELS[jump.role]}</span>
                   {#if jump.customerName}<span> with {jump.customerName}</span>{/if}
+                  <!-- The level is what tells two AFF slots on the same
+                       board apart, so it sits right on the row being
+                       ticked rather than only in the logbook entry it
+                       becomes. -->
+                  {#if jump.studentLevel}<span class="text-ink-soft"> · {jump.studentLevel}</span>{/if}
                   <span class="block font-mono text-[11.5px] text-ink-soft">
                     {loadLabel(jump)} · {jump.code} · {jump.hint}
                   </span>

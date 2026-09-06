@@ -7,10 +7,14 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
+  BURBLE_CODE_SEED_VERSION,
+  BURBLE_ROLES,
   DEFAULT_BURBLE_CODE_MAP,
+  mergeSeededCodes,
   matchSlots,
   normaliseName,
-  otherTandemStaffName,
+  affStudent,
+  otherStaffName,
   realLoads,
   splitLoadName,
   tandemCustomerName,
@@ -27,6 +31,10 @@ const departed = fixture('get-loads-departed.json');
 const emptyBoard = fixture('get-loads-empty-board.json');
 const cacheMiss = fixture('get-loads-cache-miss.json');
 const noSession = fixture('get-loads-no-session.json');
+// Skydive Langar, 2026-09-06: three AFF groups off the live board — a
+// level 6 and a level 1 (student + one AFFI each), and a consolidation
+// jump manifested with no instructor at all.
+const langarAff = fixture('get-loads-langar-aff.json');
 
 describe('realLoads', () => {
   it('reads the loads off a live board', () => {
@@ -87,28 +95,68 @@ describe('tandemCustomerName', () => {
   });
 });
 
-describe('otherTandemStaffName', () => {
+describe('otherStaffName', () => {
   it('picks the camera flyer out of the instructor\'s group', () => {
     const group = realLoads(onCall)[0].groups[0];
     // Miranda Walfield (customer) + Dylan Whitehair (TI) + Barry Woollard (camera).
-    expect(otherTandemStaffName(group, '1864662')).toBe('Barry Woollard');
+    expect(otherStaffName(group, '1864662')).toBe('Barry Woollard');
   });
 
   it('picks the instructor out of the camera flyer\'s group', () => {
     const group = realLoads(onCall)[0].groups[0];
-    expect(otherTandemStaffName(group, '1864672')).toBe('Dylan Whitehair');
+    expect(otherStaffName(group, '1864672')).toBe('Dylan Whitehair');
+  });
+
+  it('never counts the AFF student as the other staff member', () => {
+    // Alex Marsh is being taught, not working — so his instructor's
+    // group has nobody else staffing it.
+    const group = realLoads(langarAff)[0].groups[0];
+    expect(otherStaffName(group, '7707612')).toBe('');
+  });
+
+  it('names the second instructor on an AFF level that has two', () => {
+    // Langar manifested every AFF level observed with a single AFFI,
+    // including a level 1 — but the low levels can carry a main and a
+    // reserve-side instructor, so this is built by hand rather than
+    // captured.
+    const group = [
+      { id: '1', name: 'A Student', jump: 'Level 1', type: 'Student', transaction_type_id: '12', option_name: '', sale_id: '9' },
+      { id: '2', name: 'Jake Orton', jump: 'AFFI', type: 'Student', transaction_type_id: '3', option_name: '', sale_id: '9' },
+      { id: '3', name: 'Robin Fielding', jump: 'AFFI', type: 'Student', transaction_type_id: '3', option_name: '', sale_id: '9' },
+    ];
+    expect(otherStaffName(group, '2')).toBe('Robin Fielding');
+    expect(otherStaffName(group, '3')).toBe('Jake Orton');
   });
 
   it('comes back empty on a tandem manifested without a camera flyer', () => {
     // Aleksandra Rola + Liam Domin-Goddard, and nobody else.
     const group = realLoads(onCall)[0].groups[2];
-    expect(otherTandemStaffName(group, '1864702')).toBe('');
+    expect(otherStaffName(group, '1864702')).toBe('');
   });
 
   it('never returns the paying customer', () => {
     const group = realLoads(onCall)[0].groups[3];
     // Just the customer and me: whatever else is true, she isn't staff.
-    expect(otherTandemStaffName(group, '1864632')).toBe('');
+    expect(otherStaffName(group, '1864632')).toBe('');
+  });
+});
+
+describe('affStudent', () => {
+  it('reads the student and their level off the instructor\'s group', () => {
+    const group = realLoads(langarAff)[0].groups[0];
+    expect(affStudent(group)).toEqual({ name: 'Alex Marsh', level: 'Level 6' });
+  });
+
+  it('takes a non-numeric level verbatim rather than trying to parse one', () => {
+    // A consolidation jump is manifested as "Consol", not a level number
+    // — which is the whole reason a level is a string here.
+    const group = realLoads(langarAff)[1].groups[0];
+    expect(affStudent(group).level).toBe('Consol');
+  });
+
+  it('comes back empty for a group with no student in it', () => {
+    const tandemGroup = realLoads(onCall)[0].groups[0];
+    expect(affStudent(tandemGroup)).toEqual({ name: '', level: '' });
   });
 });
 
@@ -159,6 +207,37 @@ describe('matchSlots', () => {
     expect(matches).toEqual([]);
   });
 
+  it('finds an AFF instructor and attaches the student and their level', () => {
+    const { matches } = matchSlots(realLoads(langarAff), ['Robin Fielding'], map);
+    // Two AFF slots on the board for her — a level 6 and a level 1.
+    expect(matches).toHaveLength(2);
+    expect(matches[0]).toMatchObject({
+      role: 'aff',
+      jumpTypeName: 'AFF Instructor',
+      code: 'AFFI',
+      customerName: 'Alex Marsh',
+      studentLevel: 'Level 6',
+      otherStaffName: '',
+      plate: 'G-FLOH',
+      loadNumber: '2',
+    });
+    expect(matches[1]).toMatchObject({ role: 'aff', customerName: 'Sam Okafor', studentLevel: 'Level 1' });
+  });
+
+  it('never matches the student, and never offers their level as a code to map', () => {
+    // "Level 6" is a level, not a role. Treating it as an unmapped code
+    // would invite mapping it, which is how a same-named student ends up
+    // logging me a jump.
+    const { matches, unmappedCodes } = matchSlots(realLoads(langarAff), ['Alex Marsh'], map);
+    expect(matches).toEqual([]);
+    expect(unmappedCodes).toEqual([]);
+  });
+
+  it('leaves studentLevel empty on a tandem', () => {
+    const { matches } = matchSlots(realLoads(onCall), ['Dylan Whitehair'], map);
+    expect(matches[0].studentLevel).toBe('');
+  });
+
   it('surfaces an unmapped code instead of guessing or dropping it', () => {
     // "Staff" appeared on the board an hour into the first observation.
     const { matches, unmappedCodes } = matchSlots(realLoads(departed), ['Tim Trevis'], map);
@@ -178,6 +257,49 @@ describe('matchSlots', () => {
   it('carries the load status through, so the caller can tell flown from building', () => {
     const { matches } = matchSlots(realLoads(departed), ['Dylan Whitehair'], map);
     expect(matches[0].status).toBe('Departed');
+  });
+});
+
+describe('mergeSeededCodes', () => {
+  const savedBeforeAff = DEFAULT_BURBLE_CODE_MAP.filter((m) => m.code !== 'AFFI');
+
+  it('tops up a map saved before AFFI was seeded', () => {
+    // The whole point: adding a mapping to the seed list does nothing on
+    // its own, because a saved map is what matching actually uses.
+    const merged = mergeSeededCodes(savedBeforeAff, 1);
+    expect(merged.map((m) => m.code)).toContain('AFFI');
+    expect(merged.find((m) => m.code === 'AFFI')).toMatchObject({ role: 'aff', jumpTypeName: 'AFF Instructor' });
+  });
+
+  it('leaves a map alone once it is up to date with the seed', () => {
+    // Which is what makes "Remove" stick: removing a code writes the
+    // settings back at the current version, so nothing re-adds it.
+    const withoutAff = savedBeforeAff;
+    expect(mergeSeededCodes(withoutAff, BURBLE_CODE_SEED_VERSION)).toBe(withoutAff);
+  });
+
+  it('never duplicates a code the saved map already has, whatever its case', () => {
+    const saved = [{ code: 'affi', role: 'solo' as const, jumpTypeName: 'Something Else' }];
+    const merged = mergeSeededCodes(saved, 1);
+    expect(merged.filter((m) => m.code.toUpperCase() === 'AFFI')).toHaveLength(1);
+    // The saved mapping wins — a top-up must never overwrite a decision
+    // the jumper has already made about a code.
+    expect(merged[0]).toEqual(saved[0]);
+  });
+
+  it('keeps everything the saved map had', () => {
+    const saved = [{ code: 'MYOWN', role: 'solo' as const, jumpTypeName: 'Sport' }];
+    expect(mergeSeededCodes(saved, 1)).toContainEqual(saved[0]);
+  });
+});
+
+describe('BURBLE_ROLES', () => {
+  it('covers every role a mapping can be saved with', () => {
+    // Two hand-maintained copies of this list used to reject an unknown
+    // role silently — a saved AFFI mapping would have been dropped on
+    // read with nothing to show for it.
+    expect(BURBLE_ROLES).toContain('aff');
+    expect(new Set(DEFAULT_BURBLE_CODE_MAP.map((m) => m.role)).difference(new Set(BURBLE_ROLES)).size).toBe(0);
   });
 });
 

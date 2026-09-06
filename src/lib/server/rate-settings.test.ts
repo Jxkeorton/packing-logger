@@ -16,7 +16,7 @@ const { readRateSettings, writeRateSettings } = await import('./rate-settings');
 
 const DEFAULTS = {
   packing: { tandem: 11, instructor: 6.5, student: 6.5, sport: 6.5 },
-  tandem: { instructor: 42, videographer: 42 },
+  tandem: { instructor: 42, videographer: 42, aff: 42 },
   videographerPackageRate: 92,
 };
 
@@ -50,7 +50,7 @@ describe('readRateSettings', () => {
     );
     expect(await readRateSettings()).toEqual({
       packing: { tandem: 15, instructor: 6.5, student: 6.5, sport: 6.5 },
-      tandem: { instructor: 50, videographer: 42 },
+      tandem: { instructor: 50, videographer: 42, aff: 42 },
       videographerPackageRate: 92,
     });
   });
@@ -66,7 +66,7 @@ describe('writeRateSettings', () => {
   it('round-trips a full settings object', async () => {
     const custom = {
       packing: { tandem: 12, instructor: 7, student: 7, sport: 7 },
-      tandem: { instructor: 45, videographer: 45 },
+      tandem: { instructor: 45, videographer: 45, aff: 45 },
       videographerPackageRate: 95,
     };
     await writeRateSettings(custom);

@@ -10,7 +10,7 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { BurbleLoadsResponse } from '../../burble';
-import { DEFAULT_BURBLE_CODE_MAP } from '../../burble';
+import { BURBLE_CODE_SEED_VERSION, DEFAULT_BURBLE_CODE_MAP } from '../../burble';
 import type { BurbleSettings } from '../logbook-settings';
 
 const { store, queue } = vi.hoisted(() => ({
@@ -48,6 +48,7 @@ const ON_CALL = fixture('get-loads-on-call.json');
 const DEPARTED = fixture('get-loads-departed.json');
 const EMPTY_BOARD = fixture('get-loads-empty-board.json');
 const LANGAR_BUILDING = fixture('get-loads-langar-building.json');
+const LANGAR_AFF = fixture('get-loads-langar-aff.json');
 
 /** A fixture with the manifest version pinned, so version short-circuiting is testable. */
 function at(response: BurbleLoadsResponse, version: number | undefined): BurbleLoadsResponse {
@@ -77,6 +78,7 @@ function settingsFor(...myNames: string[]): BurbleSettings {
     autoPoll: false,
     pollSeconds: 30,
     codeMap: DEFAULT_BURBLE_CODE_MAP,
+    codeSeedVersion: BURBLE_CODE_SEED_VERSION,
   };
 }
 
@@ -210,6 +212,67 @@ describe('version short-circuiting', () => {
     await syncOnce(TI);
 
     expect((await readSyncState()).unmappedCodes).not.toContain('TI');
+  });
+});
+
+describe('confirming an AFF jump', () => {
+  // Robin Fielding is manifested as AFFI on two loads in this capture —
+  // a level 6 and a level 1.
+  const AFFI = settingsFor('Robin Fielding');
+
+  it('writes an invoiceable AFF jump carrying the student and their level', async () => {
+    script(at(LANGAR_AFF, 1));
+    await syncOnce(AFFI);
+
+    const pending = pendingJumps(await readSyncState());
+    expect(pending).toHaveLength(2);
+    expect(await commitMatches(pending.map((p) => p.slotId))).toEqual({ logged: 2, skippedDuplicates: 0 });
+
+    const state = await loadTodayState();
+    expect(state.counts.aff).toBe(2);
+    // Newest-seen first, so the level 1 (load 4) is committed ahead of
+    // the level 6 (load 2) — order aside, both levels have to survive.
+    expect(state.entries.aff.map((j) => [j.name, j.level]).sort()).toEqual([
+      ['Alex Marsh', 'Level 6'],
+      ['Sam Okafor', 'Level 1'],
+    ]);
+  });
+
+  it('files it under the AFF Instructor jump type and names the level in the logbook', async () => {
+    script(at(LANGAR_AFF, 1));
+    await syncOnce(AFFI);
+    const [jump] = pendingJumps(await readSyncState()).filter((p) => p.studentLevel === 'Level 6');
+    await commitMatches([jump.slotId]);
+
+    const [entry] = await readLogbook(0);
+    expect(entry.jumpType).toBe('AFF Instructor');
+    expect(entry.description).toContain('Alex Marsh (Level 6)');
+    expect(entry.description).toContain('G-FLOH load 2');
+    // Only one AFFI was manifested on this group, so there's no second
+    // instructor to name.
+    expect(entry.description).not.toContain('Second instructor');
+  });
+
+  it('gives an AFF instructor their own rig, not the tandem one', async () => {
+    // A tandem instructor jumps the DZ's shared tandem system and gets a
+    // fixed "Tandem Rig" label; an AFF instructor is on their own gear,
+    // so the starred default applies exactly as it would for a sport
+    // jump. Nothing is starred in this suite, hence the blank.
+    script(at(LANGAR_AFF, 1));
+    await syncOnce(AFFI);
+    const [jump] = pendingJumps(await readSyncState());
+    await commitMatches([jump.slotId]);
+
+    expect((await readLogbook(0))[0].rig).not.toBe('Tandem Rig');
+  });
+
+  it('never offers the student their own jump, or their level as a code to map', async () => {
+    script(at(LANGAR_AFF, 1));
+    await syncOnce(settingsFor('Alex Marsh'));
+
+    const state = await readSyncState();
+    expect(pendingJumps(state)).toHaveLength(0);
+    expect(state.unmappedCodes).toEqual([]);
   });
 });
 

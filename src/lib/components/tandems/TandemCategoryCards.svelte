@@ -1,6 +1,14 @@
 <script lang="ts">
   import { invalidateAll } from '$app/navigation';
-  import { CATEGORIES, CATEGORY_LABELS, OTHER_STAFF_LABELS, type Category, type DayState } from '$lib/tandem';
+  import {
+    AFF_LEVELS,
+    CATEGORIES,
+    CATEGORY_ACTION_LABELS,
+    CATEGORY_LABELS,
+    OTHER_STAFF_LABELS,
+    type Category,
+    type DayState,
+  } from '$lib/tandem';
   import { CARD, CARD_TOP, CARD_LABEL, CARD_RATE, CARD_SUBTOTAL, CATEGORIES_LIST } from '$lib/ui-classes';
   import TandemNameModal from './TandemNameModal.svelte';
   import Spinner from '../Spinner.svelte';
@@ -28,7 +36,15 @@
     pendingCategory ? `${CATEGORY_LABELS[pendingCategory]} jump — £${rates[pendingCategory].toFixed(2)}` : '',
   );
 
-  async function addJump(name: string, staff: string) {
+  // An AFF jump is for a *student*, not a customer, and it's the one
+  // category with a level to record. Everything the modal needs to switch
+  // between the two is derived here rather than branched inside it, so the
+  // modal stays a dumb form.
+  const isAff = $derived(pendingCategory === 'aff');
+  const modalNameLabel = $derived(isAff ? 'Student name' : 'Customer name');
+  const modalNamePlaceholder = $derived(isAff ? 'e.g. Alex Marsh' : 'e.g. Jane Smith');
+
+  async function addJump(name: string, staff: string, level: string) {
     const category = pendingCategory;
     if (!category || addingJump) return;
     addingJump = true;
@@ -37,6 +53,7 @@
       formData.set('category', category);
       formData.set('name', name);
       formData.set('staff', staff);
+      formData.set('level', level);
       await fetch('?/addTandemJump', { method: 'POST', body: formData });
       pendingCategory = null;
       await invalidateAll();
@@ -58,17 +75,21 @@
 <section class={CATEGORIES_LIST}>
   {#if visibleCategories.length === 0}
     <p class="visibility-empty">
-      Both sections are hidden — turn one back on under <strong>Settings &rarr; Work jumps</strong>.
+      Every section is hidden — turn one back on under <strong>Settings &rarr; Work jumps</strong>.
     </p>
   {/if}
   {#each visibleCategories as category (category)}
-    <section class={CARD} data-tandem-category={category} style={`--accent: var(--${category})`}>
+    <section
+      class={CARD}
+      data-tandem-category={category}
+      style={`--accent: var(--${category}); --accent-soft: var(--${category}-soft)`}
+    >
       <div class={CARD_TOP}>
         <h2 class={CARD_LABEL}>{CATEGORY_LABELS[category]}</h2>
         <span class={CARD_RATE}>£{rates[category].toFixed(2)} / jump</span>
       </div>
       <button type="button" class="add-jump-btn" style={`--accent: var(--${category})`} onclick={() => (pendingCategory = category)}>
-        &plus; Add {CATEGORY_LABELS[category].toLowerCase()} jump
+        &plus; Add {CATEGORY_ACTION_LABELS[category]} jump
       </button>
       <ul class="list-none mt-1 mb-0 p-0">
         {#if tandemState.entries[category].length === 0}
@@ -77,6 +98,7 @@
           {#each tandemState.entries[category] as jump (jump.at)}
             <li class="tandem-jump-row">
               <span class="tandem-jump-name">{jump.name}</span>
+              {#if jump.level}<span class="tandem-jump-level">{jump.level}</span>{/if}
               <button
                 type="button"
                 class="tandem-jump-delete"
@@ -98,7 +120,10 @@
 <TandemNameModal
   open={pendingCategory !== null}
   subtitle={modalSubtitle}
+  nameLabel={modalNameLabel}
+  namePlaceholder={modalNamePlaceholder}
   staffLabel={pendingCategory ? OTHER_STAFF_LABELS[pendingCategory] : ''}
+  levelOptions={isAff ? AFF_LEVELS : undefined}
   submitting={addingJump}
   onSubmit={addJump}
   onClose={() => (pendingCategory = null)}
@@ -156,8 +181,30 @@
   }
 
   .tandem-jump-name {
+    /* Takes the slack and gives it back: a long student name ellipsises
+       rather than pushing the level pill or the delete button off the
+       row. `min-width: 0` is what actually lets a flex item shrink below
+       its text width. */
+    flex: 1;
+    min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* The AFF student's level, as a quiet pill after their name — it
+     qualifies the name rather than standing on its own, and at this size
+     a second line per row would cost more height than the whole card can
+     spare (see the commit that fit these onto one screen). */
+  .tandem-jump-level {
+    flex: none;
+    padding: 1px 6px;
+    border-radius: 999px;
+    background: var(--accent-soft);
+    color: var(--accent);
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    font-weight: 600;
     white-space: nowrap;
   }
 

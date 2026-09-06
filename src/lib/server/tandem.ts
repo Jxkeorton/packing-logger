@@ -20,10 +20,23 @@ import {
 } from '../tandem';
 
 export type { Category, Counts, DayState, HistoryRow, Jump };
+
+/** One backfilled jump for setDayEntries — a name, plus a level on AFF. */
+export interface DayEntryInput {
+  name: string;
+  level?: string;
+}
 export { toHistoryRow } from '../tandem';
 
 const JUMPS_KEY = 'tandem-jumps.csv';
-const JUMPS_HEADER = 'date,category,name,at';
+const JUMPS_HEADER = 'date,category,name,level,at';
+/** The pre-AFF header, still sitting at the top of every existing file — see readJumps. */
+const LEGACY_JUMPS_HEADER = 'date,category,name,at';
+
+/** An empty per-category bucket, built from CATEGORIES so a new one can't be forgotten here. */
+function emptyEntries(): Record<Category, Jump[]> {
+  return Object.fromEntries(CATEGORIES.map((c) => [c, [] as Jump[]])) as Record<Category, Jump[]>;
+}
 
 async function readJumps(): Promise<Jump[]> {
   const raw = await readText(JUMPS_KEY);
@@ -34,22 +47,32 @@ async function readJumps(): Promise<Jump[]> {
   // that motivated it) rather than failing loudly.
   const jumps: Jump[] = [];
   for (const row of parseCsvRows(raw)) {
-    if (row.join(',') === JUMPS_HEADER) continue;
-    const [date, category, name, at] = row;
+    const joined = row.join(',');
+    if (joined === JUMPS_HEADER || joined === LEGACY_JUMPS_HEADER) continue;
+    // `level` was added with the AFF category, so every row written before
+    // that has four columns and no level. Read by *width* rather than by
+    // which header the file happens to start with: a file is rewritten
+    // whole on the next write, but until then one that was migrated
+    // mid-session could legitimately hold both shapes, and getting this
+    // wrong would shift every name one column left.
+    const [date, category] = row;
+    const [name, level, at] = row.length >= 5 ? [row[2], row[3], row[4]] : [row[2], '', row[3]];
     if (!date || !at || !CATEGORIES.includes(category as Category)) continue;
-    jumps.push({ date, category: category as Category, name: name ?? '', at });
+    jumps.push({ date, category: category as Category, name: name ?? '', level: level ?? '', at });
   }
   return jumps;
 }
 
 async function writeJumps(jumps: Jump[]): Promise<void> {
   const sorted = [...jumps].sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0));
-  const body = sorted.map((j) => [j.date, j.category, csvEscape(j.name), j.at].join(',')).join('\n');
+  const body = sorted
+    .map((j) => [j.date, j.category, csvEscape(j.name), csvEscape(j.level), j.at].join(','))
+    .join('\n');
   await writeText(JUMPS_KEY, `${JUMPS_HEADER}\n${body}\n`);
 }
 
 function entriesFor(jumps: Jump[], date: string): Record<Category, Jump[]> {
-  const out: Record<Category, Jump[]> = { instructor: [], videographer: [] };
+  const out = emptyEntries();
   for (const j of jumps) {
     if (j.date === date) out[j.category].push(j);
   }
@@ -57,7 +80,9 @@ function entriesFor(jumps: Jump[], date: string): Record<Category, Jump[]> {
 }
 
 function countsFromEntries(entries: Record<Category, Jump[]>): Counts {
-  return { instructor: entries.instructor.length, videographer: entries.videographer.length };
+  const counts = zeroCounts();
+  for (const category of CATEGORIES) counts[category] = entries[category].length;
+  return counts;
 }
 
 function stateFor(jumps: Jump[], date: string): DayState {
@@ -77,10 +102,18 @@ export async function loadTodayState(): Promise<DayState> {
  * tandem-jump route action) can share the same id with a linked record
  * in another ledger — the personal logbook's auto-logged tandem entries.
  */
-export async function addJump(category: Category, name: string, at: string = new Date().toISOString()): Promise<DayState> {
+export async function addJump(
+  category: Category,
+  name: string,
+  at: string = new Date().toISOString(),
+  level = '',
+): Promise<DayState> {
   const jumps = await readJumps();
   const today = todayKey();
-  jumps.push({ date: today, category, name, at });
+  // Only an AFF jump has a level; anything arriving on another category is
+  // dropped rather than stored, so a stray value can't turn up on a tandem
+  // row later and be rendered as if it meant something.
+  jumps.push({ date: today, category, name, level: category === 'aff' ? level : '', at });
   await writeJumps(jumps);
   return stateFor(jumps, today);
 }
@@ -105,7 +138,10 @@ export async function removeJump(at: string): Promise<DayState> {
  * for backfilling a day logged on paper, or correcting a mistake, rather
  * than adding/removing one at a time.
  */
-export async function setDayEntries(date: string, names: Record<Category, string[]>): Promise<DayState> {
+export async function setDayEntries(
+  date: string,
+  names: Record<Category, DayEntryInput[]>,
+): Promise<DayState> {
   const jumps = await readJumps();
   const remaining = jumps.filter((j) => j.date !== date);
 
@@ -114,8 +150,14 @@ export async function setDayEntries(date: string, names: Record<Category, string
   const base = new Date(`${date}T12:00:00.000Z`).getTime();
   let offset = 0;
   for (const category of CATEGORIES) {
-    for (const name of names[category] ?? []) {
-      remaining.push({ date, category, name, at: new Date(base + offset).toISOString() });
+    for (const entry of names[category] ?? []) {
+      remaining.push({
+        date,
+        category,
+        name: entry.name,
+        level: category === 'aff' ? (entry.level ?? '') : '',
+        at: new Date(base + offset).toISOString(),
+      });
       offset += 1;
     }
   }
@@ -135,9 +177,11 @@ export async function readCsvFile(): Promise<string> {
   const jumps = await readJumps();
   const rates = await readRateSettings();
   const sorted = [...jumps].sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0));
-  const header = 'date,category,name,amount,at';
+  const header = 'date,category,name,level,amount,at';
   const body = sorted
-    .map((j) => [j.date, j.category, csvEscape(j.name), rates.tandem[j.category].toFixed(2), j.at].join(','))
+    .map((j) =>
+      [j.date, j.category, csvEscape(j.name), csvEscape(j.level), rates.tandem[j.category].toFixed(2), j.at].join(','),
+    )
     .join('\n');
   return `${header}\n${body}\n`;
 }
@@ -194,7 +238,7 @@ export async function loadTodayStateAndHistory(limit = 14): Promise<{ state: Day
  */
 export async function jumpsInRange(startDate: string, endDate: string): Promise<Record<Category, Jump[]>> {
   const jumps = await readJumps();
-  const out: Record<Category, Jump[]> = { instructor: [], videographer: [] };
+  const out = emptyEntries();
   for (const j of jumps) {
     if (j.date >= startDate && j.date <= endDate) out[j.category].push(j);
   }
