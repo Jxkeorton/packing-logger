@@ -9,7 +9,7 @@
 //              ledger read/write scoped to that user's own files
 //              (storage.ts's runAsUser — this is the one line that makes
 //              a shared deployment safe for more than one person).
-import type { Handle } from '@sveltejs/kit';
+import type { Handle, HandleServerError } from '@sveltejs/kit';
 import { AUTH_COOKIE, authMode, isValidSession, verifyUserSession } from '$lib/server/auth';
 import { runAsUser } from '$lib/server/storage';
 
@@ -48,4 +48,23 @@ export const handle: Handle = async ({ event, resolve }) => {
 
   event.locals.userId = userId;
   return runAsUser(userId, () => resolve(event));
+};
+
+/**
+ * SvelteKit already console.errors an unexpected 500, but on Vercel that
+ * line is easy to lose in the stream and carries no request context. Tag
+ * it so it's greppable ("[500]") and stamp on the method + path + the
+ * signed-in user, which is usually all it takes to tell "R2 had a blip"
+ * apart from "this one ledger is corrupt". The client still sees
+ * SvelteKit's generic message — nothing here widens what's returned.
+ */
+export const handleError: HandleServerError = ({ error, event, status, message }) => {
+  if (status !== 404) {
+    const who = event.locals.userId ? ` user=${event.locals.userId}` : '';
+    console.error(
+      `[${status}] ${event.request.method} ${event.url.pathname}${who} — ${message}`,
+      error instanceof Error ? (error.stack ?? error.message) : error,
+    );
+  }
+  return { message };
 };

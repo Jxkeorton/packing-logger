@@ -6,8 +6,8 @@
 // for a fair migration rather than folded into per-tab routes (a real
 // improvement worth doing separately, once this is proven out).
 import type { Actions, PageServerLoad } from './$types';
-import { toHistoryRow, todayKey, type DayState } from '$lib/packing';
-import { loadTodayState, readHistory } from '$lib/server/packing';
+import { toHistoryRow, todayKey, totalPacks, type DayState } from '$lib/packing';
+import { loadTodayStateForRender, readHistory } from '$lib/server/packing';
 import { groupByInvoiceMonth, groupByWeek } from '$lib/server/invoice';
 import { loadTodayStateAndHistory as loadTandemStateAndHistory } from '$lib/server/tandem';
 import { toHistoryRow as toTandemHistoryRow } from '$lib/tandem';
@@ -28,9 +28,39 @@ import { configActions } from '$lib/server/actions/config';
 import { ratesActions } from '$lib/server/actions/rates';
 
 export const load: PageServerLoad = async () => {
-  const state = await loadTodayState();
-  const topTimes = await readFastestFive();
-  const rateSettings = await readRateSettings();
+  // One parallel wave rather than ~10 serial R2 round-trips: every read
+  // below is independent, and doing them one after another both slowed
+  // the render and multiplied the odds that a single transient R2 blip
+  // (each `readText` throws on a non-404 error, by design) took the whole
+  // page down as a 500. Only the logbook's jump numbers depend on
+  // another read (logbookSettings.baseJumps), so that stays a second step.
+  const [
+    { state, unflushed },
+    topTimes,
+    rateSettings,
+    packingHistory,
+    tandemBundle,
+    invoiceSettings,
+    tandemVisibility,
+    tabVisibility,
+    logbookSettings,
+    burbleState,
+  ] = await Promise.all([
+    loadTodayStateForRender(),
+    readFastestFive(),
+    readRateSettings(),
+    readHistory(400),
+    loadTandemStateAndHistory(400),
+    readInvoiceSettings(),
+    readTandemVisibility(),
+    readTabVisibility(),
+    readLogbookSettings(),
+    readSyncState(),
+  ]);
+
+  const { entries: logbookEntries, nextNumber: nextLogbookNumber } = await readLogbookAndNextNumber(
+    logbookSettings.baseJumps,
+  );
 
   // A wider window of history feeds the week/month rollups; the
   // day-by-day table only shows the most recent slice of it. A day
@@ -39,7 +69,17 @@ export const load: PageServerLoad = async () => {
   // whether anything actually happened, so these do turn up for real,
   // not just in theory. Filtered here rather than in PackHistoryPanel
   // so it never has to think about it.
-  const fullHistory = (await readHistory(400)).filter((r) => r.totalPacks > 0);
+  const csvHistory = packingHistory.filter((r) => r.totalPacks > 0);
+  // If a day rollover couldn't be persisted this render (see
+  // loadTodayStateForRender), that day's counts aren't in the CSV yet —
+  // fold it back in here, newest-first, so History doesn't briefly drop
+  // yesterday until the next write flushes it for real.
+  const unflushedRow =
+    unflushed && totalPacks(unflushed.counts) > 0 ? toHistoryRow(unflushed, rateSettings.packing) : null;
+  const fullHistory =
+    unflushedRow && !csvHistory.some((r) => r.date === unflushedRow.date)
+      ? [unflushedRow, ...csvHistory]
+      : csvHistory;
   const dayRows = fullHistory.slice(0, 14);
 
   // Today isn't in the CSV-backed history yet (it's still being logged),
@@ -64,7 +104,7 @@ export const load: PageServerLoad = async () => {
   // packing (tandem-jumps.csv only ever gets a row when a jump is
   // logged, no day-rollover phantom entry) — the filter's just here for
   // symmetry with packing and as a no-cost guard if that ever changes.
-  const { state: tandemState, history: tandemFullHistory } = await loadTandemStateAndHistory(400);
+  const { state: tandemState, history: tandemFullHistory } = tandemBundle;
   const tandemNonEmptyHistory = tandemFullHistory.filter((r) => r.totalJumps > 0);
   const tandemDayRows = tandemNonEmptyHistory.slice(0, 14);
   const tandemCombined = [...tandemNonEmptyHistory, toTandemHistoryRow(tandemState, rateSettings.tandem)];
@@ -75,23 +115,11 @@ export const load: PageServerLoad = async () => {
     .filter((r) => r.isCurrent || r.totalJumps > 0)
     .slice(0, 12);
 
-  const invoiceSettings = await readInvoiceSettings();
-  const tandemVisibility = await readTandemVisibility();
-  const tabVisibility = await readTabVisibility();
-
-  // The personal jump logbook — a separate ledger again, numbered from a
-  // configurable starting offset rather than a running daily count. One
-  // read of logbook.csv for both the entries and the next number, not two.
-  const logbookSettings = await readLogbookSettings();
-  const { entries: logbookEntries, nextNumber: nextLogbookNumber } = await readLogbookAndNextNumber(
-    logbookSettings.baseJumps,
-  );
-
-  // Manifest sync state is *read* here, never polled — a page load must
-  // not reach out to Burble. Checking the board is an explicit action.
-  const burbleState = await readSyncState();
-  // Each pending jump carries its own "how sure are we it flew" line, so
-  // the confirmation list can be rendered without re-deriving it client-side.
+  // Manifest sync state (burbleState, read above) is *read* on a page
+  // load, never polled — a page load must not reach out to Burble.
+  // Checking the board is an explicit action. Each pending jump carries
+  // its own "how sure are we it flew" line, so the confirmation list can
+  // be rendered without re-deriving it client-side.
   const burblePending = pendingJumps(burbleState).map((jump) => ({ ...jump, hint: flightHint(jump) }));
 
   const today = todayKey();

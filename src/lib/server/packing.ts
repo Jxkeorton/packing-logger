@@ -132,6 +132,38 @@ export async function loadTodayState(): Promise<DayState> {
 }
 
 /**
+ * loadTodayState() for the page `load` (render) path.
+ *
+ * Same result, but a failed day *rollover* must not 500 the whole page.
+ * The read of state.json still throws if it fails — rendering a zeroed
+ * day over a real one, and letting the next +/- tap persist that, is
+ * worse than showing an error — but flushing yesterday's totals to the
+ * CSV and writing the fresh day are best-effort here. If they fail, the
+ * next mutation's loadTodayState() (or simply the next render) retries;
+ * both steps are idempotent. The only visible cost until then is
+ * yesterday's row not yet appearing in History — so this also hands back
+ * that un-flushed day, for `load` to fold into its own rollups.
+ */
+export async function loadTodayStateForRender(): Promise<{ state: DayState; unflushed: DayState | null }> {
+  const today = todayKey();
+  const existing = await readState();
+
+  if (existing && existing.date === today) {
+    return { state: existing, unflushed: null };
+  }
+
+  const fresh: DayState = { date: today, counts: zeroCounts() };
+  try {
+    if (existing) await upsertCsvRow(existing);
+    await writeState(fresh);
+    return { state: fresh, unflushed: null };
+  } catch (err) {
+    console.error('[packing] deferred day rollover — will retry on next write', err);
+    return { state: fresh, unflushed: existing ?? null };
+  }
+}
+
+/**
  * Adjust today's count for a category by `delta` (can be negative),
  * floored at 0. Deliberately just the two smallest possible storage
  * round trips — read state.json, write state.json — since this is the
@@ -191,8 +223,7 @@ export async function readCsvFile(): Promise<string> {
 
 /** Most recent history rows (excluding today), newest first. */
 export async function readHistory(limit = 14): Promise<HistoryRow[]> {
-  const rows = await readCsvRows();
-  const rates = await readRateSettings();
+  const [rows, rates] = await Promise.all([readCsvRows(), readRateSettings()]);
   const today = todayKey();
   const dates = [...rows.keys()]
     .filter((d) => d !== today)

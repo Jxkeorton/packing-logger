@@ -113,6 +113,31 @@ function contentTypeFor(name: string): string {
   return name.endsWith('.json') ? 'application/json' : 'text/csv';
 }
 
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
+ * aws4fetch retries HTTP 5xx/429 *responses* (retries: 2, above), but a
+ * network-level failure — ECONNRESET, "fetch failed", a TLS reset —
+ * makes `fetch` reject, and its retry loop rethrows that on the first
+ * hit with no second try. On a serverless function doing ~10 R2 reads
+ * per page render that gap is most of the difference between a blip and
+ * a 500, so cover it here: a couple more goes with a short backoff, for
+ * thrown errors only (a returned 5xx has already exhausted aws4fetch's
+ * own retries and won't improve by asking again immediately). Every R2
+ * call this file makes is idempotent — GET, or a whole-object PUT — so
+ * replaying one is always safe.
+ */
+async function r2Fetch(url: string, init: RequestInit, attempts = 3): Promise<Response> {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await r2!.client.fetch(url, init);
+    } catch (err) {
+      if (attempt >= attempts) throw err;
+      await sleep(120 * 2 ** (attempt - 1));
+    }
+  }
+}
+
 /** Read a stored text file, or null if it doesn't exist yet. */
 export async function readText(name: string): Promise<string | null> {
   assertBackend();
@@ -120,7 +145,7 @@ export async function readText(name: string): Promise<string | null> {
   if (r2) {
     // no-store because every caller here is reading a ledger it may be
     // about to rewrite — a cached copy would mean writing back stale rows.
-    const response = await r2.client.fetch(r2Url(name), { method: 'GET', cache: 'no-store' });
+    const response = await r2Fetch(r2Url(name), { method: 'GET', cache: 'no-store' });
     if (response.status === 404) return null;
     if (!response.ok) {
       // Deliberately not `return null`: "missing" and "the store is having
@@ -141,7 +166,7 @@ export async function writeText(name: string, content: string): Promise<void> {
   assertBackend();
 
   if (r2) {
-    const response = await r2.client.fetch(r2Url(name), {
+    const response = await r2Fetch(r2Url(name), {
       method: 'PUT',
       body: content,
       headers: { 'content-type': contentTypeFor(name) },
