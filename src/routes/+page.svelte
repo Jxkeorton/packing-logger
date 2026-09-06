@@ -523,6 +523,16 @@
       </div>
     </header>
 
+    <BurbleSyncPanel
+      enabled={data.logbookSettings.burble.enabled}
+      autoPoll={data.logbookSettings.burble.autoPoll}
+      pollSeconds={data.logbookSettings.burble.pollSeconds}
+      pendingCount={data.burblePending.length}
+      unmappedCodes={data.burbleUnmappedCodes}
+      lastSyncAt={data.burbleLastSyncAt}
+      myNames={data.logbookSettings.burble.myNames}
+    />
+
     <TandemCategoryCards tandemState={data.tandemState} visibility={data.tandemVisibility} rates={data.rateSettings.tandem} />
 
     <TandemHistoryPanel dayRows={data.tandemDayRows} weekRows={data.tandemWeekRows} monthRows={data.tandemMonthRows} />
