@@ -89,7 +89,6 @@
           categories={CATEGORIES}
           categoryLabels={CATEGORY_LABELS}
           unitLabel="Jumps"
-          exportHref={(key) => `/api/tandem-invoice.pdf?month=${encodeURIComponent(key)}`}
         />
       {/if}
     </div>

@@ -24,6 +24,7 @@
   import PackTimerView from '$lib/components/packing/PackTimerView.svelte';
   import TandemCategoryCards from '$lib/components/tandems/TandemCategoryCards.svelte';
   import TandemHistoryPanel from '$lib/components/tandems/TandemHistoryPanel.svelte';
+  import MonthlyInvoiceButton from '$lib/components/tandems/MonthlyInvoiceButton.svelte';
   import InvoiceSettingsPanel from '$lib/components/tandems/InvoiceSettingsPanel.svelte';
   import WorkJumpsSettingsPanel from '$lib/components/tandems/WorkJumpsSettingsPanel.svelte';
   import RatesSettingsPanel from '$lib/components/tandems/RatesSettingsPanel.svelte';
@@ -128,6 +129,12 @@
   // {id, name, detail?} row, same as the real app's ReferenceListPanel.astro.
   // $derived (not computed once) so these stay current after any action
   // re-runs `load` — no separate "refresh" step anywhere.
+  // The invoice month that's still filling up — the one the "Export
+  // monthly invoice" button targets. tandemMonthRows always keeps its
+  // isCurrent row (today's own jump row seeds that bucket even at zero),
+  // so this is only ever null in the theoretical case it's missing.
+  const currentInvoiceMonth = $derived(data.tandemMonthRows.find((r) => r.isCurrent) ?? null);
+
   const places = $derived(data.logbookSettings.places.map((p) => ({ id: p.id, name: p.name })));
   const aircraft = $derived(data.logbookSettings.aircraft.map((ac) => ({ id: ac.id, name: ac.plate })));
   const jumpTypes = $derived(data.logbookSettings.jumpTypes.map((jt) => ({ id: jt.id, name: jt.name })));
@@ -536,6 +543,10 @@
     <TandemCategoryCards tandemState={data.tandemState} visibility={data.tandemVisibility} rates={data.rateSettings.tandem} />
 
     <TandemHistoryPanel dayRows={data.tandemDayRows} weekRows={data.tandemWeekRows} monthRows={data.tandemMonthRows} />
+
+    {#if currentInvoiceMonth}
+      <MonthlyInvoiceButton monthKey={currentInvoiceMonth.key} rangeLabel={currentInvoiceMonth.rangeLabel} />
+    {/if}
 
     <footer class={FOOT}>
       <DownloadButton href="/api/tandem-export.csv" filename="tandem-log.csv" label="Download full tandem log (.csv)" />

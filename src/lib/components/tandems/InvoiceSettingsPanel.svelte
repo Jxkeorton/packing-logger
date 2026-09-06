@@ -23,7 +23,8 @@
 
 <div>
       <p class={PANEL_HINT}>
-        Used on the "Export PDF" invoices below — your details, who it's billed to, and the next invoice number.
+        Used on the "Export monthly invoice" PDF on the Work jumps tab — your details, who it's billed to, and the
+        next invoice number.
       </p>
       <form
         method="POST"
