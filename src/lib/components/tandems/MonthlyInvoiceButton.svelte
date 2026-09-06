@@ -29,7 +29,7 @@
 <div class="flex flex-col items-center gap-1.5">
   <button
     type="button"
-    class="{FORM_SAVE_BUTTON_SECONDARY} w-full flex items-center justify-center gap-2"
+    class="{FORM_SAVE_BUTTON_SECONDARY} w-full flex items-center justify-center gap-2 border-danger!"
     class:text-danger={failed}
     disabled={busy}
     onclick={handleClick}
