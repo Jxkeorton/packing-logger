@@ -1,111 +1,42 @@
 // Groups daily pack-job history into weeks and invoice months. The
-// underlying invoice-period math lives in ./periods (shared with the
-// tandem log's ./tandem-invoice) — see that file for how cutoffs work.
+// bucketing itself lives in ./history-buckets (shared with the work-jumps
+// log's ./tandem-invoice); this file is just the pack-job adapter over
+// it — its category set, its "packs" unit, its default rates.
+import { CATEGORIES, RATES, totalEarnings, totalPacks, zeroCounts, type Category, type Counts, type HistoryRow } from '../packing';
 import {
-  CATEGORIES,
-  RATES as DEFAULT_RATES,
-  totalEarnings,
-  totalPacks,
-  type Category,
-  type Counts,
-  type HistoryRow,
-} from '../packing';
-import {
-  addDays,
-  formatDateKey,
-  invoiceCutoff,
-  invoiceMonthOf,
-  mondayOf,
-  parseDateKey,
-  rangeLabel,
-} from './periods';
+  groupByInvoiceMonth as bucketByInvoiceMonth,
+  groupByWeek as bucketByWeek,
+  type Bucket,
+  type HistoryDomain,
+} from './history-buckets';
 
-export interface AggregateRow {
-  key: string;
-  /** True when today falls inside this bucket (it's still filling up). */
-  isCurrent: boolean;
-  rangeLabel: string;
+/** A week/month rollup row. `totalPacks` is `Bucket.total` named for the pack-job call sites. */
+export interface AggregateRow extends Bucket<Category> {
   counts: Counts;
   totalPacks: number;
-  totalEarnings: number;
 }
 
-function emptyCounts(): Counts {
-  return { tandem: 0, instructor: 0, student: 0, sport: 0 };
-}
+const DOMAIN: HistoryDomain<Category> = {
+  categories: CATEGORIES,
+  zeroCounts,
+  total: totalPacks,
+  earnings: totalEarnings,
+  defaultRates: RATES,
+};
 
-function addCounts(a: Counts, b: Counts): Counts {
-  const out = { ...a };
-  for (const c of CATEGORIES) out[c] += b[c];
-  return out;
-}
-
-function toBuckets<K extends string>(
-  rows: HistoryRow[],
-  rates: Record<Category, number>,
-  keyOf: (d: Date) => K,
-  rangeOf: (key: K) => { start: Date; end: Date },
-): AggregateRow[] {
-  const buckets = new Map<K, Counts>();
-  for (const row of rows) {
-    const key = keyOf(parseDateKey(row.date));
-    buckets.set(key, addCounts(buckets.get(key) ?? emptyCounts(), row.counts));
-  }
-
-  const todayKey = formatDateKey(new Date());
-  const today = parseDateKey(todayKey);
-
-  return [...buckets.entries()]
-    .sort((a, b) => (a[0] < b[0] ? 1 : -1)) // newest first
-    .map(([key, counts]) => {
-      const { start, end } = rangeOf(key);
-      return {
-        key,
-        isCurrent: today.getTime() >= start.getTime() && today.getTime() <= end.getTime(),
-        rangeLabel: rangeLabel(start, end),
-        counts,
-        totalPacks: totalPacks(counts),
-        totalEarnings: totalEarnings(counts, rates),
-      };
-    });
-}
+const named = (rows: Bucket<Category>[]): AggregateRow[] => rows.map((r) => ({ ...r, totalPacks: r.total }));
 
 /**
- * Group daily rows into Monday–Sunday weeks, most recent first. `rates`
- * defaults to $lib/packing.ts's hardcoded RATES — real callers pass the
- * actual settings-backed rates (rate-settings.ts) explicitly; this
- * default is for this file's own tests, which exercise the hardcoded
- * values on purpose.
+ * `rates` defaults (inside history-buckets) to $lib/packing.ts's
+ * hardcoded RATES — real callers pass the settings-backed rates
+ * (rate-settings.ts) explicitly; the default is for this file's own
+ * tests, which exercise the hardcoded values on purpose.
  */
 export function groupByWeek(rows: HistoryRow[], rates?: Record<Category, number>): AggregateRow[] {
-  return toBuckets(
-    rows,
-    rates ?? DEFAULT_RATES,
-    (d) => formatDateKey(mondayOf(d)) as `${string}`,
-    (key) => {
-      const start = parseDateKey(key);
-      return { start, end: addDays(start, 6) };
-    },
-  );
+  return named(bucketByWeek(rows, DOMAIN, rates));
 }
 
 /** Group daily rows into invoice months (cutoff-to-cutoff), most recent first. Same `rates` default as groupByWeek. */
 export function groupByInvoiceMonth(rows: HistoryRow[], rates?: Record<Category, number>): AggregateRow[] {
-  return toBuckets(
-    rows,
-    rates ?? DEFAULT_RATES,
-    (d) => {
-      const { year, month } = invoiceMonthOf(d);
-      return `${year}-${String(month + 1).padStart(2, '0')}` as `${string}`;
-    },
-    (key) => {
-      const [yearStr, monthStr] = key.split('-');
-      const year = Number(yearStr);
-      const month = Number(monthStr) - 1;
-      const end = invoiceCutoff(year, month);
-      const prev = month === 0 ? { year: year - 1, month: 11 } : { year, month: month - 1 };
-      const start = addDays(invoiceCutoff(prev.year, prev.month), 1);
-      return { start, end };
-    },
-  );
+  return named(bucketByInvoiceMonth(rows, DOMAIN, rates));
 }
