@@ -231,6 +231,11 @@ loads into logbook entries.
 
 ### Where the polling runs
 
+**Resolved:** a Cloudflare Worker cron trigger (free, 1-minute
+granularity) hits `/api/cron/burble-sync` every 2 minutes during
+operating hours — see `cron.ts` and `../../../../worker/`. The original
+options weighed at the time, kept for the reasoning:
+
 This is the part that needs a decision. The app is on Vercel with Blob
 storage, and a serverless function can't hold a 5-second timer all day:
 

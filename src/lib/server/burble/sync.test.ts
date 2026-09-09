@@ -112,6 +112,16 @@ describe('capturing a sighting', () => {
     });
   });
 
+  it('takes a pre-fetched board instead of hitting Burble, for the shared cron pass', async () => {
+    // No script() — the queue is empty, so any call to fetchLoads would
+    // throw. The board comes in as the second argument instead.
+    await syncOnce(TI, at(ON_CALL, 1));
+
+    const pending = pendingJumps(await readSyncState());
+    expect(pending).toHaveLength(1);
+    expect(pending[0]).toMatchObject({ role: 'instructor', customerName: 'Miranda Walfield' });
+  });
+
   it('flags the load as off the board once it stops being displayed', async () => {
     script(at(ON_CALL, 1), at(EMPTY_BOARD, 2));
     await syncOnce(TI);

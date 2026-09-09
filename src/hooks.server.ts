@@ -13,7 +13,17 @@ import type { Handle, HandleServerError } from '@sveltejs/kit';
 import { AUTH_COOKIE, authMode, isValidSession, verifyUserSession } from '$lib/server/auth';
 import { runAsUser } from '$lib/server/storage';
 
-const PUBLIC_PATHS = new Set(['/login', '/favicon.svg', '/robots.txt']);
+const PUBLIC_PATHS = new Set([
+  '/login',
+  '/favicon.svg',
+  '/robots.txt',
+  // The scheduled manifest-sync endpoint. It carries no user session —
+  // the Cloudflare Worker that calls it authenticates with CRON_SECRET,
+  // which the route checks itself. Letting it past here also means, in
+  // multi-user mode, that `resolve` runs with no storage scope, which is
+  // what the route wants: it opens its own per-user scopes with runAsUser.
+  '/api/cron/burble-sync',
+]);
 
 function isPublic(pathname: string): boolean {
   return PUBLIC_PATHS.has(pathname) || pathname.startsWith('/_app/');

@@ -1,0 +1,17 @@
+name = "skydive-helper-burble-cron"
+main = "burble-cron.js"
+compatibility_date = "2026-09-01"
+workers_dev = false
+
+# Every 2 minutes, hours 07–20 UTC. That's a loose bracket around the
+# app's precise 08:45–20:00 Europe/London window (which handles BST) —
+# ticks that land outside it are rejected by the app in a few ms without
+# reaching Burble, so over-covering here costs nothing.
+[triggers]
+crons = ["*/2 7-20 * * *"]
+
+[vars]
+APP_URL = "https://skydive-helper.vercel.app"
+
+# CRON_SECRET is set with `wrangler secret put CRON_SECRET`, not here —
+# see README.md.

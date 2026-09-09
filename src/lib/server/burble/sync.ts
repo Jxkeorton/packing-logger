@@ -36,6 +36,7 @@ import {
   normaliseCode,
   realLoads,
   describeMatch,
+  type BurbleLoadsResponse,
   type BurbleMatch,
   type BurbleRole,
 } from '../../burble';
@@ -174,8 +175,13 @@ export interface SyncOutcome {
  * A new Burble `session_id` means a new jumping day, which is the moment
  * to drop anything still being watched: those loads belong to a day that's
  * over, and if they'd flown we'd have committed them already.
+ *
+ * `board` lets a caller supply an already-fetched loads response instead
+ * of hitting Burble again — the background cron (api/cron/burble-sync)
+ * fetches each dropzone's board once per tick and passes it to every user
+ * at that DZ, rather than N identical requests to a wall-display endpoint.
  */
-export async function syncOnce(settings?: BurbleSettings): Promise<SyncOutcome> {
+export async function syncOnce(settings?: BurbleSettings, board?: BurbleLoadsResponse): Promise<SyncOutcome> {
   const burble = settings ?? (await readLogbookSettings()).burble;
   const state = await readSyncState();
 
@@ -185,12 +191,16 @@ export async function syncOnce(settings?: BurbleSettings): Promise<SyncOutcome> 
     return { ok: false, error: 'No name set to look for on the board.', boardLoads: 0, state };
   }
 
-  let response;
-  try {
-    ({ response } = await fetchLoads(burble.dzId));
-  } catch (err) {
-    const message = err instanceof BurbleError ? err.message : 'Could not reach the Burble manifest.';
-    return { ok: false, error: message, boardLoads: 0, state };
+  let response: BurbleLoadsResponse;
+  if (board) {
+    response = board;
+  } else {
+    try {
+      ({ response } = await fetchLoads(burble.dzId));
+    } catch (err) {
+      const message = err instanceof BurbleError ? err.message : 'Could not reach the Burble manifest.';
+      return { ok: false, error: message, boardLoads: 0, state };
+    }
   }
 
   const now = new Date().toISOString();
