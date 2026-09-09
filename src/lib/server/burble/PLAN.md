@@ -5,11 +5,16 @@
 > sighting of your name becomes a pending jump, confirmed by hand after
 > landing via the "Jumps to confirm" menu above the tabs. See §3.
 >
-> **Status: all three phases built and verified.** Phase 1 (check by
-> hand, confirm after landing), Phase 2 (client-side auto-poll toggle,
-> off by default), and Phase 3 — a scheduler that runs when the app isn't
-> open: a Cloudflare Worker cron trigger hitting `/api/cron/burble-sync`.
-> See §4 and `cron.ts` / `../../../../worker/`.
+> **Status: built and verified.** Phase 1 (check by hand, confirm after
+> landing) and Phase 3 — a scheduler that runs when the app isn't open: a
+> Cloudflare Worker cron trigger hitting `/api/cron/burble-sync` every 2
+> min, plus `/api/burble-pending` so an open app picks up its writes
+> without a reload. See §4 and `cron.ts` / `../../../../worker/`.
+>
+> Phase 2 (a client-side "keep checking every 30s while this screen is
+> open" toggle) was built, then removed once Phase 3 landed — it only
+> worked with the screen awake and the cron covers the same ground
+> better. "Check the board" stays as the on-demand poll.
 >
 > Code: `$lib/burble.ts` (matching), `client.ts` (HTTP), `sync.ts` (state
 > machine), `cron.ts` (the scheduled pass), `$lib/server/auto-log.ts`
@@ -157,10 +162,10 @@ Given a missed poll means a missed jump — and a wrong poll means a wrong
 entry — I'd build it in this order:
 
 **Phase 1 — check by hand, confirm after landing.** A "Manifest" panel on
-the Logbook tab holds the *controls* (check the board, auto-poll toggle);
-the jumps themselves surface in a **"Jumps to confirm"** menu above the
-tabs, so it's visible from any tab. The intended workflow, and the one the
-app is built around:
+the Logbook tab holds the *control* (check the board); the jumps
+themselves surface in a **"Jumps to confirm"** menu above the tabs, so
+it's visible from any tab. The intended workflow, and the one the app is
+built around:
 
 1. Tap **Check the board** while you're manifested — before you board.
 2. Jump. Phone in the packing area, app closed, nothing running.
@@ -170,19 +175,16 @@ Step 1 is the one that matters: the app can only capture loads that are on
 the board at the moment it looks, so a check *before* boarding is what makes
 the jump recoverable afterwards.
 
-**Phase 2 — auto-poll while the app is open.** The panel polls its own
-endpoint every 30s. That number comes from a measured departure, not from the
-config: the `Departed` window was **2m21s** (`NOTES.md` §2), so 30s gives
-about seven sightings of a departing load, 60s gives two, and a 2-minute
-interval can miss a departure altogether and silently lose the jump. Don't
-loosen it without re-measuring. With
-`autoCommit` on, matched jumps are written the moment their load clears,
-with the last few shown and an Undo — which is free, since `removeJump(at)`
-already cascades to the logbook entry.
-
-This is honestly the sweet spot for the way you use the app: phone in your
-pocket at the DZ, tab open. It captures the day without you touching anything,
-and it degrades to "tap sync between loads" if the phone sleeps.
+**Phase 2 — auto-poll while the app is open (built, then removed).** The
+panel polled `?/syncManifest` every 30s (a toggle, off by default) and
+re-synced on `visibilitychange`. The 30s came from a measured departure:
+the `Departed` window was **2m21s** (`NOTES.md` §2), so 30s gave ~seven
+sightings of a departing load. But it only ran with the screen awake —
+iOS suspends the timer the moment the tab backgrounds — and once Phase 3
+landed it was doing the same job worse, so it went. What's left client-side
+is `/api/burble-pending`: a cheap re-read of *our own* sync state (no
+Burble call) on return-to-foreground and a 90s beat, so an open app shows
+what the cron found.
 
 **Phase 3 (built) — a scheduler.** See `cron.ts` and `../../../../worker/`.
 A Cloudflare Worker cron trigger (free plan, 1-minute granularity — the
@@ -205,10 +207,10 @@ The original analysis, kept for the reasoning:
 > support Background Sync or Periodic Background Sync — there is no web API
 > that keeps a poll alive on a locked iPhone, PWA or not.
 
-So client-side auto-poll is honest about its limits: it pauses on
-`visibilitychange` rather than pretending to run, and syncs immediately
-when the tab comes back. With the Worker running, a load that departs and
-leaves the board during a lock is caught anyway on the next 2-minute tick.
+Client-side auto-poll (Phase 2) was honest about this — it paused on
+`visibilitychange` rather than pretending to run — but that's exactly why
+it wasn't enough. With the Worker running, a load that departs and leaves
+the board during a lock is caught anyway on the next 2-minute tick.
 
 > Options, all server-side: Vercel Cron (needs a paid plan for minute-level
 > schedules; Hobby is once a day, useless here), a GitHub Actions cron
@@ -293,9 +295,10 @@ runtime goes in `src/lib/burble.ts`, storage-touching code under
    (`dzm_jm_use_real_name_for_staff: 1`), but that is a DZ config someone could
    flip. If sync silently stops logging, this is the first thing to check —
    worth a "last matched: 2 hours ago" line in the panel so it fails loudly.
-2. **Nothing polls, nothing logs.** Phase 2 only covers you while the tab is
-   awake. The review queue means a missed load can still be logged by hand;
-   it just isn't automatic.
+2. **Nothing polls, nothing logs.** The Worker cron (Phase 3) only runs
+   inside its operating-hours window and only if `CRON_SECRET` is set on
+   both ends. The review queue means a missed load can still be logged by
+   hand; it just isn't automatic.
 3. **Codes drift.** `Staff` showed up within an hour of watching. Unmapped
    codes must be visible in the UI, never dropped on the floor.
 4. **`data/` holds real records.** Per `instructions.md` §1, test this against

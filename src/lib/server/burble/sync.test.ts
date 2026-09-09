@@ -76,8 +76,6 @@ function settingsFor(...myNames: string[]): BurbleSettings {
     enabled: true,
     dzId: '8494',
     myNames,
-    autoPoll: false,
-    pollSeconds: 30,
     codeMap: DEFAULT_BURBLE_CODE_MAP,
     codeSeedVersion: BURBLE_CODE_SEED_VERSION,
   };

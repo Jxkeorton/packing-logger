@@ -48,8 +48,6 @@ vi.mock('../logbook-settings', () => ({
       myNames: [],
       codeMap: [],
       codeSeedVersion: 1,
-      autoPoll: false,
-      pollSeconds: 30,
     };
     return { burble };
   },
@@ -79,8 +77,6 @@ const enabled = (dzId: string, names = ['Jake Orton']): BurbleSettings => ({
   myNames: names,
   codeMap: [],
   codeSeedVersion: 1,
-  autoPoll: false,
-  pollSeconds: 30,
 });
 
 // A fixed instant inside 08:45–20:00 Europe/London (13:00 BST).

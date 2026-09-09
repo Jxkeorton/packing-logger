@@ -28,7 +28,7 @@ import { todayKey } from '../../packing';
 import { addJump, loadTodayState } from '../tandem';
 import { OTHER_STAFF_LABELS } from '../../tandem';
 import { autoLogJump } from '../auto-log';
-import { readLogbookSettings, setBurbleSettings, type BurbleSettings } from '../logbook-settings';
+import { readLogbookSettings, type BurbleSettings } from '../logbook-settings';
 import { fetchLoads, BurbleError } from './client';
 import {
   FLOWN_STATUSES,
@@ -410,11 +410,6 @@ export async function forgetCommitted(at: string): Promise<void> {
 export async function clearUnmappedCodes(): Promise<void> {
   const state = await readSyncState();
   await writeSyncState({ ...state, unmappedCodes: [] });
-}
-
-/** Convenience for the auto-poll toggle, which flips one field. */
-export async function setAutoPoll(autoPoll: boolean): Promise<void> {
-  await setBurbleSettings({ autoPoll });
 }
 
 function tandemKey(role: BurbleRole, customerName: string): string {

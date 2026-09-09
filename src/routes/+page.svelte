@@ -445,7 +445,6 @@
             enabled={data.logbookSettings.burble.enabled}
             dzId={data.logbookSettings.burble.dzId}
             myNames={data.logbookSettings.burble.myNames}
-            pollSeconds={data.logbookSettings.burble.pollSeconds}
             codeMap={data.logbookSettings.burble.codeMap}
             unmappedCodes={burbleUnmappedCodes}
           />
@@ -590,8 +589,6 @@
 
     <BurbleSyncPanel
       enabled={data.logbookSettings.burble.enabled}
-      autoPoll={data.logbookSettings.burble.autoPoll}
-      pollSeconds={data.logbookSettings.burble.pollSeconds}
       pendingCount={burblePending.length}
       unmappedCodes={burbleUnmappedCodes}
       lastSyncAt={burbleLastSyncAt}
@@ -623,8 +620,6 @@
       {#snippet belowTrigger()}
         <BurbleSyncPanel
           enabled={data.logbookSettings.burble.enabled}
-          autoPoll={data.logbookSettings.burble.autoPoll}
-          pollSeconds={data.logbookSettings.burble.pollSeconds}
           pendingCount={burblePending.length}
           unmappedCodes={burbleUnmappedCodes}
           lastSyncAt={burbleLastSyncAt}
