@@ -160,6 +160,16 @@ export function flightHint(jump: PendingJump): string {
   return jump.status;
 }
 
+/**
+ * The pending list in the shape the client renders it — each jump with
+ * its `hint` line baked in. Both the page `load` and the /api/burble-pending
+ * poll (which lets an open app pick up the background cron's writes
+ * without a full reload) return exactly this.
+ */
+export function pendingForClient(state: SyncState): (PendingJump & { hint: string })[] {
+  return pendingJumps(state).map((jump) => ({ ...jump, hint: flightHint(jump) }));
+}
+
 export interface SyncOutcome {
   ok: boolean;
   error?: string;
