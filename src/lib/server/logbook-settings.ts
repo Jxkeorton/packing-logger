@@ -82,10 +82,6 @@ export interface BurbleSettings {
    * stops matching, adding the other spelling here is the first fix.
    */
   myNames: string[];
-  /** Poll automatically while the Logbook tab is open. Off by default — it only works with the screen awake. */
-  autoPoll: boolean;
-  /** Seconds between automatic polls. Kept well inside the ~2m20s departed window. */
-  pollSeconds: number;
   codeMap: BurbleCodeMapping[];
   /**
    * Which revision of the seeded code map this saved one was last topped
@@ -132,8 +128,6 @@ const DEFAULTS: LogbookSettings = {
     dzId: '531', // Skydive Langar — overridable, but it's where this app's user jumps
 
     myNames: [],
-    autoPoll: false,
-    pollSeconds: 30,
     codeMap: DEFAULT_BURBLE_CODE_MAP,
     // Nothing saved yet means the map *is* the current seed.
     codeSeedVersion: BURBLE_CODE_SEED_VERSION,
@@ -262,10 +256,6 @@ function asBurbleSettings(value: unknown): BurbleSettings {
   const fallback = DEFAULTS.burble;
   if (!value || typeof value !== 'object') return fallback;
   const raw = value as Record<string, unknown>;
-  const pollSeconds =
-    typeof raw.pollSeconds === 'number' && Number.isFinite(raw.pollSeconds)
-      ? Math.min(300, Math.max(15, Math.round(raw.pollSeconds)))
-      : fallback.pollSeconds;
   // A saved map from before the seed version existed reads as 1, so
   // anything added to the seed list since gets merged in below.
   const codeSeedVersion =
@@ -277,8 +267,6 @@ function asBurbleSettings(value: unknown): BurbleSettings {
     myNames: Array.isArray(raw.myNames)
       ? raw.myNames.filter((n): n is string => typeof n === 'string' && n.trim().length > 0).map((n) => n.trim())
       : fallback.myNames,
-    autoPoll: raw.autoPoll === true,
-    pollSeconds,
     codeMap: mergeSeededCodes(asBurbleCodeMap(raw.codeMap), codeSeedVersion),
     // Reported as current, not as saved: the map handed back above has
     // already been topped up, so the next write of these settings — a
@@ -360,9 +348,9 @@ export async function setBaseJumps(baseJumps: number): Promise<LogbookSettings> 
 }
 
 /**
- * Update the manifest-sync settings, merging over what's saved — so the
- * auto-poll toggle can be flipped on its own without the caller having to
- * resend the dropzone id, names and code map.
+ * Update the manifest-sync settings, merging over what's saved — so a
+ * caller changing one field doesn't have to resend the dropzone id,
+ * names and code map.
  */
 export async function setBurbleSettings(patch: Partial<BurbleSettings>): Promise<LogbookSettings> {
   const current = await readLogbookSettings();

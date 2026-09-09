@@ -25,14 +25,12 @@
     enabled,
     dzId,
     myNames,
-    pollSeconds,
     codeMap,
     unmappedCodes,
   }: {
     enabled: boolean;
     dzId: string;
     myNames: string[];
-    pollSeconds: number;
     codeMap: BurbleCodeMapping[];
     unmappedCodes: string[];
   } = $props();
@@ -104,13 +102,9 @@
           sure which it'll be.
         </p>
 
-        <label class={FIELD_LABEL_NARROW}>
-          <span>Seconds between checks</span>
-          <input type="number" name="pollSeconds" class={FIELD_INPUT} value={pollSeconds} min="15" max="300" step="5" />
-        </label>
         <p class="{PANEL_HINT} -mt-1.5">
-          Only used when automatic checking is switched on. A load can drop off the board a couple of minutes after it
-          goes, so leave this well under that — 30s is a sensible default.
+          The app checks the board on its own every couple of minutes while the dropzone's open. "Check the board" on
+          the Log tab does it on demand too.
         </p>
 
         <div class={FORM_ACTIONS}>

@@ -28,7 +28,7 @@ import { todayKey } from '../../packing';
 import { addJump, loadTodayState } from '../tandem';
 import { OTHER_STAFF_LABELS } from '../../tandem';
 import { autoLogJump } from '../auto-log';
-import { readLogbookSettings, setBurbleSettings, type BurbleSettings } from '../logbook-settings';
+import { readLogbookSettings, type BurbleSettings } from '../logbook-settings';
 import { fetchLoads, BurbleError } from './client';
 import {
   FLOWN_STATUSES,
@@ -158,6 +158,16 @@ export function flightHint(jump: PendingJump): string {
   if (jump.timeLeft !== null && jump.timeLeft <= 0) return `Overdue by ${Math.abs(jump.timeLeft)} min`;
   if (jump.timeLeft !== null) return `${jump.timeLeft} min to go`;
   return jump.status;
+}
+
+/**
+ * The pending list in the shape the client renders it — each jump with
+ * its `hint` line baked in. Both the page `load` and the /api/burble-pending
+ * poll (which lets an open app pick up the background cron's writes
+ * without a full reload) return exactly this.
+ */
+export function pendingForClient(state: SyncState): (PendingJump & { hint: string })[] {
+  return pendingJumps(state).map((jump) => ({ ...jump, hint: flightHint(jump) }));
 }
 
 export interface SyncOutcome {
@@ -400,11 +410,6 @@ export async function forgetCommitted(at: string): Promise<void> {
 export async function clearUnmappedCodes(): Promise<void> {
   const state = await readSyncState();
   await writeSyncState({ ...state, unmappedCodes: [] });
-}
-
-/** Convenience for the auto-poll toggle, which flips one field. */
-export async function setAutoPoll(autoPoll: boolean): Promise<void> {
-  await setBurbleSettings({ autoPoll });
 }
 
 function tandemKey(role: BurbleRole, customerName: string): string {

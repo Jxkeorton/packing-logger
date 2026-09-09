@@ -120,6 +120,65 @@
     historyRefreshTimer = setTimeout(() => invalidateAll(), 1500);
   }
 
+  // The background cron (worker/ → /api/cron/burble-sync) advances the
+  // manifest sync while every phone is locked, but it writes to storage —
+  // an app that's already open won't show the new "Jumps to confirm"
+  // until its `load` re-runs. So re-poll just that slice — one storage
+  // read, no Burble call — whenever the app comes back to the foreground,
+  // and on a slow beat while it's visible. Server `load` data stays the
+  // source of truth; this only ever runs *ahead* of it between loads.
+  let livePending = $state<PageData['burblePending'] | null>(null);
+  let liveUnmappedCodes = $state<string[] | null>(null);
+  let liveLastSyncAt = $state<string | null>(null);
+
+  // Any real `load` — first paint, a commit/dismiss, an invalidateAll —
+  // is fresher than the poll, so drop the live copy and defer to it.
+  $effect(() => {
+    void data.burblePending;
+    livePending = null;
+    liveUnmappedCodes = null;
+    liveLastSyncAt = null;
+  });
+
+  async function refreshBurblePending() {
+    try {
+      const res = await fetch('/api/burble-pending');
+      if (!res.ok) return;
+      const body = await res.json();
+      livePending = body.pending;
+      liveUnmappedCodes = body.unmappedCodes;
+      liveLastSyncAt = body.lastSyncAt;
+    } catch {
+      // offline, or a blip — keep showing whatever we already have
+    }
+  }
+
+  $effect(() => {
+    if (!data.logbookSettings.burble.enabled) return;
+
+    const onForeground = () => {
+      if (document.visibilityState === 'visible') refreshBurblePending();
+    };
+    // pageshow with persisted=true is a bfcache restore, where `load`
+    // didn't re-run and visibilitychange may not fire.
+    const onPageShow = (e: PageTransitionEvent) => {
+      if (e.persisted) onForeground();
+    };
+    document.addEventListener('visibilitychange', onForeground);
+    window.addEventListener('pageshow', onPageShow);
+    const beat = setInterval(onForeground, 90_000);
+
+    return () => {
+      document.removeEventListener('visibilitychange', onForeground);
+      window.removeEventListener('pageshow', onPageShow);
+      clearInterval(beat);
+    };
+  });
+
+  const burblePending = $derived(livePending ?? data.burblePending);
+  const burbleUnmappedCodes = $derived(liveUnmappedCodes ?? data.burbleUnmappedCodes);
+  const burbleLastSyncAt = $derived(liveLastSyncAt ?? data.burbleLastSyncAt);
+
   // Same ghost-segments-on-a-glass-bar treatment as AppTabs.svelte.
   const subTabClass =
     'flex-1 min-w-0 appearance-none border-0 bg-transparent text-ink-soft font-sans font-bold text-[12.5px] tracking-[-0.01em] whitespace-nowrap overflow-hidden text-ellipsis px-2.5 py-1.5 rounded-[var(--radius-control)] cursor-pointer aria-selected:bg-ink aria-selected:text-canvas';
@@ -188,7 +247,7 @@
 <div
   class="max-w-140 mx-auto px-4 pt-4 [padding-bottom:calc(40px+env(safe-area-inset-bottom))] flex flex-col gap-5.5"
 >
-  <PendingJumpsMenu pending={data.burblePending} />
+  <PendingJumpsMenu pending={burblePending} />
 
   <!--
     Sticky so the tabs (and Settings) stay reachable while a long history
@@ -386,9 +445,8 @@
             enabled={data.logbookSettings.burble.enabled}
             dzId={data.logbookSettings.burble.dzId}
             myNames={data.logbookSettings.burble.myNames}
-            pollSeconds={data.logbookSettings.burble.pollSeconds}
             codeMap={data.logbookSettings.burble.codeMap}
-            unmappedCodes={data.burbleUnmappedCodes}
+            unmappedCodes={burbleUnmappedCodes}
           />
         {/snippet}
       </SettingsRow>
@@ -531,11 +589,9 @@
 
     <BurbleSyncPanel
       enabled={data.logbookSettings.burble.enabled}
-      autoPoll={data.logbookSettings.burble.autoPoll}
-      pollSeconds={data.logbookSettings.burble.pollSeconds}
-      pendingCount={data.burblePending.length}
-      unmappedCodes={data.burbleUnmappedCodes}
-      lastSyncAt={data.burbleLastSyncAt}
+      pendingCount={burblePending.length}
+      unmappedCodes={burbleUnmappedCodes}
+      lastSyncAt={burbleLastSyncAt}
       myNames={data.logbookSettings.burble.myNames}
     />
 
@@ -564,11 +620,9 @@
       {#snippet belowTrigger()}
         <BurbleSyncPanel
           enabled={data.logbookSettings.burble.enabled}
-          autoPoll={data.logbookSettings.burble.autoPoll}
-          pollSeconds={data.logbookSettings.burble.pollSeconds}
-          pendingCount={data.burblePending.length}
-          unmappedCodes={data.burbleUnmappedCodes}
-          lastSyncAt={data.burbleLastSyncAt}
+          pendingCount={burblePending.length}
+          unmappedCodes={burbleUnmappedCodes}
+          lastSyncAt={burbleLastSyncAt}
           myNames={data.logbookSettings.burble.myNames}
         />
       {/snippet}

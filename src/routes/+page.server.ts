@@ -18,7 +18,7 @@ import { readTabVisibility } from '$lib/server/tab-visibility';
 import { readRateSettings } from '$lib/server/rate-settings';
 import { readLogbookAndNextNumber } from '$lib/server/logbook';
 import { readLogbookSettings } from '$lib/server/logbook-settings';
-import { flightHint, pendingJumps, readSyncState } from '$lib/server/burble/sync';
+import { pendingForClient, readSyncState } from '$lib/server/burble/sync';
 import { readFastestFive } from '$lib/server/times';
 import { authEnabled } from '$lib/server/auth';
 import { packingActions } from '$lib/server/actions/packing';
@@ -119,8 +119,9 @@ export const load: PageServerLoad = async () => {
   // load, never polled — a page load must not reach out to Burble.
   // Checking the board is an explicit action. Each pending jump carries
   // its own "how sure are we it flew" line, so the confirmation list can
-  // be rendered without re-deriving it client-side.
-  const burblePending = pendingJumps(burbleState).map((jump) => ({ ...jump, hint: flightHint(jump) }));
+  // be rendered without re-deriving it client-side. /api/burble-pending
+  // returns this same shape for the open app to re-poll cheaply.
+  const burblePending = pendingForClient(burbleState);
 
   const today = todayKey();
   const dateDisplay = new Date(`${today}T00:00:00`).toLocaleDateString('en-GB', {

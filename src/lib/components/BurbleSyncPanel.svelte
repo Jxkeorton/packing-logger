@@ -1,28 +1,27 @@
 <script lang="ts">
-  // Manifest sync controls, on the Log tab: check the board, and set
-  // whether to keep checking automatically.
+  // "Check the board" on the Log / Work jumps tabs — an on-demand poll of
+  // the manifest, for when you want to look right now rather than wait
+  // for the background sync (worker/ → /api/cron/burble-sync, every 2
+  // min). Automatic checking that needed the app open and the screen
+  // awake used to live here too; the cron replaced it.
   //
   // This panel deliberately does *not* list the jumps it found — those go
   // to PendingJumpsMenu at the top of the app, because you check the board
   // before boarding and confirm after landing, by which point you could be
   // on any tab. Nothing here writes a jump.
-  import { enhance, deserialize } from '$app/forms';
+  import { deserialize } from '$app/forms';
   import { invalidateAll } from '$app/navigation';
   import { FORM_SAVE_BUTTON_SECONDARY, FORM_STATUS, PANEL_HINT } from '$lib/ui-classes';
   import Spinner from './Spinner.svelte';
 
   let {
     enabled,
-    autoPoll,
-    pollSeconds,
     pendingCount,
     unmappedCodes,
     lastSyncAt,
     myNames,
   }: {
     enabled: boolean;
-    autoPoll: boolean;
-    pollSeconds: number;
     pendingCount: number;
     unmappedCodes: string[];
     lastSyncAt: string | null;
@@ -43,11 +42,10 @@
     iso ? new Date(iso).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : '';
 
   /**
-   * Post to the sync action directly rather than through a <form>.
-   *
-   * Everything else in this app submits with `use:enhance` (see
-   * instructions.md §3), but the auto-poll timer has no user submit to
-   * enhance — this is the documented way to invoke an action from script.
+   * Post to the sync action directly rather than through a <form>: this
+   * is a plain button, not a form submit, so there's nothing for
+   * `use:enhance` to wrap. This is the documented way to invoke an action
+   * from script (instructions.md §3).
    */
   async function syncNow() {
     if (syncing) return;
@@ -73,34 +71,6 @@
       syncing = false;
     }
   }
-
-  // Auto-poll. Deliberately paused while the tab is hidden: iOS suspends
-  // timers the moment the tab backgrounds or the phone locks, so a timer
-  // that "keeps running" is a lie — better to stop cleanly and catch up
-  // with one immediate sync when the tab comes back.
-  $effect(() => {
-    if (!enabled || !autoPoll) return;
-
-    let timer: ReturnType<typeof setInterval> | undefined;
-
-    const start = () => {
-      stop();
-      void syncNow();
-      timer = setInterval(() => void syncNow(), Math.max(15, pollSeconds) * 1000);
-    };
-    const stop = () => {
-      if (timer) clearInterval(timer);
-      timer = undefined;
-    };
-    const onVisibility = () => (document.visibilityState === 'visible' ? start() : stop());
-
-    start();
-    document.addEventListener('visibilitychange', onVisibility);
-    return () => {
-      stop();
-      document.removeEventListener('visibilitychange', onVisibility);
-    };
-  });
 </script>
 
 <!--
@@ -123,23 +93,6 @@
   </span>
 
   {#if ready}
-    <form
-      method="POST"
-      action="?/setBurbleAutoPoll"
-      use:enhance={() => async ({ update }) => await update({ reset: false })}
-    >
-      <label class="flex items-center gap-2 text-[12.5px] font-semibold text-ink-soft">
-        <input
-          type="checkbox"
-          name="autoPoll"
-          checked={autoPoll}
-          onchange={(e) => e.currentTarget.form?.requestSubmit()}
-          class="size-4"
-        />
-        <span>Keep checking every {pollSeconds}s while this screen is open</span>
-      </label>
-    </form>
-
     {#if lastSyncAt}
       <p class="{PANEL_HINT} mt-0 mb-0">Last checked {clockOf(lastSyncAt)}.</p>
     {/if}

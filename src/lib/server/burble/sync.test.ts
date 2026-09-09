@@ -36,7 +36,8 @@ vi.mock('./client', () => ({
   },
 }));
 
-const { syncOnce, readSyncState, pendingJumps, flightHint, commitMatches, dismissMatch, forgetCommitted } = await import('./sync');
+const { syncOnce, readSyncState, pendingJumps, pendingForClient, flightHint, commitMatches, dismissMatch, forgetCommitted } =
+  await import('./sync');
 const { readLogbook, removeEntry } = await import('../logbook');
 const { loadTodayState, removeJump } = await import('../tandem');
 
@@ -75,8 +76,6 @@ function settingsFor(...myNames: string[]): BurbleSettings {
     enabled: true,
     dzId: '8494',
     myNames,
-    autoPoll: false,
-    pollSeconds: 30,
     codeMap: DEFAULT_BURBLE_CODE_MAP,
     codeSeedVersion: BURBLE_CODE_SEED_VERSION,
   };
@@ -120,6 +119,12 @@ describe('capturing a sighting', () => {
     const pending = pendingJumps(await readSyncState());
     expect(pending).toHaveLength(1);
     expect(pending[0]).toMatchObject({ role: 'instructor', customerName: 'Miranda Walfield' });
+
+    // pendingForClient is what both the page load and /api/burble-pending
+    // return — same list, each row with its hint line baked in.
+    const forClient = pendingForClient(await readSyncState());
+    expect(forClient).toHaveLength(1);
+    expect(forClient[0].hint).toBe(flightHint(pending[0]));
   });
 
   it('flags the load as off the board once it stops being displayed', async () => {

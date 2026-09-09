@@ -270,21 +270,11 @@ export const logbookActions: Record<string, Action> = {
       .filter(Boolean)
       .slice(0, 10);
 
-    const pollSeconds = Number(formData.get('pollSeconds'));
     await setBurbleSettings({
       enabled: formData.get('enabled') === 'on',
       dzId,
       myNames,
-      pollSeconds: Number.isFinite(pollSeconds) ? Math.min(300, Math.max(15, Math.round(pollSeconds))) : 30,
     });
-  },
-
-  // Its own action rather than part of saveBurbleSettings: the toggle is
-  // flipped from the Log tab mid-session, and shouldn't have to resend
-  // (or risk clobbering) the dropzone id, names and code map.
-  setBurbleAutoPoll: async ({ request }) => {
-    const on = String((await request.formData()).get('autoPoll') ?? '') === 'on';
-    await setBurbleSettings({ autoPoll: on });
   },
 
   syncManifest: async () => {

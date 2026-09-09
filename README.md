@@ -166,18 +166,18 @@ so local dev (`npm run dev`) never needs it set. See `.env.example`.
 
 ## Background manifest sync (optional)
 
-The Burble manifest sync (Settings → Manifest sync) normally only runs
-while someone has the app open and taps "Check the board", or has
-auto-poll on with the screen awake — a locked phone stops polling, and a
-load that flew *and* left the board during the lock is gone (Burble keeps
-no history).
+Without this, the Burble manifest sync (Settings → Manifest sync) only
+runs when someone opens the app and taps "Check the board" — a load that
+flew while every phone was locked is gone (Burble keeps no history).
 
 To keep it polling with every phone in a pocket, there's a small
 Cloudflare Worker in [`worker/`](worker/) that pings
 `/api/cron/burble-sync` every couple of minutes. That endpoint fetches
 each dropzone's board once and advances every user's sync state — still
 **poll-only**: jumps land in "Jumps to confirm" for a human to commit,
-same as tapping the button.
+same as tapping the button. An open app picks them up on its own via
+`/api/burble-pending` (polled on return-to-foreground and a slow beat);
+"Check the board" stays as the on-demand option.
 
 Setup, once:
 
