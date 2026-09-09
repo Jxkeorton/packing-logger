@@ -164,6 +164,33 @@ password:
 Leaving `APP_PASSWORD` unset — the default — disables the gate entirely,
 so local dev (`npm run dev`) never needs it set. See `.env.example`.
 
+## Background manifest sync (optional)
+
+The Burble manifest sync (Settings → Manifest sync) normally only runs
+while someone has the app open and taps "Check the board", or has
+auto-poll on with the screen awake — a locked phone stops polling, and a
+load that flew *and* left the board during the lock is gone (Burble keeps
+no history).
+
+To keep it polling with every phone in a pocket, there's a small
+Cloudflare Worker in [`worker/`](worker/) that pings
+`/api/cron/burble-sync` every couple of minutes. That endpoint fetches
+each dropzone's board once and advances every user's sync state — still
+**poll-only**: jumps land in "Jumps to confirm" for a human to commit,
+same as tapping the button.
+
+Setup, once:
+
+1. Set `CRON_SECRET` (any long random string —
+   `openssl rand -hex 32`) in the Vercel project's **Settings →
+   Environment Variables** (Production), and redeploy. Without it the
+   endpoint returns `503`.
+2. Deploy the Worker with the *same* secret — see
+   [`worker/README.md`](worker/README.md).
+
+Leave `CRON_SECRET` unset to keep the endpoint disabled; nothing else
+depends on it.
+
 ## Architecture notes
 
 This app started as an [Astro](https://astro.build) app and was migrated

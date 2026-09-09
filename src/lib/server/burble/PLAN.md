@@ -5,14 +5,17 @@
 > sighting of your name becomes a pending jump, confirmed by hand after
 > landing via the "Jumps to confirm" menu above the tabs. See §3.
 >
-> **Status: Phase 1 is built and verified**, along with the
-> Phase 2 auto-poll toggle (off by default). What remains is Phase 3 — a
-> scheduler that runs when the app isn't open. See §4.
+> **Status: all three phases built and verified.** Phase 1 (check by
+> hand, confirm after landing), Phase 2 (client-side auto-poll toggle,
+> off by default), and Phase 3 — a scheduler that runs when the app isn't
+> open: a Cloudflare Worker cron trigger hitting `/api/cron/burble-sync`.
+> See §4 and `cron.ts` / `../../../../worker/`.
 >
 > Code: `$lib/burble.ts` (matching), `client.ts` (HTTP), `sync.ts` (state
-> machine), `$lib/server/auto-log.ts` (shared with the Tandems tab), and
-> the two panels `BurbleSyncPanel` / `BurbleSettingsPanel`. 30 tests across
-> `$lib/burble.test.ts` and `sync.test.ts`.
+> machine), `cron.ts` (the scheduled pass), `$lib/server/auto-log.ts`
+> (shared with the Tandems tab), and the two panels `BurbleSyncPanel` /
+> `BurbleSettingsPanel`. Tests across
+> `$lib/burble.test.ts`, `sync.test.ts` and `cron.test.ts`.
 
 A design for turning "my name is on the board" into logbook entries, with the
 right role (tandem instructor / camera / solo) picked automatically. Read
@@ -181,8 +184,20 @@ This is honestly the sweet spot for the way you use the app: phone in your
 pocket at the DZ, tab open. It captures the day without you touching anything,
 and it degrades to "tap sync between loads" if the phone sleeps.
 
-**Phase 3 (not built) — a scheduler.** The only option that works with the
-phone locked, because nothing client-side does:
+**Phase 3 (built) — a scheduler.** See `cron.ts` and `../../../../worker/`.
+A Cloudflare Worker cron trigger (free plan, 1-minute granularity — the
+option below was written when this ran on Vercel Blob, before the R2 move
+made a Cloudflare account a given) POSTs to `/api/cron/burble-sync` every
+2 minutes during operating hours. That endpoint fetches each dropzone's
+board once and runs `syncOnce()` for every user at it. Still poll-only:
+it records sightings, exactly as the button does, and a human still
+commits. The window and per-DZ fan-out live in `cron.ts`; the trigger
+holds no logic.
+
+The original analysis, kept for the reasoning:
+
+> The only option that works with the phone locked, because nothing
+> client-side does:
 
 > iOS suspends JS timers as soon as the tab is backgrounded or the screen
 > locks. `setInterval` stops, and the page may be frozen or discarded
@@ -190,21 +205,25 @@ phone locked, because nothing client-side does:
 > support Background Sync or Periodic Background Sync — there is no web API
 > that keeps a poll alive on a locked iPhone, PWA or not.
 
-So auto-poll is honest about its limits: it pauses on `visibilitychange`
-rather than pretending to run, and syncs immediately when the tab comes
-back. A load that departed *and* left the board during a lock is simply
-gone, and has to be logged by hand.
+So client-side auto-poll is honest about its limits: it pauses on
+`visibilitychange` rather than pretending to run, and syncs immediately
+when the tab comes back. With the Worker running, a load that departs and
+leaves the board during a lock is caught anyway on the next 2-minute tick.
 
-Options, all server-side: Vercel Cron (needs a paid plan for minute-level
-schedules; Hobby is once a day, useless here), a GitHub Actions cron
-(5-minute floor — marginal against the 2m21s departed window, so it would
-miss some), or a small always-on poller (a Pi, a cheap VPS) writing to the
-same Blob store, which is the only one that reliably fits the window.
+> Options, all server-side: Vercel Cron (needs a paid plan for minute-level
+> schedules; Hobby is once a day, useless here), a GitHub Actions cron
+> (5-minute floor — marginal against the 2m21s departed window, so it would
+> miss some), or a small always-on poller (a Pi, a cheap VPS) writing to the
+> same Blob store, which is the only one that reliably fits the window.
+>
+> A cheaper mitigation worth trying first: the Screen Wake Lock API
+> (`navigator.wakeLock`, supported in iOS Safari 16.4+) to hold the screen on
+> while auto-poll is enabled.
 
-A cheaper mitigation worth trying first: the Screen Wake Lock API
-(`navigator.wakeLock`, supported in iOS Safari 16.4+) to hold the screen on
-while auto-poll is enabled. It doesn't survive backgrounding the app, but
-it does stop the phone auto-locking in your pocket mid-load.
+The Cloudflare Worker cron trigger — free, 1-minute granularity — wasn't
+in that list because the app was on Vercel Blob at the time; moving
+storage to R2 brought a Cloudflare account with it, and the Worker fits
+the departed window comfortably at a 2-minute interval.
 
 ---
 
