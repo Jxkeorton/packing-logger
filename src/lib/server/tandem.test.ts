@@ -7,7 +7,7 @@
 // tandem-jumps.csv was written with four columns and no level, and a
 // parser that guesses wrong there doesn't fail loudly — it shifts every
 // name one column left and quietly relabels a day's work.
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { store } = vi.hoisted(() => ({ store: new Map<string, string>() }));
 
@@ -18,11 +18,16 @@ vi.mock('./storage', () => ({
   },
 }));
 
-const { addJump, jumpsInRange, loadTodayState, readCsvFile, setDayEntries } = await import('./tandem');
+const { addJump, handyCamJumpsInRange, jumpsInRange, loadTodayState, readCsvFile, setDayEntries, setJumpHandyCam } =
+  await import('./tandem');
 const { todayKey } = await import('../packing');
 
 beforeEach(() => {
   store.clear();
+});
+
+afterEach(() => {
+  vi.useRealTimers();
 });
 
 const JUMPS_KEY = 'tandem-jumps.csv';
@@ -38,7 +43,15 @@ describe('reading a file written before AFF existed', () => {
 
     const jumps = await jumpsInRange('2026-08-01', '2026-08-01');
     expect(jumps.instructor).toEqual([
-      { date: '2026-08-01', category: 'instructor', name: 'Jane Smith', level: '', at: '2026-08-01T10:00:00.000Z' },
+      {
+        date: '2026-08-01',
+        category: 'instructor',
+        name: 'Jane Smith',
+        level: '',
+        handyCam: false,
+        handyCamAt: '',
+        at: '2026-08-01T10:00:00.000Z',
+      },
     ]);
     expect(jumps.videographer[0].at).toBe('2026-08-01T11:00:00.000Z');
     expect(jumps.aff).toEqual([]);
@@ -86,6 +99,85 @@ describe('addJump', () => {
     expect(store.get(JUMPS_KEY)).toContain('"Level 6, re-jump"');
     expect((await loadTodayState()).entries.aff[0].level).toBe('Level 6, re-jump');
   });
+
+  it('flags an instructor jump as handy cam, stamping handyCamAt with the same `at`', async () => {
+    await addJump('instructor', 'Jane Smith', '2026-08-01T10:00:00.000Z', '', true);
+    const jump = (await loadTodayState()).entries.instructor[0];
+    expect(jump.handyCam).toBe(true);
+    expect(jump.handyCamAt).toBe('2026-08-01T10:00:00.000Z');
+  });
+
+  it('drops a handy-cam flag posted against a category that has none', async () => {
+    await addJump('videographer', 'Sam Patel', '2026-08-01T11:00:00.000Z', '', true);
+    const jump = (await loadTodayState()).entries.videographer[0];
+    expect(jump.handyCam).toBe(false);
+    expect(jump.handyCamAt).toBe('');
+  });
+});
+
+describe('setJumpHandyCam', () => {
+  it('flags an existing instructor jump, stamping handyCamAt with now', async () => {
+    // addJump always dates the jump to "today", so both the add and the
+    // date-window query below need to agree on what that was — pin it
+    // with fake time, then move the clock on for the toggle itself.
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-08-01T10:00:00.000Z'));
+    await addJump('instructor', 'Jane Smith');
+
+    vi.setSystemTime(new Date('2026-08-05T09:00:00.000Z'));
+    await setJumpHandyCam('2026-08-01T10:00:00.000Z', true);
+
+    const [jump] = (await jumpsInRange('2026-08-01', '2026-08-01')).instructor;
+    expect(jump.handyCam).toBe(true);
+    expect(jump.handyCamAt).toBe('2026-08-05T09:00:00.000Z');
+  });
+
+  it('clears the flag and the timestamp when toggled back off', async () => {
+    const added = await addJump('instructor', 'Jane Smith', undefined, '', true);
+    const at = added.entries.instructor[0].at;
+
+    await setJumpHandyCam(at, false);
+    const jump = (await loadTodayState()).entries.instructor[0];
+    expect(jump.handyCam).toBe(false);
+    expect(jump.handyCamAt).toBe('');
+  });
+
+  it('no-ops on a jump that is not an instructor jump', async () => {
+    const added = await addJump('videographer', 'Sam Patel');
+    const at = added.entries.videographer[0].at;
+
+    await setJumpHandyCam(at, true);
+    const jump = (await loadTodayState()).entries.videographer[0];
+    expect(jump.handyCam).toBe(false);
+  });
+
+  it('no-ops on an unknown id', async () => {
+    await expect(setJumpHandyCam('does-not-exist', true)).resolves.toBeDefined();
+  });
+});
+
+describe('handyCamJumpsInRange', () => {
+  it('buckets a bonus by handyCamAt, not by the jump\'s own date', async () => {
+    // Logged (and flagged) on 30 Aug — an invoice-month cutoff day at
+    // Langar — then upgraded on 2 Sep, after that period's invoice would
+    // already have gone out. The bonus belongs in September, not August.
+    await addJump('instructor', 'Jane Smith', '2026-08-30T10:00:00.000Z');
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-09-02T18:00:00.000Z'));
+    await setJumpHandyCam('2026-08-30T10:00:00.000Z', true);
+
+    expect(await handyCamJumpsInRange('2026-08-01', '2026-08-30')).toEqual([]);
+    const september = await handyCamJumpsInRange('2026-08-31', '2026-09-30');
+    expect(september).toHaveLength(1);
+    expect(september[0]).toMatchObject({ name: 'Jane Smith', handyCam: true });
+  });
+
+  it('excludes an unflagged jump, and a flagged one outside the range', async () => {
+    await addJump('instructor', 'Sam Patel', '2026-08-01T10:00:00.000Z'); // never flagged
+    await addJump('instructor', 'Jane Smith', '2026-08-01T11:00:00.000Z', '', true); // flagged, but outside the queried range
+
+    expect(await handyCamJumpsInRange('2026-09-01', '2026-09-30')).toEqual([]);
+  });
 });
 
 describe('setDayEntries', () => {
@@ -111,8 +203,14 @@ describe('readCsvFile', () => {
     });
 
     const csv = await readCsvFile();
-    expect(csv.split('\n')[0]).toBe('date,category,name,level,amount,at');
-    expect(csv).toContain('2026-08-01,aff,Alex Marsh,Level 6,42.00,');
+    expect(csv.split('\n')[0]).toBe('date,category,name,level,amount,handyCam,handyCamBonus,at');
+    expect(csv).toContain('2026-08-01,aff,Alex Marsh,Level 6,42.00,0,0.00,');
+  });
+
+  it('exports the handy-cam bonus alongside a flagged instructor jump', async () => {
+    await addJump('instructor', 'Jane Smith', '2026-08-01T10:00:00.000Z', '', true);
+    const csv = await readCsvFile();
+    expect(csv).toContain(`${todayKey()},instructor,Jane Smith,,42.00,1,20.00,2026-08-01T10:00:00.000Z`);
   });
 });
 

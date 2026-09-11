@@ -353,8 +353,12 @@ export async function commitMatches(slotIds: string[]): Promise<CommitResult> {
       // The level rides along for an AFF jump and is '' for everything
       // else — addJump drops it on any other category anyway. `?? ''`
       // rather than a bare read: a sighting captured before this field
-      // existed is still in burble-sync.json without it.
-      await addJump(slot.role, slot.customerName, at, slot.studentLevel ?? '');
+      // existed is still in burble-sync.json without it. Same reasoning
+      // for `handyCam` and `?? false` — a self-filmed tandem is only ever
+      // an instructor match to begin with (see mergeSelfFilmed), so
+      // addJump's own category guard is what actually protects every
+      // other role.
+      await addJump(slot.role, slot.customerName, at, slot.studentLevel ?? '', slot.handyCam ?? false);
       await autoLogJump({
         jumpTypeName: slot.jumpTypeName,
         date,
@@ -447,7 +451,11 @@ function manifestDescription(slot: PendingJump): string {
   // sitting in burble-sync.json without it.
   const alongside =
     slot.role !== 'solo' && slot.otherStaffName ? ` ${OTHER_STAFF_LABELS[slot.role]}: ${slot.otherStaffName}.` : '';
-  return `Auto-logged from the manifest — ${load}, ${slot.code}${who}.${alongside}`;
+  // Called out explicitly rather than left implicit in the missing
+  // "Camera flyer: …" line — otherwise a merged self-filmed jump reads
+  // exactly like an ordinary instructor jump with no camera booked at all.
+  const handyCamNote = slot.handyCam ? ' Filmed own handy-cam footage.' : '';
+  return `Auto-logged from the manifest — ${load}, ${slot.code}${who}.${alongside}${handyCamNote}`;
 }
 
 export { describeMatch };

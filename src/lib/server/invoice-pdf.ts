@@ -46,6 +46,14 @@ export interface InvoicePdfOptions {
   /** Per-jump pay rate, and the gross package rate videographer jumps are billed at — see rate-settings.ts. Passed in rather than imported so the PDF always reflects whatever's actually saved, not the hardcoded defaults. */
   rates: Record<Category, number>;
   videographerPackageRate: number;
+  /**
+   * Instructor jumps whose handy-cam bonus bills into this invoice period —
+   * from handyCamJumpsInRange, so already bucketed by *update* date rather
+   * than the jump's own date (see that function and Jump.handyCamAt).
+   * Rendered as its own section only when non-empty.
+   */
+  handyCamJumps: Jump[];
+  handyCamBonusRate: number;
 }
 
 const MARGIN = 50;
@@ -233,6 +241,54 @@ export async function buildTandemInvoicePdf(opts: InvoicePdfOptions): Promise<Bu
     y += 24;
   }
 
+  // ---- Handy cam footage ----
+  // A genuinely optional section: nothing renders (and nothing is added to
+  // `total`) when no jump's bonus falls in this period, rather than a
+  // permanent zero row. See InvoicePdfOptions.handyCamJumps for why this
+  // list can include a jump whose own `date` isn't in the instructor
+  // section above (upgraded to Ultimate after its own invoice period had
+  // already gone out).
+  if (opts.handyCamJumps.length > 0) {
+    if (y > doc.page.height - MARGIN - 100) {
+      doc.addPage();
+      y = MARGIN;
+    }
+
+    doc.font('Body-Bold').fontSize(10.5).fillColor(NAVY);
+    doc.text('Handy Cam Footage', MARGIN, y, { lineBreak: false });
+    y += 16;
+
+    doc.font('Body').fontSize(9.5);
+    for (const jump of opts.handyCamJumps) {
+      if (y > doc.page.height - MARGIN - 60) {
+        doc.addPage();
+        y = MARGIN;
+      }
+      doc.text(formatJumpDate(jump.date), MARGIN, y, { width: dateColW, lineBreak: false });
+      doc.text(jump.name, MARGIN + dateColW, y, { width: nameColW - 8, lineBreak: false });
+      doc.text(money(opts.handyCamBonusRate), MARGIN + dateColW + nameColW, y, {
+        width: amountColW,
+        align: 'right',
+        lineBreak: false,
+      });
+      y += 14;
+    }
+
+    const handyCamSubtotal = opts.handyCamJumps.length * opts.handyCamBonusRate;
+    y += 2;
+    doc.font('Body-Bold');
+    doc.text(`${opts.handyCamJumps.length} @ ${money(opts.handyCamBonusRate)}`, MARGIN, y, {
+      width: pageWidth - amountColW,
+      align: 'right',
+      lineBreak: false,
+    });
+    doc.text(money(handyCamSubtotal), MARGIN + pageWidth - amountColW, y, { width: amountColW, align: 'right', lineBreak: false });
+    doc.font('Body');
+    y += 24;
+
+    total += handyCamSubtotal;
+  }
+
   // ---- Total ----
   doc.rect(MARGIN, y, pageWidth, 24).fill(TOTAL_BG);
   doc.fillColor(NAVY).font('Body-Bold').fontSize(11);
@@ -243,12 +299,14 @@ export async function buildTandemInvoicePdf(opts: InvoicePdfOptions): Promise<Bu
   const instructing = opts.jumpsByCategory.instructor?.length ?? 0;
   const videoing = opts.jumpsByCategory.videographer?.length ?? 0;
   const affing = opts.jumpsByCategory.aff?.length ?? 0;
-  // AFF only earns a mention when there were some — an invoice month with
-  // no AFF work on it reads exactly as it always did, rather than growing
-  // a permanent "and 0 AFF instructing jump(s)".
+  const handyCamming = opts.handyCamJumps.length;
+  // AFF and handy cam only earn a mention when there were some — an
+  // invoice month with none of either reads exactly as it always did,
+  // rather than growing a permanent "and 0 AFF instructing jump(s)".
   const summary =
     `${instructing} tandem instructing jump(s) and ${videoing} videographer jump(s)` +
     (affing > 0 ? `, plus ${affing} AFF instructing jump(s),` : '') +
+    (handyCamming > 0 ? `, plus ${handyCamming} handy cam bonus(es),` : '') +
     ' this period.';
   doc.font('Body').fontSize(8).fillColor(MUTED).text(summary, MARGIN, y, { lineBreak: false });
 

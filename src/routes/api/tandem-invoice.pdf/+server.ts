@@ -1,5 +1,5 @@
 import type { RequestHandler } from './$types';
-import { jumpsInRange } from '$lib/server/tandem';
+import { handyCamJumpsInRange, jumpsInRange } from '$lib/server/tandem';
 import { invoiceMonthDateRange } from '$lib/server/tandem-invoice';
 import { formatDateKey, rangeLabel } from '$lib/server/periods';
 import { claimInvoiceRef, readInvoiceSettings } from '$lib/server/invoice-settings';
@@ -33,8 +33,9 @@ export const GET: RequestHandler = async ({ url }) => {
   const startKey = formatDateKey(start);
   const endKey = formatDateKey(end);
 
-  const [jumpsByCategory, settings, rateSettings, ref] = await Promise.all([
+  const [jumpsByCategory, handyCamJumps, settings, rateSettings, ref] = await Promise.all([
     jumpsInRange(startKey, endKey),
+    handyCamJumpsInRange(startKey, endKey),
     readInvoiceSettings(),
     readRateSettings(),
     claimInvoiceRef(),
@@ -48,6 +49,8 @@ export const GET: RequestHandler = async ({ url }) => {
     jumpsByCategory,
     rates: rateSettings.tandem,
     videographerPackageRate: rateSettings.videographerPackageRate,
+    handyCamJumps,
+    handyCamBonusRate: rateSettings.handyCamBonusRate,
   });
 
   const filenameSafeName = settings.fromName.trim().replace(/\s+/g, '_') || 'Tandem';

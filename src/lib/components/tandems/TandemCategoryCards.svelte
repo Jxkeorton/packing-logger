@@ -20,7 +20,13 @@
     tandemState,
     visibility,
     rates,
-  }: { tandemState: DayState; visibility: Record<Category, boolean>; rates: Record<Category, number> } = $props();
+    handyCamBonusRate,
+  }: {
+    tandemState: DayState;
+    visibility: Record<Category, boolean>;
+    rates: Record<Category, number>;
+    handyCamBonusRate: number;
+  } = $props();
 
   // Hiding a category is a display preference only (Settings > Work
   // jumps) — it never touches tandemState itself, so a jump logged
@@ -44,7 +50,7 @@
   const modalNameLabel = $derived(isAff ? 'Student name' : 'Customer name');
   const modalNamePlaceholder = $derived(isAff ? 'e.g. Alex Marsh' : 'e.g. Jane Smith');
 
-  async function addJump(name: string, staff: string, level: string) {
+  async function addJump(name: string, staff: string, level: string, handyCam: boolean) {
     const category = pendingCategory;
     if (!category || addingJump) return;
     addingJump = true;
@@ -54,6 +60,7 @@
       formData.set('name', name);
       formData.set('staff', staff);
       formData.set('level', level);
+      if (handyCam) formData.set('handyCam', 'on');
       await fetch('?/addTandemJump', { method: 'POST', body: formData });
       pendingCategory = null;
       await invalidateAll();
@@ -99,6 +106,7 @@
             <li class="tandem-jump-row">
               <span class="tandem-jump-name">{jump.name}</span>
               {#if jump.level}<span class="tandem-jump-level">{jump.level}</span>{/if}
+              {#if jump.handyCam}<span class="tandem-jump-level" title="Handy cam footage">HC</span>{/if}
               <button
                 type="button"
                 class="tandem-jump-delete"
@@ -124,6 +132,8 @@
   namePlaceholder={modalNamePlaceholder}
   staffLabel={pendingCategory ? OTHER_STAFF_LABELS[pendingCategory] : ''}
   levelOptions={isAff ? AFF_LEVELS : undefined}
+  showHandyCam={pendingCategory === 'instructor'}
+  {handyCamBonusRate}
   submitting={addingJump}
   onSubmit={addJump}
   onClose={() => (pendingCategory = null)}

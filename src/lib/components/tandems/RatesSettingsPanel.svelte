@@ -125,6 +125,18 @@
         required
       />
     </label>
+    <label class="{FIELD_LABEL_NARROW} mb-2.5">
+      <span>Handy cam bonus</span>
+      <input
+        type="number"
+        name="handyCamBonusRate"
+        class={FIELD_INPUT}
+        min="0"
+        step="0.01"
+        value={rates.handyCamBonusRate}
+        required
+      />
+    </label>
   </div>
 
   <div class={FORM_ACTIONS}>

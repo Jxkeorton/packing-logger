@@ -89,6 +89,16 @@ export const RATES: Record<Category, number> = {
  */
 export const VIDEOGRAPHER_PACKAGE_RATE = 92;
 
+/**
+ * What a tandem instructor earns on top of RATES.instructor for shooting
+ * "handy cam" footage themselves — a customer who's bought the Ultimate
+ * package but has no dedicated videographer booked. A flat bonus rather
+ * than its own category: it's still an instructor jump in every other
+ * respect (same rig, same rate), just with one add-on line on the
+ * invoice (see invoice-pdf.ts).
+ */
+export const HANDY_CAM_BONUS_RATE = 20;
+
 export type Counts = Record<Category, number>;
 
 export interface Jump {
@@ -102,6 +112,23 @@ export interface Jump {
    * for a synced jump and its wording is the DZ's, not ours.
    */
   level: string;
+  /**
+   * True when this jump earns the handy-cam bonus — only ever on an
+   * 'instructor' jump; every other category is dropped to false the same
+   * way `level` is dropped outside 'aff' (see addJump/setJumpHandyCam in
+   * server/tandem.ts).
+   */
+  handyCam: boolean;
+  /**
+   * ISO timestamp of the last time `handyCam` was set true, '' otherwise.
+   * A customer can upgrade to Ultimate after the jump, once home — so
+   * this, not `date`, is what decides which invoice period the bonus
+   * bills into (see handyCamJumpsInRange): flagged at logging time, it
+   * lands in the same period as the jump; flagged later, once a period
+   * has already closed, it rolls into whichever period the update
+   * actually happened in.
+   */
+  handyCamAt: string;
   at: string; // ISO timestamp — also this jump's id, for deletion
 }
 

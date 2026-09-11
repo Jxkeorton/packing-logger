@@ -13,6 +13,7 @@
 import { CATEGORIES as PACKING_CATEGORIES, RATES as DEFAULT_PACKING_RATES, type Category as PackingCategory } from '../packing';
 import {
   CATEGORIES as TANDEM_CATEGORIES,
+  HANDY_CAM_BONUS_RATE as DEFAULT_HANDY_CAM_BONUS_RATE,
   RATES as DEFAULT_TANDEM_RATES,
   VIDEOGRAPHER_PACKAGE_RATE as DEFAULT_VIDEOGRAPHER_PACKAGE_RATE,
   type Category as TandemCategory,
@@ -23,6 +24,8 @@ export interface RateSettings {
   packing: Record<PackingCategory, number>;
   tandem: Record<TandemCategory, number>;
   videographerPackageRate: number;
+  /** What an instructor jump's handy-cam add-on earns — see $lib/tandem.ts's HANDY_CAM_BONUS_RATE. */
+  handyCamBonusRate: number;
 }
 
 const SETTINGS_KEY = 'rate-settings.json';
@@ -31,6 +34,7 @@ const DEFAULTS: RateSettings = {
   packing: { ...DEFAULT_PACKING_RATES },
   tandem: { ...DEFAULT_TANDEM_RATES },
   videographerPackageRate: DEFAULT_VIDEOGRAPHER_PACKAGE_RATE,
+  handyCamBonusRate: DEFAULT_HANDY_CAM_BONUS_RATE,
 };
 
 /** A rate is a non-negative, finite number of pounds — anything else falls back. */
@@ -58,6 +62,7 @@ export async function readRateSettings(): Promise<RateSettings> {
         packing,
         tandem,
         videographerPackageRate: rate(parsed.videographerPackageRate, DEFAULTS.videographerPackageRate),
+        handyCamBonusRate: rate(parsed.handyCamBonusRate, DEFAULTS.handyCamBonusRate),
       };
     },
     DEFAULTS,

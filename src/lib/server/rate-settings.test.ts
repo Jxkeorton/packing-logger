@@ -18,6 +18,7 @@ const DEFAULTS = {
   packing: { tandem: 11, instructor: 6.5, student: 6.5, sport: 6.5 },
   tandem: { instructor: 42, videographer: 42, aff: 42 },
   videographerPackageRate: 92,
+  handyCamBonusRate: 20,
 };
 
 beforeEach(() => {
@@ -46,12 +47,14 @@ describe('readRateSettings', () => {
         packing: { tandem: 15, instructor: 'nope', student: -1 },
         tandem: { instructor: 50 },
         videographerPackageRate: -5,
+        handyCamBonusRate: 'nope',
       }),
     );
     expect(await readRateSettings()).toEqual({
       packing: { tandem: 15, instructor: 6.5, student: 6.5, sport: 6.5 },
       tandem: { instructor: 50, videographer: 42, aff: 42 },
       videographerPackageRate: 92,
+      handyCamBonusRate: 20,
     });
   });
 
@@ -68,6 +71,7 @@ describe('writeRateSettings', () => {
       packing: { tandem: 12, instructor: 7, student: 7, sport: 7 },
       tandem: { instructor: 45, videographer: 45, aff: 45 },
       videographerPackageRate: 95,
+      handyCamBonusRate: 25,
     };
     await writeRateSettings(custom);
     expect(await readRateSettings()).toEqual(custom);

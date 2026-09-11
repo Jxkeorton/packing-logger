@@ -595,9 +595,19 @@
       myNames={data.logbookSettings.burble.myNames}
     />
 
-    <TandemCategoryCards tandemState={data.tandemState} visibility={data.tandemVisibility} rates={data.rateSettings.tandem} />
+    <TandemCategoryCards
+      tandemState={data.tandemState}
+      visibility={data.tandemVisibility}
+      rates={data.rateSettings.tandem}
+      handyCamBonusRate={data.rateSettings.handyCamBonusRate}
+    />
 
-    <TandemHistoryPanel dayRows={data.tandemDayRows} weekRows={data.tandemWeekRows} monthRows={data.tandemMonthRows} />
+    <TandemHistoryPanel
+      dayRows={data.tandemDayRows}
+      weekRows={data.tandemWeekRows}
+      monthRows={data.tandemMonthRows}
+      dayJumps={data.tandemDayJumps}
+    />
 
     {#if currentInvoiceMonth}
       <MonthlyInvoiceButton monthKey={currentInvoiceMonth.key} rangeLabel={currentInvoiceMonth.rangeLabel} />

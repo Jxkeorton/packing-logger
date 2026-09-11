@@ -7,7 +7,7 @@ import { buildTandemInvoicePdf } from './invoice-pdf';
 import type { Category, Jump } from '../tandem';
 
 function jump(category: Category, name: string, level = ''): Jump {
-  return { date: '2026-09-06', category, name, level, at: `2026-09-06T10:00:00.000Z` };
+  return { date: '2026-09-06', category, name, level, handyCam: false, handyCamAt: '', at: `2026-09-06T10:00:00.000Z` };
 }
 
 const SETTINGS = {
@@ -20,7 +20,7 @@ const SETTINGS = {
 
 const RATES: Record<Category, number> = { instructor: 42, videographer: 42, aff: 42 };
 
-async function build(jumpsByCategory: Record<Category, Jump[]>) {
+async function build(jumpsByCategory: Record<Category, Jump[]>, handyCamJumps: Jump[] = []) {
   return buildTandemInvoicePdf({
     ref: 1,
     issuedDate: '06/09/2026',
@@ -29,6 +29,8 @@ async function build(jumpsByCategory: Record<Category, Jump[]>) {
     jumpsByCategory,
     rates: RATES,
     videographerPackageRate: 92,
+    handyCamJumps,
+    handyCamBonusRate: 20,
   });
 }
 
@@ -56,5 +58,24 @@ describe('buildTandemInvoicePdf', () => {
   it('still renders a month with nothing in it', async () => {
     const pdf = await build({ instructor: [], videographer: [], aff: [] });
     expect(pdf.subarray(0, 5).toString()).toBe('%PDF-');
+  });
+
+  it('renders a handy cam footage section, and folds its bonus into the total', async () => {
+    const withoutBonus = await build({
+      instructor: [jump('instructor', 'Jane Smith')],
+      videographer: [],
+      aff: [],
+    });
+    const withBonus = await build(
+      { instructor: [jump('instructor', 'Jane Smith')], videographer: [], aff: [] },
+      [jump('instructor', 'Jane Smith')],
+    );
+
+    expect(withBonus.subarray(0, 5).toString()).toBe('%PDF-');
+    // Not a byte-for-byte content check (that'd mean asserting against
+    // pdfkit's binary stream) — but the section adds a real page of
+    // content and a real £20 to the total, so the output can't be the
+    // same size as the otherwise-identical invoice without it.
+    expect(withBonus.length).toBeGreaterThan(withoutBonus.length);
   });
 });
