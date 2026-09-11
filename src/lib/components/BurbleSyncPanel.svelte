@@ -111,8 +111,6 @@
         {pendingCount === 1 ? '1 jump is' : `${pendingCount} jumps are`} waiting to be confirmed — see
         <strong class="text-ink">Jumps to confirm</strong> at the top of the screen.
       </p>
-    {:else if lastSyncAt}
-      <p class="{PANEL_HINT} mt-0 mb-0">Nothing with your name on it right now.</p>
     {/if}
   {/if}
 </div>
