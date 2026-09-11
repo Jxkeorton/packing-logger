@@ -12,6 +12,8 @@
     namePlaceholder,
     staffLabel,
     levelOptions,
+    showHandyCam = false,
+    handyCamBonusRate,
     submitting = false,
     onSubmit,
     onClose,
@@ -30,6 +32,10 @@
      * only sometimes meaningful is worse than one that comes and goes.
      */
     levelOptions?: readonly string[];
+    /** Show the handy-cam checkbox — only ever true for an instructor jump, the one category the bonus applies to. */
+    showHandyCam?: boolean;
+    /** The live bonus rate, for the checkbox's own label — only read when showHandyCam is true. */
+    handyCamBonusRate?: number;
     /**
      * True while the caller's own onSubmit is still in flight — this
      * component doesn't own that request (TandemCategoryCards does, via
@@ -39,13 +45,14 @@
      * logged the same jump twice.
      */
     submitting?: boolean;
-    onSubmit: (name: string, staff: string, level: string) => void;
+    onSubmit: (name: string, staff: string, level: string, handyCam: boolean) => void;
     onClose: () => void;
   } = $props();
 
   let name = $state('');
   let staff = $state('');
   let level = $state('');
+  let handyCam = $state(false);
   let inputEl: HTMLInputElement | undefined = $state();
 
   $effect(() => {
@@ -58,6 +65,7 @@
       // <select> is `required`, so the browser makes it a deliberate
       // choice instead.
       level = '';
+      handyCam = false;
       inputEl?.focus();
     }
   });
@@ -70,7 +78,7 @@
     if (levelOptions && !level) return; // matches the select's own `required`
     // The other staff member stays optional — plenty of jumps go up without
     // a camera, and a solo instructor shouldn't be blocked on filling it in.
-    onSubmit(trimmed, staff.trim(), levelOptions ? level : '');
+    onSubmit(trimmed, staff.trim(), levelOptions ? level : '', showHandyCam && handyCam);
   }
 
   // Both inputs are styled identically; named once so they stay that way.
@@ -129,6 +137,13 @@
           maxlength="80"
           bind:value={staff}
         />
+        {#if showHandyCam}
+          <label class="flex items-center gap-2 mt-3.5 text-[13.5px] font-medium cursor-pointer">
+            <input type="checkbox" class="w-[18px] h-[18px] accent-gold" bind:checked={handyCam} />
+            Handy cam footage
+            <span class="font-normal text-ink-soft">(Ultimate package, +£{(handyCamBonusRate ?? 0).toFixed(2)})</span>
+          </label>
+        {/if}
         <div class="flex gap-2.5 mt-3.5">
           <button
             type="button"

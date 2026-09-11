@@ -104,9 +104,16 @@ export const load: PageServerLoad = async () => {
   // packing (tandem-jumps.csv only ever gets a row when a jump is
   // logged, no day-rollover phantom entry) — the filter's just here for
   // symmetry with packing and as a no-cost guard if that ever changes.
-  const { state: tandemState, history: tandemFullHistory } = tandemBundle;
+  const { state: tandemState, history: tandemFullHistory, dayJumps: tandemDayJumpsFull } = tandemBundle;
   const tandemNonEmptyHistory = tandemFullHistory.filter((r) => r.totalJumps > 0);
   const tandemDayRows = tandemNonEmptyHistory.slice(0, 14);
+  // The individual jumps behind the Day tab's rows, narrowed to just the
+  // dates it actually renders — tandemDayJumpsFull carries one entry per
+  // date in the wider 400-day window loaded for the week/month rollups,
+  // most of which never reach the page.
+  const tandemDayJumps = Object.fromEntries(
+    tandemDayRows.map((row) => [row.date, tandemDayJumpsFull[row.date] ?? []]),
+  );
   const tandemCombined = [...tandemNonEmptyHistory, toTandemHistoryRow(tandemState, rateSettings.tandem)];
   const tandemWeekRows = groupTandemByWeek(tandemCombined, rateSettings.tandem)
     .filter((r) => r.isCurrent || r.totalJumps > 0)
@@ -140,6 +147,7 @@ export const load: PageServerLoad = async () => {
     monthRows,
     tandemState,
     tandemDayRows,
+    tandemDayJumps,
     tandemWeekRows,
     tandemMonthRows,
     invoiceSettings,

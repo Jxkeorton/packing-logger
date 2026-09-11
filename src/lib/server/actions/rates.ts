@@ -34,8 +34,9 @@ export const ratesActions: Record<string, Action> = {
       'videographerPackageRate',
       current.videographerPackageRate,
     );
+    const handyCamBonusRate = parseRate(formData, 'handyCamBonusRate', current.handyCamBonusRate);
 
-    const next: RateSettings = { packing, tandem, videographerPackageRate };
+    const next: RateSettings = { packing, tandem, videographerPackageRate, handyCamBonusRate };
     await writeRateSettings(next);
   },
 };

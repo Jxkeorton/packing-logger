@@ -29,9 +29,11 @@ export interface DayEntryInput {
 export { toHistoryRow } from '../tandem';
 
 const JUMPS_KEY = 'tandem-jumps.csv';
-const JUMPS_HEADER = 'date,category,name,level,at';
-/** The pre-AFF header, still sitting at the top of every existing file — see readJumps. */
-const LEGACY_JUMPS_HEADER = 'date,category,name,at';
+const JUMPS_HEADER = 'date,category,name,level,handyCam,handyCamAt,at';
+/** The pre-handy-cam header, still sitting at the top of every existing file — see readJumps. */
+const LEGACY_JUMPS_HEADER_V2 = 'date,category,name,level,at';
+/** The pre-AFF header, older still. */
+const LEGACY_JUMPS_HEADER_V1 = 'date,category,name,at';
 
 /** An empty per-category bucket, built from CATEGORIES so a new one can't be forgotten here. */
 function emptyEntries(): Record<Category, Jump[]> {
@@ -48,17 +50,33 @@ async function readJumps(): Promise<Jump[]> {
   const jumps: Jump[] = [];
   for (const row of parseCsvRows(raw)) {
     const joined = row.join(',');
-    if (joined === JUMPS_HEADER || joined === LEGACY_JUMPS_HEADER) continue;
-    // `level` was added with the AFF category, so every row written before
-    // that has four columns and no level. Read by *width* rather than by
-    // which header the file happens to start with: a file is rewritten
-    // whole on the next write, but until then one that was migrated
-    // mid-session could legitimately hold both shapes, and getting this
-    // wrong would shift every name one column left.
+    if (joined === JUMPS_HEADER || joined === LEGACY_JUMPS_HEADER_V2 || joined === LEGACY_JUMPS_HEADER_V1) continue;
+    // `level` was added with the AFF category, `handyCam`/`handyCamAt` with
+    // the handy-cam bonus — so a row written before either has fewer
+    // columns. Read by *width* rather than by which header the file happens
+    // to start with: a file is rewritten whole on the next write, but until
+    // then one that was migrated mid-session could legitimately hold more
+    // than one shape at once, and getting this wrong would shift a later
+    // column into an earlier one (a timestamp into the level, say).
     const [date, category] = row;
-    const [name, level, at] = row.length >= 5 ? [row[2], row[3], row[4]] : [row[2], '', row[3]];
+    let name = '';
+    let level = '';
+    let handyCam = false;
+    let handyCamAt = '';
+    let at = '';
+    if (row.length >= 7) {
+      name = row[2];
+      level = row[3];
+      handyCam = row[4] === '1';
+      handyCamAt = row[5] ?? '';
+      at = row[6];
+    } else if (row.length >= 5) {
+      [name, level, at] = [row[2], row[3], row[4]];
+    } else {
+      [name, at] = [row[2], row[3]];
+    }
     if (!date || !at || !CATEGORIES.includes(category as Category)) continue;
-    jumps.push({ date, category: category as Category, name: name ?? '', level: level ?? '', at });
+    jumps.push({ date, category: category as Category, name: name ?? '', level: level ?? '', handyCam, handyCamAt, at });
   }
   return jumps;
 }
@@ -66,7 +84,9 @@ async function readJumps(): Promise<Jump[]> {
 async function writeJumps(jumps: Jump[]): Promise<void> {
   const sorted = [...jumps].sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0));
   const body = sorted
-    .map((j) => [j.date, j.category, csvEscape(j.name), csvEscape(j.level), j.at].join(','))
+    .map((j) =>
+      [j.date, j.category, csvEscape(j.name), csvEscape(j.level), j.handyCam ? '1' : '0', j.handyCamAt, j.at].join(','),
+    )
     .join('\n');
   await writeText(JUMPS_KEY, `${JUMPS_HEADER}\n${body}\n`);
 }
@@ -107,13 +127,26 @@ export async function addJump(
   name: string,
   at: string = new Date().toISOString(),
   level = '',
+  handyCam = false,
 ): Promise<DayState> {
   const jumps = await readJumps();
   const today = todayKey();
-  // Only an AFF jump has a level; anything arriving on another category is
-  // dropped rather than stored, so a stray value can't turn up on a tandem
-  // row later and be rendered as if it meant something.
-  jumps.push({ date: today, category, name, level: category === 'aff' ? level : '', at });
+  // Only an AFF jump has a level, only an instructor jump can earn the
+  // handy-cam bonus; anything arriving on another category is dropped
+  // rather than stored, so a stray value can't turn up on the wrong kind
+  // of row later and be rendered as if it meant something.
+  const isHandyCam = category === 'instructor' && handyCam;
+  jumps.push({
+    date: today,
+    category,
+    name,
+    level: category === 'aff' ? level : '',
+    handyCam: isHandyCam,
+    // Flagged at logging time, so the bonus starts out billing into the
+    // same period as the jump itself — see the Jump.handyCamAt doc comment.
+    handyCamAt: isHandyCam ? at : '',
+    at,
+  });
   await writeJumps(jumps);
   return stateFor(jumps, today);
 }
@@ -131,6 +164,25 @@ export async function removeJump(at: string): Promise<DayState> {
     await writeJumps(remaining);
   }
   return stateFor(remaining, todayKey());
+}
+
+/**
+ * Flip a single jump's handy-cam bonus on or off — the "customer upgraded
+ * to Ultimate after the jump, once home" flow, called from the History tab
+ * for a past jump (or from today's own card). No-ops on anything that
+ * isn't an 'instructor' jump, the same guard addJump applies at creation
+ * time. Stamps `handyCamAt` with *now*, not the jump's own date/time — see
+ * the Jump.handyCamAt doc comment for why that's what makes a late upgrade
+ * bill into the invoice period it actually happened in.
+ */
+export async function setJumpHandyCam(at: string, handyCam: boolean): Promise<DayState> {
+  const jumps = await readJumps();
+  const index = jumps.findIndex((j) => j.at === at);
+  if (index !== -1 && jumps[index].category === 'instructor') {
+    jumps[index] = { ...jumps[index], handyCam, handyCamAt: handyCam ? new Date().toISOString() : '' };
+    await writeJumps(jumps);
+  }
+  return stateFor(jumps, todayKey());
 }
 
 /**
@@ -156,6 +208,11 @@ export async function setDayEntries(
         category,
         name: entry.name,
         level: category === 'aff' ? (entry.level ?? '') : '',
+        // Backfilling a day from paper records has no handy-cam concept —
+        // if one turns out to need it, it can be flagged afterwards from
+        // the History tab like any other jump.
+        handyCam: false,
+        handyCamAt: '',
         at: new Date(base + offset).toISOString(),
       });
       offset += 1;
@@ -177,10 +234,19 @@ export async function readCsvFile(): Promise<string> {
   const jumps = await readJumps();
   const rates = await readRateSettings();
   const sorted = [...jumps].sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0));
-  const header = 'date,category,name,level,amount,at';
+  const header = 'date,category,name,level,amount,handyCam,handyCamBonus,at';
   const body = sorted
     .map((j) =>
-      [j.date, j.category, csvEscape(j.name), csvEscape(j.level), rates.tandem[j.category].toFixed(2), j.at].join(','),
+      [
+        j.date,
+        j.category,
+        csvEscape(j.name),
+        csvEscape(j.level),
+        rates.tandem[j.category].toFixed(2),
+        j.handyCam ? '1' : '0',
+        (j.handyCam ? rates.handyCamBonusRate : 0).toFixed(2),
+        j.at,
+      ].join(','),
     )
     .join('\n');
   return `${header}\n${body}\n`;
@@ -209,6 +275,25 @@ function historyFromJumps(jumps: Jump[], rates: Record<Category, number>, limit:
   });
 }
 
+/** Shared by loadTodayStateAndHistory() — the History tab's per-day jump lists, for finding and editing (e.g. a late handy-cam upgrade) an individual past jump rather than just seeing its day's totals. Same date window as historyFromJumps, keyed the same way, so the two line up. */
+function dayJumpsFromJumps(jumps: Jump[], limit: number): Record<string, Jump[]> {
+  const today = todayKey();
+  const byDate = new Map<string, Jump[]>();
+  for (const j of jumps) {
+    if (j.date === today) continue;
+    const list = byDate.get(j.date);
+    if (list) list.push(j);
+    else byDate.set(j.date, [j]);
+  }
+
+  const dates = [...byDate.keys()].sort().reverse().slice(0, limit);
+  const out: Record<string, Jump[]> = {};
+  for (const date of dates) {
+    out[date] = byDate.get(date)!.sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0));
+  }
+  return out;
+}
+
 /** Most recent history rows (excluding today), newest first, one per day. */
 export async function readHistory(limit = 14): Promise<HistoryRow[]> {
   const [jumps, rates] = await Promise.all([readJumps(), readRateSettings()]);
@@ -222,12 +307,19 @@ export async function readHistory(limit = 14): Promise<HistoryRow[]> {
  * same jump list either way). Used by +page.server.ts, which needs
  * both; loadTodayState()/readHistory() stay as their own functions for
  * the callers (actions, mostly) that only ever need one of them.
+ *
+ * `dayJumps` rides along on the same read, keyed by the same dates as
+ * `history` — the individual jumps behind each day's counts, for the
+ * History tab's per-jump list (see dayJumpsFromJumps).
  */
-export async function loadTodayStateAndHistory(limit = 14): Promise<{ state: DayState; history: HistoryRow[] }> {
+export async function loadTodayStateAndHistory(
+  limit = 14,
+): Promise<{ state: DayState; history: HistoryRow[]; dayJumps: Record<string, Jump[]> }> {
   const [jumps, rates] = await Promise.all([readJumps(), readRateSettings()]);
   return {
     state: stateFor(jumps, todayKey()),
     history: historyFromJumps(jumps, rates.tandem, limit),
+    dayJumps: dayJumpsFromJumps(jumps, limit),
   };
 }
 
@@ -245,5 +337,25 @@ export async function jumpsInRange(startDate: string, endDate: string): Promise<
   for (const category of CATEGORIES) {
     out[category].sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0));
   }
+  return out;
+}
+
+/**
+ * Every handy-cam-flagged jump whose *bonus* falls within `startDate`..
+ * `endDate` (both YYYY-MM-DD, inclusive) — the invoice PDF's data source
+ * for the handy-cam footage section. Bucketed on `handyCamAt`, not `date`:
+ * a jump flagged at logging time bills in the same period as the jump
+ * itself, but one upgraded later — after its own period's invoice has
+ * already gone out — rolls into whichever period the upgrade actually
+ * happened in (see the Jump.handyCamAt doc comment).
+ */
+export async function handyCamJumpsInRange(startDate: string, endDate: string): Promise<Jump[]> {
+  const jumps = await readJumps();
+  const out = jumps.filter((j) => {
+    if (!j.handyCam || !j.handyCamAt) return false;
+    const bonusDate = j.handyCamAt.slice(0, 10);
+    return bonusDate >= startDate && bonusDate <= endDate;
+  });
+  out.sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0));
   return out;
 }

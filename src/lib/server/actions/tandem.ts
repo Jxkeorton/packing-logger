@@ -4,7 +4,7 @@
 // `load` after success, so state/history/week/month refresh together).
 import { fail, type Action } from '@sveltejs/kit';
 import { CATEGORIES, CATEGORY_ACTION_LABELS, OTHER_STAFF_LABELS, TANDEM_JUMP_TYPES, type Category } from '$lib/tandem';
-import { addJump, removeJump } from '$lib/server/tandem';
+import { addJump, removeJump, setJumpHandyCam } from '$lib/server/tandem';
 import { removeEntry as removeLogbookEntry } from '$lib/server/logbook';
 import { readLogbookSettings } from '$lib/server/logbook-settings';
 import { autoLogJump } from '$lib/server/auto-log';
@@ -87,8 +87,12 @@ export const tandemActions: Record<string, Action> = {
     // outright on any other category by addJump.
     const cleanLevel = oneLine(formData.get('level'), MAX_LEVEL_LENGTH);
 
+    // Only meaningful on an instructor jump — addJump drops it on any other
+    // category the same way it drops a level outside 'aff'.
+    const handyCam = formData.get('handyCam') === 'on';
+
     const at = new Date().toISOString();
-    const state = await addJump(category as Category, cleanName, at, cleanLevel);
+    const state = await addJump(category as Category, cleanName, at, cleanLevel, handyCam);
     await autoLogTandemJump(
       category as Category,
       cleanName,
@@ -162,5 +166,18 @@ export const tandemActions: Record<string, Action> = {
 
     const visible = formData.get('visible') === 'on';
     await setTandemVisibility(category as Category, visible);
+  },
+
+  // Flip a past jump's handy-cam bonus on or off — the History tab's "the
+  // customer upgraded to Ultimate once they got home" flow (see
+  // TandemHistoryPanel.svelte). setJumpHandyCam itself no-ops on anything
+  // that isn't an instructor jump, so nothing further to validate here.
+  setTandemJumpHandyCam: async ({ request }) => {
+    const formData = await request.formData();
+    const at = String(formData.get('at') ?? '');
+    if (!at) return fail(400, { error: 'at is required' });
+
+    const handyCam = formData.get('handyCam') === 'on';
+    await setJumpHandyCam(at, handyCam);
   },
 };
