@@ -53,21 +53,37 @@
   // Date, one column per category, Jumps, Earned.
   const DAY_COLSPAN = CATEGORIES.length + 3;
 
-  // Toggling a past jump's handy-cam bonus — the "customer upgraded to
-  // Ultimate once they got home" flow. A plain fetch + invalidateAll(),
-  // the same pattern TandemCategoryCards' own addJump/deleteJump use,
-  // since this list isn't a <form> either.
-  async function toggleHandyCam(jump: Jump) {
+  // Shared by toggleHandyCam and setAfterJump below — both just post the
+  // jump's desired end state and reload, the same fetch + invalidateAll()
+  // pattern TandemCategoryCards' own addJump/deleteJump use, since this
+  // list isn't a <form> either.
+  async function postHandyCam(jump: Jump, handyCam: boolean, afterJump: boolean) {
     togglingAt = jump.at;
     try {
       const formData = new FormData();
       formData.set('at', jump.at);
-      if (!jump.handyCam) formData.set('handyCam', 'on');
+      if (handyCam) formData.set('handyCam', 'on');
+      if (afterJump) formData.set('afterJump', 'on');
       await fetch('?/setTandemJumpHandyCam', { method: 'POST', body: formData });
       await invalidateAll();
     } finally {
       togglingAt = null;
     }
+  }
+
+  // The "customer upgraded to Ultimate once they got home" flow — turning
+  // it on defaults to "bought after the jump" (that's normally exactly why
+  // this is being flagged from History rather than at logging time), with
+  // its own checkbox below to correct that when it isn't. Turning it back
+  // off clears both.
+  function toggleHandyCam(jump: Jump) {
+    return postHandyCam(jump, !jump.handyCam, true);
+  }
+
+  // Corrects the package/after-jump classification on a jump that's
+  // already flagged — doesn't touch handyCam itself.
+  function setAfterJump(jump: Jump, afterJump: boolean) {
+    return postHandyCam(jump, true, afterJump);
   }
 </script>
 
@@ -127,24 +143,40 @@
                       <td colspan={DAY_COLSPAN} class="p-0 border-b border-line">
                         <ul class="list-none m-0 py-1 px-2 bg-canvas">
                           {#each dayJumps[row.date] ?? [] as jump (jump.at)}
-                            <li class="flex items-center gap-2 py-1.5 border-t border-line first:border-t-0 text-[12.5px] font-sans">
-                              <span class="shrink-0 font-mono text-[10px] font-bold uppercase {CATEGORY_TEXT_CLASS[jump.category]}">
-                                {CATEGORY_LABELS[jump.category].slice(0, 3)}
-                              </span>
-                              <span class="flex-1 min-w-0 truncate">{jump.name}</span>
-                              {#if jump.level}
-                                <span class="shrink-0 px-1.5 py-0.5 rounded-full bg-line text-ink-soft font-mono text-[10px] font-semibold">{jump.level}</span>
-                              {/if}
-                              {#if jump.category === 'instructor'}
-                                <button
-                                  type="button"
-                                  class="shrink-0 appearance-none rounded-full border px-2 py-0.5 text-[10.5px] font-semibold cursor-pointer touch-manipulation disabled:opacity-60 disabled:cursor-default flex items-center gap-1 {jump.handyCam ? 'bg-gold text-white border-gold' : 'bg-transparent text-ink-soft border-line-strong'}"
-                                  aria-pressed={jump.handyCam}
-                                  disabled={togglingAt === jump.at}
-                                  onclick={() => toggleHandyCam(jump)}
-                                >
-                                  {#if togglingAt === jump.at}<Spinner size={11} />{:else}{jump.handyCam ? '✓ Handy cam' : '+ Handy cam'}{/if}
-                                </button>
+                            <li class="py-1.5 border-t border-line first:border-t-0 text-[12.5px] font-sans">
+                              <div class="flex items-center gap-2">
+                                <span class="shrink-0 font-mono text-[10px] font-bold uppercase {CATEGORY_TEXT_CLASS[jump.category]}">
+                                  {CATEGORY_LABELS[jump.category].slice(0, 3)}
+                                </span>
+                                <span class="flex-1 min-w-0 truncate">{jump.name}</span>
+                                {#if jump.level}
+                                  <span class="shrink-0 px-1.5 py-0.5 rounded-full bg-line text-ink-soft font-mono text-[10px] font-semibold">{jump.level}</span>
+                                {/if}
+                                {#if jump.category === 'instructor'}
+                                  <button
+                                    type="button"
+                                    class="shrink-0 appearance-none rounded-full border px-2 py-0.5 text-[10.5px] font-semibold cursor-pointer touch-manipulation disabled:opacity-60 disabled:cursor-default flex items-center gap-1 {jump.handyCam ? 'bg-gold text-white border-gold' : 'bg-transparent text-ink-soft border-line-strong'}"
+                                    aria-pressed={jump.handyCam}
+                                    disabled={togglingAt === jump.at}
+                                    onclick={() => toggleHandyCam(jump)}
+                                  >
+                                    {#if togglingAt === jump.at}<Spinner size={11} />{:else}{jump.handyCam ? '✓ Handy cam' : '+ Handy cam'}{/if}
+                                  </button>
+                                {/if}
+                              </div>
+                              {#if jump.category === 'instructor' && jump.handyCam}
+                                <label class="mt-1 ml-[26px] flex items-center gap-1.5 text-[11px] text-ink-soft cursor-pointer w-fit">
+                                  <input
+                                    type="checkbox"
+                                    class="size-3.5 accent-gold"
+                                    checked={jump.handyCamAfterJump}
+                                    disabled={togglingAt === jump.at}
+                                    onchange={(e) => setAfterJump(jump, e.currentTarget.checked)}
+                                  />
+                                  Bought after the jump
+                                  <!-- Unticked = the Ultimate package, bought upfront — what the employer's
+                                       invoice needs kept apart from a jump the customer upgraded on later. -->
+                                </label>
                               {/if}
                             </li>
                           {:else}

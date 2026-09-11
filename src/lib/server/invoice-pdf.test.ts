@@ -3,11 +3,20 @@
 // fail silently — nothing typechecks the layout, and a broken invoice is
 // only discovered at the point of sending it.
 import { describe, expect, it } from 'vitest';
-import { buildTandemInvoicePdf } from './invoice-pdf';
+import { buildSummaryLine, buildTandemInvoicePdf } from './invoice-pdf';
 import type { Category, Jump } from '../tandem';
 
 function jump(category: Category, name: string, level = ''): Jump {
-  return { date: '2026-09-06', category, name, level, handyCam: false, handyCamAt: '', at: `2026-09-06T10:00:00.000Z` };
+  return {
+    date: '2026-09-06',
+    category,
+    name,
+    level,
+    handyCam: false,
+    handyCamAt: '',
+    handyCamAfterJump: false,
+    at: `2026-09-06T10:00:00.000Z`,
+  };
 }
 
 const SETTINGS = {
@@ -20,7 +29,11 @@ const SETTINGS = {
 
 const RATES: Record<Category, number> = { instructor: 42, videographer: 42, aff: 42 };
 
-async function build(jumpsByCategory: Record<Category, Jump[]>, handyCamJumps: Jump[] = []) {
+async function build(
+  jumpsByCategory: Record<Category, Jump[]>,
+  handyCamPackageJumps: Jump[] = [],
+  handyCamAfterJumpJumps: Jump[] = [],
+) {
   return buildTandemInvoicePdf({
     ref: 1,
     issuedDate: '06/09/2026',
@@ -29,7 +42,8 @@ async function build(jumpsByCategory: Record<Category, Jump[]>, handyCamJumps: J
     jumpsByCategory,
     rates: RATES,
     videographerPackageRate: 92,
-    handyCamJumps,
+    handyCamPackageJumps,
+    handyCamAfterJumpJumps,
     handyCamBonusRate: 20,
   });
 }
@@ -77,5 +91,52 @@ describe('buildTandemInvoicePdf', () => {
     // content and a real £20 to the total, so the output can't be the
     // same size as the otherwise-identical invoice without it.
     expect(withBonus.length).toBeGreaterThan(withoutBonus.length);
+  });
+
+  it('renders package and after-jump bonuses as two separate sections, both folded into the total', async () => {
+    const neither = await build({ instructor: [jump('instructor', 'Jane Smith')], videographer: [], aff: [] });
+    const packageOnly = await build(
+      { instructor: [jump('instructor', 'Jane Smith')], videographer: [], aff: [] },
+      [jump('instructor', 'Jane Smith')],
+    );
+    const both = await build(
+      { instructor: [jump('instructor', 'Jane Smith')], videographer: [], aff: [] },
+      [jump('instructor', 'Jane Smith')],
+      [jump('instructor', 'Alex Marsh')],
+    );
+
+    expect(both.subarray(0, 5).toString()).toBe('%PDF-');
+    // Each section is real added content (and a real added £20 in the
+    // total), so a PDF with both sections must be bigger than one with
+    // only the package section, which in turn must be bigger than one
+    // with neither.
+    expect(packageOnly.length).toBeGreaterThan(neither.length);
+    expect(both.length).toBeGreaterThan(packageOnly.length);
+  });
+});
+
+describe('buildSummaryLine', () => {
+  const base = { instructing: 5, videoing: 2, affing: 0, handyCamPackage: 0, handyCamAfterJump: 0 };
+
+  it('mentions only instructor and videographer counts when there are no extras', () => {
+    expect(buildSummaryLine(base)).toBe('5 tandem instructing jump(s) and 2 videographer jump(s) this period.');
+  });
+
+  it('adds a single extra clause with exactly one comma before "this period"', () => {
+    expect(buildSummaryLine({ ...base, affing: 3 })).toBe(
+      '5 tandem instructing jump(s) and 2 videographer jump(s), plus 3 AFF instructing jump(s), this period.',
+    );
+  });
+
+  it('joins every extra with its own "plus", never a double comma between two of them', () => {
+    // The exact regression this guards: each clause used to carry its own
+    // trailing comma, so stacking the two handy-cam ones produced
+    // "…(package),, plus…".
+    const line = buildSummaryLine({ ...base, affing: 3, handyCamPackage: 1, handyCamAfterJump: 2 });
+    expect(line).toBe(
+      '5 tandem instructing jump(s) and 2 videographer jump(s), plus 3 AFF instructing jump(s), ' +
+        'plus 1 handy cam bonus(es) (package), plus 2 handy cam bonus(es) (after jump), this period.',
+    );
+    expect(line).not.toContain(',,');
   });
 });

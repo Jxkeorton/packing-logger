@@ -41,6 +41,13 @@ export const GET: RequestHandler = async ({ url }) => {
     claimInvoiceRef(),
   ]);
 
+  // The employer wants the Ultimate package, bought upfront, kept apart
+  // from a bonus the customer bought once they were already home — see
+  // Jump.handyCamAfterJump and invoice-pdf.ts's two Handy Cam Footage
+  // sections.
+  const handyCamPackageJumps = handyCamJumps.filter((j) => !j.handyCamAfterJump);
+  const handyCamAfterJumpJumps = handyCamJumps.filter((j) => j.handyCamAfterJump);
+
   const pdf = await buildTandemInvoicePdf({
     ref,
     issuedDate: todayFormatted(),
@@ -49,7 +56,8 @@ export const GET: RequestHandler = async ({ url }) => {
     jumpsByCategory,
     rates: rateSettings.tandem,
     videographerPackageRate: rateSettings.videographerPackageRate,
-    handyCamJumps,
+    handyCamPackageJumps,
+    handyCamAfterJumpJumps,
     handyCamBonusRate: rateSettings.handyCamBonusRate,
   });
 

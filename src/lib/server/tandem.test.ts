@@ -50,6 +50,7 @@ describe('reading a file written before AFF existed', () => {
         level: '',
         handyCam: false,
         handyCamAt: '',
+        handyCamAfterJump: false,
         at: '2026-08-01T10:00:00.000Z',
       },
     ]);
@@ -116,7 +117,7 @@ describe('addJump', () => {
 });
 
 describe('setJumpHandyCam', () => {
-  it('flags an existing instructor jump, stamping handyCamAt with now', async () => {
+  it('flags an existing instructor jump, stamping handyCamAt with now and defaulting to "after the jump"', async () => {
     // addJump always dates the jump to "today", so both the add and the
     // date-window query below need to agree on what that was — pin it
     // with fake time, then move the clock on for the toggle itself.
@@ -130,9 +131,42 @@ describe('setJumpHandyCam', () => {
     const [jump] = (await jumpsInRange('2026-08-01', '2026-08-01')).instructor;
     expect(jump.handyCam).toBe(true);
     expect(jump.handyCamAt).toBe('2026-08-05T09:00:00.000Z');
+    // The employer's default assumption: back-flagging a past jump from
+    // History normally *is* the "customer upgraded once home" case.
+    expect(jump.handyCamAfterJump).toBe(true);
   });
 
-  it('clears the flag and the timestamp when toggled back off', async () => {
+  it('flags a jump as the package, not after-jump, when told so explicitly', async () => {
+    const added = await addJump('instructor', 'Jane Smith');
+    const at = added.entries.instructor[0].at;
+
+    await setJumpHandyCam(at, true, false);
+    const jump = (await loadTodayState()).entries.instructor[0];
+    expect(jump.handyCam).toBe(true);
+    expect(jump.handyCamAfterJump).toBe(false);
+  });
+
+  it('flips the package/after-jump classification without moving handyCamAt', async () => {
+    // Correcting which kind of bonus this is, once it's already flagged,
+    // must not silently move it into a different invoice period.
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-08-05T09:00:00.000Z'));
+    const added = await addJump('instructor', 'Jane Smith');
+    const at = added.entries.instructor[0].at;
+    await setJumpHandyCam(at, true, true);
+
+    vi.setSystemTime(new Date('2026-08-09T09:00:00.000Z'));
+    await setJumpHandyCam(at, true, false);
+
+    // The clock's moved on since addJump ran, so loadTodayState() ("today"
+    // now being the 9th) would miss the jump entirely — it's still dated
+    // the 5th, which is exactly the point of this test.
+    const [jump] = (await jumpsInRange('2026-08-05', '2026-08-05')).instructor;
+    expect(jump.handyCamAfterJump).toBe(false);
+    expect(jump.handyCamAt).toBe('2026-08-05T09:00:00.000Z');
+  });
+
+  it('clears the flag, the timestamp and the classification when toggled back off', async () => {
     const added = await addJump('instructor', 'Jane Smith', undefined, '', true);
     const at = added.entries.instructor[0].at;
 
@@ -140,6 +174,7 @@ describe('setJumpHandyCam', () => {
     const jump = (await loadTodayState()).entries.instructor[0];
     expect(jump.handyCam).toBe(false);
     expect(jump.handyCamAt).toBe('');
+    expect(jump.handyCamAfterJump).toBe(false);
   });
 
   it('no-ops on a jump that is not an instructor jump', async () => {
@@ -203,14 +238,16 @@ describe('readCsvFile', () => {
     });
 
     const csv = await readCsvFile();
-    expect(csv.split('\n')[0]).toBe('date,category,name,level,amount,handyCam,handyCamBonus,at');
-    expect(csv).toContain('2026-08-01,aff,Alex Marsh,Level 6,42.00,0,0.00,');
+    expect(csv.split('\n')[0]).toBe('date,category,name,level,amount,handyCam,handyCamType,handyCamBonus,at');
+    expect(csv).toContain('2026-08-01,aff,Alex Marsh,Level 6,42.00,0,,0.00,');
   });
 
-  it('exports the handy-cam bonus alongside a flagged instructor jump', async () => {
+  it('exports the handy-cam bonus alongside a flagged instructor jump, labelled by which kind', async () => {
     await addJump('instructor', 'Jane Smith', '2026-08-01T10:00:00.000Z', '', true);
     const csv = await readCsvFile();
-    expect(csv).toContain(`${todayKey()},instructor,Jane Smith,,42.00,1,20.00,2026-08-01T10:00:00.000Z`);
+    // Flagged via addJump, so it's always the package — see
+    // Jump.handyCamAfterJump's doc comment.
+    expect(csv).toContain(`${todayKey()},instructor,Jane Smith,,42.00,1,package,20.00,2026-08-01T10:00:00.000Z`);
   });
 });
 

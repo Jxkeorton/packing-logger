@@ -29,8 +29,10 @@ export interface DayEntryInput {
 export { toHistoryRow } from '../tandem';
 
 const JUMPS_KEY = 'tandem-jumps.csv';
-const JUMPS_HEADER = 'date,category,name,level,handyCam,handyCamAt,at';
-/** The pre-handy-cam header, still sitting at the top of every existing file — see readJumps. */
+const JUMPS_HEADER = 'date,category,name,level,handyCam,handyCamAt,handyCamAfterJump,at';
+/** The pre-package/after-jump-split header, still sitting at the top of every existing file — see readJumps. */
+const LEGACY_JUMPS_HEADER_V3 = 'date,category,name,level,handyCam,handyCamAt,at';
+/** The pre-handy-cam header, older still. */
 const LEGACY_JUMPS_HEADER_V2 = 'date,category,name,level,at';
 /** The pre-AFF header, older still. */
 const LEGACY_JUMPS_HEADER_V1 = 'date,category,name,at';
@@ -50,21 +52,37 @@ async function readJumps(): Promise<Jump[]> {
   const jumps: Jump[] = [];
   for (const row of parseCsvRows(raw)) {
     const joined = row.join(',');
-    if (joined === JUMPS_HEADER || joined === LEGACY_JUMPS_HEADER_V2 || joined === LEGACY_JUMPS_HEADER_V1) continue;
+    if (
+      joined === JUMPS_HEADER ||
+      joined === LEGACY_JUMPS_HEADER_V3 ||
+      joined === LEGACY_JUMPS_HEADER_V2 ||
+      joined === LEGACY_JUMPS_HEADER_V1
+    ) {
+      continue;
+    }
     // `level` was added with the AFF category, `handyCam`/`handyCamAt` with
-    // the handy-cam bonus — so a row written before either has fewer
-    // columns. Read by *width* rather than by which header the file happens
-    // to start with: a file is rewritten whole on the next write, but until
-    // then one that was migrated mid-session could legitimately hold more
-    // than one shape at once, and getting this wrong would shift a later
-    // column into an earlier one (a timestamp into the level, say).
+    // the handy-cam bonus, `handyCamAfterJump` with the package/after-jump
+    // split — so a row written before any of these has fewer columns. Read
+    // by *width* rather than by which header the file happens to start
+    // with: a file is rewritten whole on the next write, but until then one
+    // that was migrated mid-session could legitimately hold more than one
+    // shape at once, and getting this wrong would shift a later column into
+    // an earlier one (a timestamp into the level, say).
     const [date, category] = row;
     let name = '';
     let level = '';
     let handyCam = false;
     let handyCamAt = '';
+    let handyCamAfterJump = false;
     let at = '';
-    if (row.length >= 7) {
+    if (row.length >= 8) {
+      name = row[2];
+      level = row[3];
+      handyCam = row[4] === '1';
+      handyCamAt = row[5] ?? '';
+      handyCamAfterJump = row[6] === '1';
+      at = row[7];
+    } else if (row.length >= 7) {
       name = row[2];
       level = row[3];
       handyCam = row[4] === '1';
@@ -76,7 +94,16 @@ async function readJumps(): Promise<Jump[]> {
       [name, at] = [row[2], row[3]];
     }
     if (!date || !at || !CATEGORIES.includes(category as Category)) continue;
-    jumps.push({ date, category: category as Category, name: name ?? '', level: level ?? '', handyCam, handyCamAt, at });
+    jumps.push({
+      date,
+      category: category as Category,
+      name: name ?? '',
+      level: level ?? '',
+      handyCam,
+      handyCamAt,
+      handyCamAfterJump,
+      at,
+    });
   }
   return jumps;
 }
@@ -85,7 +112,16 @@ async function writeJumps(jumps: Jump[]): Promise<void> {
   const sorted = [...jumps].sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0));
   const body = sorted
     .map((j) =>
-      [j.date, j.category, csvEscape(j.name), csvEscape(j.level), j.handyCam ? '1' : '0', j.handyCamAt, j.at].join(','),
+      [
+        j.date,
+        j.category,
+        csvEscape(j.name),
+        csvEscape(j.level),
+        j.handyCam ? '1' : '0',
+        j.handyCamAt,
+        j.handyCamAfterJump ? '1' : '0',
+        j.at,
+      ].join(','),
     )
     .join('\n');
   await writeText(JUMPS_KEY, `${JUMPS_HEADER}\n${body}\n`);
@@ -145,6 +181,13 @@ export async function addJump(
     // Flagged at logging time, so the bonus starts out billing into the
     // same period as the jump itself — see the Jump.handyCamAt doc comment.
     handyCamAt: isHandyCam ? at : '',
+    // Every caller of addJump (the manual "+ Add instructor jump" modal,
+    // and a self-filmed match committed from the manifest) knows the
+    // customer bought Ultimate *before* the jump — that's the whole
+    // reason either one can flag it right now, at creation time. So this
+    // is never the "bought after the jump" case; only setJumpHandyCam,
+    // used later from the History tab, can set that true.
+    handyCamAfterJump: false,
     at,
   });
   await writeJumps(jumps);
@@ -167,19 +210,37 @@ export async function removeJump(at: string): Promise<DayState> {
 }
 
 /**
- * Flip a single jump's handy-cam bonus on or off — the "customer upgraded
- * to Ultimate after the jump, once home" flow, called from the History tab
- * for a past jump (or from today's own card). No-ops on anything that
- * isn't an 'instructor' jump, the same guard addJump applies at creation
- * time. Stamps `handyCamAt` with *now*, not the jump's own date/time — see
- * the Jump.handyCamAt doc comment for why that's what makes a late upgrade
- * bill into the invoice period it actually happened in.
+ * Flip a single jump's handy-cam bonus on or off, and (while it's on) which
+ * kind it is — the History tab's edit flow, for a past jump the customer
+ * upgraded to Ultimate on, or a jump that needs its package/after-jump
+ * classification corrected. No-ops on anything that isn't an 'instructor'
+ * jump, the same guard addJump applies at creation time.
+ *
+ * `afterJump` defaults true (see the Jump.handyCamAfterJump doc comment):
+ * the History tab is normally used for exactly the "customer upgraded once
+ * home" case, so that's the assumption when turning the bonus on fresh —
+ * the caller passes `false` when the instructor unticks the "bought after
+ * the jump" checkbox, whether that's in the same action or a later one
+ * correcting it.
+ *
+ * `handyCamAt` — which decides the bonus's invoice period, see its own doc
+ * comment — is only re-stamped with *now* on the actual off→on transition.
+ * Calling this again on a jump that's already flagged, only to flip
+ * `afterJump`, must not silently move an already-billed bonus into a
+ * different invoice period.
  */
-export async function setJumpHandyCam(at: string, handyCam: boolean): Promise<DayState> {
+export async function setJumpHandyCam(at: string, handyCam: boolean, afterJump = true): Promise<DayState> {
   const jumps = await readJumps();
   const index = jumps.findIndex((j) => j.at === at);
   if (index !== -1 && jumps[index].category === 'instructor') {
-    jumps[index] = { ...jumps[index], handyCam, handyCamAt: handyCam ? new Date().toISOString() : '' };
+    const current = jumps[index];
+    const turningOn = handyCam && !current.handyCam;
+    jumps[index] = {
+      ...current,
+      handyCam,
+      handyCamAt: handyCam ? (turningOn ? new Date().toISOString() : current.handyCamAt) : '',
+      handyCamAfterJump: handyCam && afterJump,
+    };
     await writeJumps(jumps);
   }
   return stateFor(jumps, todayKey());
@@ -213,6 +274,7 @@ export async function setDayEntries(
         // the History tab like any other jump.
         handyCam: false,
         handyCamAt: '',
+        handyCamAfterJump: false,
         at: new Date(base + offset).toISOString(),
       });
       offset += 1;
@@ -234,7 +296,7 @@ export async function readCsvFile(): Promise<string> {
   const jumps = await readJumps();
   const rates = await readRateSettings();
   const sorted = [...jumps].sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0));
-  const header = 'date,category,name,level,amount,handyCam,handyCamBonus,at';
+  const header = 'date,category,name,level,amount,handyCam,handyCamType,handyCamBonus,at';
   const body = sorted
     .map((j) =>
       [
@@ -244,6 +306,10 @@ export async function readCsvFile(): Promise<string> {
         csvEscape(j.level),
         rates.tandem[j.category].toFixed(2),
         j.handyCam ? '1' : '0',
+        // Human-readable rather than another 1/0 — this is the column the
+        // employer's "package vs after-jump" split actually shows up in on
+        // the raw export, so it's worth spelling out.
+        j.handyCam ? (j.handyCamAfterJump ? 'after-jump' : 'package') : '',
         (j.handyCam ? rates.handyCamBonusRate : 0).toFixed(2),
         j.at,
       ].join(','),

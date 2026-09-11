@@ -49,10 +49,15 @@ export interface InvoicePdfOptions {
   /**
    * Instructor jumps whose handy-cam bonus bills into this invoice period —
    * from handyCamJumpsInRange, so already bucketed by *update* date rather
-   * than the jump's own date (see that function and Jump.handyCamAt).
-   * Rendered as its own section only when non-empty.
+   * than the jump's own date (see that function and Jump.handyCamAt) —
+   * split by Jump.handyCamAfterJump into the two sections the employer
+   * wants kept apart on the invoice: the Ultimate package, bought upfront
+   * (`handyCamPackageJumps`, `handyCamAfterJump: false`), and one the
+   * customer bought once they were already home (`handyCamAfterJumpJumps`).
+   * Each renders as its own section only when non-empty.
    */
-  handyCamJumps: Jump[];
+  handyCamPackageJumps: Jump[];
+  handyCamAfterJumpJumps: Jump[];
   handyCamBonusRate: number;
 }
 
@@ -64,6 +69,39 @@ const MUTED = '#5c6b78';
 
 const FONT_REGULAR = Buffer.from(robotoRegularBase64, 'base64');
 const FONT_BOLD = Buffer.from(robotoMediumBase64, 'base64');
+
+/**
+ * The one-line summary under the total — "N tandem instructing jump(s) and
+ * M videographer jump(s), plus …, this period." Pulled out as its own pure
+ * function (rather than assembled inline in buildTandemInvoicePdf) so the
+ * comma-joining logic — easy to get wrong once there's more than one
+ * optional clause, see its own tests — can be checked directly, without
+ * going through pdfkit and a PDF text extractor.
+ */
+export function buildSummaryLine(counts: {
+  instructing: number;
+  videoing: number;
+  affing: number;
+  handyCamPackage: number;
+  handyCamAfterJump: number;
+}): string {
+  // AFF and each handy-cam kind only earn a mention when there were some —
+  // an invoice month with none of them reads exactly as it always did,
+  // rather than growing a permanent "and 0 AFF instructing jump(s)". Built
+  // as a list and joined, rather than each clause carrying its own
+  // trailing comma, so two extras in a row don't run into each other
+  // ("…(package),, plus…") — only ever one comma, right before "this
+  // period", and only when there's at least one extra to introduce it.
+  const extras: string[] = [];
+  if (counts.affing > 0) extras.push(`${counts.affing} AFF instructing jump(s)`);
+  if (counts.handyCamPackage > 0) extras.push(`${counts.handyCamPackage} handy cam bonus(es) (package)`);
+  if (counts.handyCamAfterJump > 0) extras.push(`${counts.handyCamAfterJump} handy cam bonus(es) (after jump)`);
+  return (
+    `${counts.instructing} tandem instructing jump(s) and ${counts.videoing} videographer jump(s)` +
+    (extras.length > 0 ? `, plus ${extras.join(', plus ')},` : '') +
+    ' this period.'
+  );
+}
 
 function formatJumpDate(dateStr: string): string {
   const [y, m, d] = dateStr.split('-');
@@ -241,25 +279,28 @@ export async function buildTandemInvoicePdf(opts: InvoicePdfOptions): Promise<Bu
     y += 24;
   }
 
-  // ---- Handy cam footage ----
-  // A genuinely optional section: nothing renders (and nothing is added to
-  // `total`) when no jump's bonus falls in this period, rather than a
-  // permanent zero row. See InvoicePdfOptions.handyCamJumps for why this
-  // list can include a jump whose own `date` isn't in the instructor
-  // section above (upgraded to Ultimate after its own invoice period had
-  // already gone out).
-  if (opts.handyCamJumps.length > 0) {
+  // ---- Handy cam footage (two sections, not one) ----
+  // The employer wants the Ultimate package, bought upfront, kept apart on
+  // the invoice from a bonus the customer bought once they were already
+  // home — see InvoicePdfOptions' two handyCam*Jumps fields. Each is
+  // genuinely optional: nothing renders (and nothing is added to `total`)
+  // for a section with nothing in it this period, rather than a permanent
+  // zero row. Either list can include a jump whose own `date` isn't in the
+  // instructor section above — its bonus is bucketed by *when it was
+  // flagged*, not the jump's own date (see handyCamJumpsInRange).
+  function renderHandyCamSection(title: string, jumps: Jump[]): number {
+    if (jumps.length === 0) return 0;
     if (y > doc.page.height - MARGIN - 100) {
       doc.addPage();
       y = MARGIN;
     }
 
     doc.font('Body-Bold').fontSize(10.5).fillColor(NAVY);
-    doc.text('Handy Cam Footage', MARGIN, y, { lineBreak: false });
+    doc.text(title, MARGIN, y, { lineBreak: false });
     y += 16;
 
     doc.font('Body').fontSize(9.5);
-    for (const jump of opts.handyCamJumps) {
+    for (const jump of jumps) {
       if (y > doc.page.height - MARGIN - 60) {
         doc.addPage();
         y = MARGIN;
@@ -274,20 +315,23 @@ export async function buildTandemInvoicePdf(opts: InvoicePdfOptions): Promise<Bu
       y += 14;
     }
 
-    const handyCamSubtotal = opts.handyCamJumps.length * opts.handyCamBonusRate;
+    const subtotal = jumps.length * opts.handyCamBonusRate;
     y += 2;
     doc.font('Body-Bold');
-    doc.text(`${opts.handyCamJumps.length} @ ${money(opts.handyCamBonusRate)}`, MARGIN, y, {
+    doc.text(`${jumps.length} @ ${money(opts.handyCamBonusRate)}`, MARGIN, y, {
       width: pageWidth - amountColW,
       align: 'right',
       lineBreak: false,
     });
-    doc.text(money(handyCamSubtotal), MARGIN + pageWidth - amountColW, y, { width: amountColW, align: 'right', lineBreak: false });
+    doc.text(money(subtotal), MARGIN + pageWidth - amountColW, y, { width: amountColW, align: 'right', lineBreak: false });
     doc.font('Body');
     y += 24;
 
-    total += handyCamSubtotal;
+    return subtotal;
   }
+
+  total += renderHandyCamSection('Handy Cam Footage — Package', opts.handyCamPackageJumps);
+  total += renderHandyCamSection('Handy Cam Footage — Purchased After Jump', opts.handyCamAfterJumpJumps);
 
   // ---- Total ----
   doc.rect(MARGIN, y, pageWidth, 24).fill(TOTAL_BG);
@@ -296,18 +340,13 @@ export async function buildTandemInvoicePdf(opts: InvoicePdfOptions): Promise<Bu
   doc.text(money(total), MARGIN + pageWidth - amountColW, y + 7, { width: amountColW - 6, align: 'right', lineBreak: false });
   y += 36;
 
-  const instructing = opts.jumpsByCategory.instructor?.length ?? 0;
-  const videoing = opts.jumpsByCategory.videographer?.length ?? 0;
-  const affing = opts.jumpsByCategory.aff?.length ?? 0;
-  const handyCamming = opts.handyCamJumps.length;
-  // AFF and handy cam only earn a mention when there were some — an
-  // invoice month with none of either reads exactly as it always did,
-  // rather than growing a permanent "and 0 AFF instructing jump(s)".
-  const summary =
-    `${instructing} tandem instructing jump(s) and ${videoing} videographer jump(s)` +
-    (affing > 0 ? `, plus ${affing} AFF instructing jump(s),` : '') +
-    (handyCamming > 0 ? `, plus ${handyCamming} handy cam bonus(es),` : '') +
-    ' this period.';
+  const summary = buildSummaryLine({
+    instructing: opts.jumpsByCategory.instructor?.length ?? 0,
+    videoing: opts.jumpsByCategory.videographer?.length ?? 0,
+    affing: opts.jumpsByCategory.aff?.length ?? 0,
+    handyCamPackage: opts.handyCamPackageJumps.length,
+    handyCamAfterJump: opts.handyCamAfterJumpJumps.length,
+  });
   doc.font('Body').fontSize(8).fillColor(MUTED).text(summary, MARGIN, y, { lineBreak: false });
 
   doc.end();

@@ -129,6 +129,22 @@ export interface Jump {
    * actually happened in.
    */
   handyCamAt: string;
+  /**
+   * Whether this bonus is billed as "purchased after the jump" rather
+   * than "the Ultimate package, bought upfront" — the employer wants the
+   * two kept apart on the invoice (see invoice-pdf.ts's two Handy Cam
+   * Footage sections). Meaningless when `handyCam` is false, and always
+   * false there.
+   *
+   * A jump synced from the manifest as Ultimate, or flagged from the
+   * manual "+ Add instructor jump" checkbox, is always the package —
+   * both are known upfront, so addJump never sets this true. It's only
+   * ever true when set from the History tab, which defaults it true on
+   * the assumption that back-flagging a past jump *is* the "customer
+   * upgraded once home" case — but stays an editable checkbox there, for
+   * the times that assumption is wrong (see setJumpHandyCam).
+   */
+  handyCamAfterJump: boolean;
   at: string; // ISO timestamp — also this jump's id, for deletion
 }
 

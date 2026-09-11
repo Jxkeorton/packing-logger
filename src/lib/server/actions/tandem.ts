@@ -168,16 +168,19 @@ export const tandemActions: Record<string, Action> = {
     await setTandemVisibility(category as Category, visible);
   },
 
-  // Flip a past jump's handy-cam bonus on or off — the History tab's "the
-  // customer upgraded to Ultimate once they got home" flow (see
-  // TandemHistoryPanel.svelte). setJumpHandyCam itself no-ops on anything
-  // that isn't an instructor jump, so nothing further to validate here.
+  // Flip a past jump's handy-cam bonus on or off, and which kind it is —
+  // the History tab's "the customer upgraded to Ultimate once they got
+  // home" flow, or a correction to its package/after-jump classification
+  // (see TandemHistoryPanel.svelte). setJumpHandyCam itself no-ops on
+  // anything that isn't an instructor jump, so nothing further to
+  // validate here.
   setTandemJumpHandyCam: async ({ request }) => {
     const formData = await request.formData();
     const at = String(formData.get('at') ?? '');
     if (!at) return fail(400, { error: 'at is required' });
 
     const handyCam = formData.get('handyCam') === 'on';
-    await setJumpHandyCam(at, handyCam);
+    const afterJump = formData.get('afterJump') === 'on';
+    await setJumpHandyCam(at, handyCam, afterJump);
   },
 };
