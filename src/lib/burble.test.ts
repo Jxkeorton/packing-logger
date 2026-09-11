@@ -175,6 +175,7 @@ describe('matchSlots', () => {
       loadNumber: '6',
       code: 'TI',
       status: 'On Call',
+      handyCam: false,
     });
   });
 
@@ -187,6 +188,48 @@ describe('matchSlots', () => {
       customerName: 'Samantha Townshend',
       otherStaffName: 'Gareth Pepperell',
       code: 'CAM PHOTO',
+      handyCam: false,
+    });
+  });
+
+  describe('a self-filmed tandem — my name against both the TI slot and a camera code', () => {
+    // Barry Woollard, Dylan Whitehair's camera flyer, renamed to Dylan
+    // Whitehair himself: the manifest convention for "he shot his own
+    // handy-cam footage" rather than a dedicated videographer being
+    // booked. Built off the same group as the tests above, one name
+    // changed, rather than a hand-rolled fixture.
+    function selfFilmedGroup() {
+      const group = realLoads(onCall)[0].groups[0];
+      return group.map((slot) => (slot.id === '1864672' ? { ...slot, name: 'Dylan Whitehair' } : slot));
+    }
+
+    it('collapses to a single instructor match with the handy-cam bonus flagged', () => {
+      const loads = [{ ...realLoads(onCall)[0], groups: [selfFilmedGroup(), ...realLoads(onCall)[0].groups.slice(1)] }];
+      const { matches } = matchSlots(loads, ['Dylan Whitehair'], map);
+
+      // Not two — an instructor match and a videographer match for the
+      // same booking, which is exactly the "duplicate in Jumps to
+      // confirm" this merge exists to prevent.
+      expect(matches).toHaveLength(1);
+      expect(matches[0]).toMatchObject({
+        role: 'instructor',
+        jumpTypeName: 'Tandem Instructor',
+        customerName: 'Miranda Walfield',
+        handyCam: true,
+        // Neither of my two slots is "other staff" — I'm not my own
+        // camera flyer.
+        otherStaffName: '',
+      });
+    });
+
+    it('leaves a normal TI + a different, dedicated camera flyer alone', () => {
+      // Regression guard for the merge itself: matching only the TI's own
+      // name must not touch a camera slot that belongs to someone else —
+      // covered structurally by the two tests above (each only configures
+      // one of the two names), asserted here directly.
+      const { matches } = matchSlots(realLoads(onCall), ['Dylan Whitehair'], map);
+      expect(matches).toHaveLength(1);
+      expect(matches[0].handyCam).toBe(false);
     });
   });
 

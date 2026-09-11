@@ -24,6 +24,14 @@
      * existed and still sitting in burble-sync.json.
      */
     studentLevel?: string;
+    /**
+     * True on an instructor jump the board showed self-filmed (my name
+     * against both the TI slot and a camera code) — merged from what
+     * would otherwise be two separate entries for one jump, see
+     * $lib/burble.ts's mergeSelfFilmed. `undefined` on a sighting
+     * captured before this field existed.
+     */
+    handyCam?: boolean;
     hint: string;
     leftBoard: boolean;
   }
@@ -95,6 +103,7 @@
                 <span class="flex-1 text-[13.5px] leading-snug">
                   <span class="font-semibold">{BURBLE_ROLE_LABELS[jump.role]}</span>
                   {#if jump.customerName}<span> with {jump.customerName}</span>{/if}
+                  {#if jump.handyCam}<span class="text-ink-soft"> · handy cam</span>{/if}
                   <!-- The level is what tells two AFF slots on the same
                        board apart, so it sits right on the row being
                        ticked rather than only in the logbook entry it

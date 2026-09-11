@@ -406,6 +406,54 @@ describe('confirming a tandem jump', () => {
   });
 });
 
+describe('confirming a self-filmed handy-cam tandem', () => {
+  // ON_CALL with Barry Woollard — Dylan Whitehair's camera flyer — renamed
+  // to Dylan Whitehair himself: the manifest convention observed for "he
+  // shot his own footage" (an Ultimate-package customer with no dedicated
+  // videographer booked) rather than a hand-rolled fixture, since it's the
+  // same board shape with one name changed.
+  function selfFilmed(): BurbleLoadsResponse {
+    const loads = (ON_CALL.loads as unknown[]).map((load) => {
+      if (!load || Array.isArray(load) || typeof load !== 'object') return load;
+      const groups = (load as { groups: { id: string; name: string }[][] }).groups.map((group) =>
+        group.map((slot) => (slot.id === '1864672' ? { ...slot, name: 'Dylan Whitehair' } : slot)),
+      );
+      return { ...load, groups };
+    });
+    return { ...ON_CALL, loads };
+  }
+
+  it('captures one pending jump, not two, with the handy-cam bonus flagged', async () => {
+    script(at(selfFilmed(), 1));
+    await syncOnce(TI);
+
+    // Without the merge this would be two: an instructor match and a
+    // videographer match, both for Miranda Walfield's booking.
+    const pending = pendingJumps(await readSyncState());
+    expect(pending).toHaveLength(1);
+    expect(pending[0]).toMatchObject({ role: 'instructor', handyCam: true, customerName: 'Miranda Walfield', otherStaffName: '' });
+  });
+
+  it('logs one instructor jump with the bonus flagged, not an instructor jump plus a videographer jump', async () => {
+    script(at(selfFilmed(), 1));
+    await syncOnce(TI);
+    const [jump] = pendingJumps(await readSyncState());
+
+    expect(await commitMatches([jump.slotId])).toEqual({ logged: 1, skippedDuplicates: 0 });
+
+    const tandemState = await loadTodayState();
+    expect(tandemState.counts).toEqual({ instructor: 1, videographer: 0, aff: 0 });
+    expect(tandemState.entries.instructor[0]).toMatchObject({ name: 'Miranda Walfield', handyCam: true });
+
+    const [entry] = await readLogbook(0);
+    expect(entry.jumpType).toBe('Tandem Instructor');
+    expect(entry.description).toContain('Filmed own handy-cam footage.');
+    // Not "Camera flyer: Dylan Whitehair" — that would be crediting
+    // himself as if someone else worked the jump alongside him.
+    expect(entry.description).not.toContain('Camera flyer');
+  });
+});
+
 describe('confirming a solo jump', () => {
   it('writes only a logbook entry — no invoice line', async () => {
     script(at(ON_CALL, 1));

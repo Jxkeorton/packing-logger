@@ -296,11 +296,16 @@ export function affStudent(group: BurbleSlot[]): { name: string; level: string }
  * codes allow for, or the two instructors on an AFF level 1 — are joined
  * rather than picked between. Better a label that reads slightly oddly
  * than a name quietly dropped.
+ *
+ * `excludeIds` is usually just my own slot — but a self-filmed tandem (see
+ * mergeSelfFilmed) has *two* of my slots in the group, and both need
+ * excluding there, not just the one being described.
  */
-export function otherStaffName(group: BurbleSlot[], mySlotId: string): string {
+export function otherStaffName(group: BurbleSlot[], excludeIds: string | Set<string>): string {
+  const exclude = typeof excludeIds === 'string' ? new Set([excludeIds]) : excludeIds;
   return group
     .filter((slot) => slot && typeof slot.name === 'string')
-    .filter((slot) => !PAYING_TTS.has(slot.transaction_type_id) && String(slot.id) !== mySlotId)
+    .filter((slot) => !PAYING_TTS.has(slot.transaction_type_id) && !exclude.has(String(slot.id)))
     .map((slot) => slot.name.trim())
     .filter(Boolean)
     .join(' & ');
@@ -334,6 +339,14 @@ export interface BurbleMatch {
    * level.
    */
   otherStaffName: string;
+  /**
+   * True on an 'instructor' match that was manifested self-filmed — the
+   * same person's name against both the TI slot and a camera code in one
+   * group, rather than a dedicated videographer — so it earns the
+   * handy-cam bonus. See mergeSelfFilmed; always false on every other
+   * match.
+   */
+  handyCam: boolean;
 }
 
 export interface MatchResult {
@@ -360,6 +373,12 @@ export function matchSlots(loads: BurbleLoad[], myNames: string[], codeMap: Burb
   for (const load of loads) {
     const { plate, loadNumber } = splitLoadName(load.name);
     for (const group of load.groups) {
+      // Collected per group, not pushed straight into `matches` — a
+      // self-filmed tandem needs to see every one of my slots in this
+      // group before it can tell a dedicated camera flyer from me wearing
+      // two hats (see mergeSelfFilmed).
+      const groupMatches: BurbleMatch[] = [];
+
       for (const slot of group) {
         if (!slot || typeof slot.name !== 'string') continue;
         if (!wanted.has(normaliseName(slot.name))) continue;
@@ -380,7 +399,7 @@ export function matchSlots(loads: BurbleLoad[], myNames: string[], codeMap: Burb
 
         const student = mapping.role === 'aff' ? affStudent(group) : { name: '', level: '' };
 
-        matches.push({
+        groupMatches.push({
           slotId: String(slot.id),
           loadId: load.id,
           loadName: load.name,
@@ -399,12 +418,56 @@ export function matchSlots(loads: BurbleLoad[], myNames: string[], codeMap: Burb
           customerName: mapping.role === 'aff' ? student.name : mapping.role === 'solo' ? '' : tandemCustomerName(group),
           studentLevel: mapping.role === 'aff' ? student.level : '',
           otherStaffName: mapping.role === 'solo' ? '' : otherStaffName(group, String(slot.id)),
+          handyCam: false,
         });
       }
+
+      matches.push(...mergeSelfFilmed(group, groupMatches));
     }
   }
 
   return { matches, unmappedCodes: [...unmapped] };
+}
+
+/**
+ * Collapse a self-filmed tandem — my name manifested against *both* the TI
+ * slot and a camera code in the same group, because I'm shooting my own
+ * handy-cam footage rather than a dedicated videographer being booked —
+ * into the single instructor match it actually is.
+ *
+ * Without this, the two slots survive as two separate matches for what is
+ * physically one jump: an instructor jump and a videographer jump both
+ * landing in "Jumps to confirm" for the same customer, and confirming both
+ * double-logs it (full videographer pay on top of instructor pay, rather
+ * than the instructor rate plus the smaller handy-cam bonus — see
+ * $lib/tandem.ts's HANDY_CAM_BONUS_RATE).
+ *
+ * Keyed on role, not name, deliberately: `myNames` only ever holds one
+ * jumper's own aliases (see BurbleSettings), so two of *my* matches in one
+ * group can only ever be the same physical person wearing two hats — there
+ * is no "two different instructors happen to share my configured name"
+ * case to guard against here the way matchSlots' outer wanted-name check
+ * has to. Anything other than exactly an instructor and a camera match is
+ * left untouched — a third match (shouldn't happen) or a lone one (the
+ * ordinary case, a dedicated camera flyer or no camera at all) passes
+ * through unchanged.
+ */
+function mergeSelfFilmed(group: BurbleSlot[], groupMatches: BurbleMatch[]): BurbleMatch[] {
+  if (groupMatches.length !== 2) return groupMatches;
+  const instructor = groupMatches.find((m) => m.role === 'instructor');
+  const camera = groupMatches.find((m) => m.role === 'videographer');
+  if (!instructor || !camera) return groupMatches;
+
+  return [
+    {
+      ...instructor,
+      handyCam: true,
+      // Neither of my two slots is "other staff" any more — the previous
+      // per-slot value still credits the camera slot (me again) as if
+      // someone else worked the jump alongside me.
+      otherStaffName: otherStaffName(group, new Set([instructor.slotId, camera.slotId])),
+    },
+  ];
 }
 
 /** A one-line summary of a matched jump, for the review queue and the logbook description. */
