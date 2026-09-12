@@ -51,9 +51,14 @@ const EMPTY_BOARD = fixture('get-loads-empty-board.json');
 const LANGAR_BUILDING = fixture('get-loads-langar-building.json');
 const LANGAR_AFF = fixture('get-loads-langar-aff.json');
 
-/** A fixture with the manifest version pinned, so version short-circuiting is testable. */
-function at(response: BurbleLoadsResponse, version: number | undefined): BurbleLoadsResponse {
-  const copy: BurbleLoadsResponse = { ...response, version, session_id: 9682 };
+/**
+ * A fixture with the manifest version pinned, so version short-circuiting
+ * is testable. `sessionId` defaults to a fixed value shared by every call
+ * site that doesn't care about it; pass a different one to simulate the
+ * board handing out a new session mid-test.
+ */
+function at(response: BurbleLoadsResponse, version: number | undefined, sessionId = 9682): BurbleLoadsResponse {
+  const copy: BurbleLoadsResponse = { ...response, version, session_id: sessionId };
   if (version === undefined) delete copy.version;
   return copy;
 }
@@ -483,6 +488,41 @@ describe('discarding', () => {
 
     expect(pendingJumps(await readSyncState())).toHaveLength(0);
     expect(await readLogbook(0)).toEqual([]);
+  });
+});
+
+describe('a mid-window session_id change', () => {
+  // Reported bug: a jump matched at 18:24 BST was gone by the 19:58 sync
+  // the same evening — well inside the 08:45-20:00 operating window. Burble
+  // had handed out a new session_id in between, and syncOnce used to treat
+  // any session_id change as "the previous day's leftovers" and wipe
+  // pending/committed outright. Nothing should purge either of them except
+  // the jumper confirming or dismissing a slot by hand.
+  it('keeps a pending jump when the board rolls over to a new session_id', async () => {
+    script(at(ON_CALL, 1, 9682));
+    await syncOnce(TI);
+    const [firstSeen] = pendingJumps(await readSyncState());
+
+    script(at(EMPTY_BOARD, 2, 4321));
+    await syncOnce(TI);
+
+    const pending = pendingJumps(await readSyncState());
+    expect(pending).toHaveLength(1);
+    expect(pending[0].slotId).toBe(firstSeen.slotId);
+    expect(pending[0].leftBoard).toBe(true);
+  });
+
+  it('keeps recognising an already-committed slot after a new session_id, instead of re-offering it', async () => {
+    script(at(ON_CALL, 1, 9682));
+    await syncOnce(TI);
+    const [jump] = pendingJumps(await readSyncState());
+    await commitMatches([jump.slotId]);
+
+    script(at(ON_CALL, 2, 4321));
+    await syncOnce(TI);
+
+    expect(pendingJumps(await readSyncState())).toHaveLength(0);
+    expect(await readLogbook(0)).toHaveLength(1);
   });
 });
 

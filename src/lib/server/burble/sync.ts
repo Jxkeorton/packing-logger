@@ -59,6 +59,13 @@ export interface PendingJump extends BurbleMatch {
 }
 
 export interface SyncState {
+  /**
+   * Whatever `session_id` the board last reported. Purely informational —
+   * kept because it's what let us diagnose a lost jump once (a stale
+   * `pending` entry survived a mid-window session change, and reading this
+   * back out of R2 was the tell). Nothing here branches on it: see the
+   * comment above the reset that used to live in syncOnce.
+   */
   sessionId: number | null;
   /** Absent on a cache miss, so `null` means "unknown" and forces a full pass. */
   lastVersion: number | null;
@@ -220,11 +227,17 @@ export async function syncOnce(settings?: BurbleSettings, board?: BurbleLoadsRes
 
   const next: SyncState = { ...state, lastSyncAt: now };
 
-  // A new jumping day — anything still being watched is from the old one.
-  if (sessionId !== null && state.sessionId !== null && sessionId !== state.sessionId) {
-    next.pending = {};
-    next.committed = {};
-  }
+  // This used to wipe `pending` and `committed` here on the theory that a
+  // new `session_id` means a new jumping day, so anything still being
+  // watched must be stale leftovers. It isn't reliable: Burble can hand out
+  // a fresh session_id more than once inside the same operating window
+  // (caught in the wild — a jump matched at 18:24 BST was silently wiped
+  // by the 19:58 sync the same evening, well before the day was over). A
+  // real, unconfirmed jump is worth far more than the tidiness of clearing
+  // out an old one, so nothing here purges pending or committed
+  // automatically, ever — see PendingJump's doc comment. Only the jumper
+  // discarding it (dismissMatch) or confirming it (commitMatches) removes
+  // an entry.
   if (sessionId !== null) next.sessionId = sessionId;
 
   // Cheap short-circuit, but only when we positively know *both* the
