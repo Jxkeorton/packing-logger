@@ -46,3 +46,36 @@ export function formatWhen(iso: string): string {
   const time = d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
   return `${date}, ${time}`;
 }
+
+/**
+ * Which calendar day a timestamp falls on, in the viewer's own local
+ * time — "Today" and "Yesterday" for the common case, otherwise a short
+ * date ("Sat 29 Aug", or "Sat 20 Dec 2025" once it's crossed a year
+ * boundary). Locale pinned to 'en-GB' rather than left to the runtime's
+ * default so this reads the same in a test as it does in a browser —
+ * Node's own ICU default is 'en-US' ("Sat, Aug 29"), which isn't what a UK
+ * dropzone app should show regardless of who's viewing it.
+ *
+ * Built for the "Jumps to confirm" backlog: nothing purges a pending jump
+ * (see burble/sync.ts), so the list can span months, and day headers are
+ * what keep that from turning into one undifferentiated pile.
+ *
+ * `now` defaults to the current time and only exists as a parameter so
+ * this is testable without mocking the clock.
+ */
+export function dayLabel(iso: string, now: Date = new Date()): string {
+  const date = new Date(iso);
+  const dayKey = (d: Date) => `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+
+  if (dayKey(date) === dayKey(now)) return 'Today';
+  if (dayKey(date) === dayKey(yesterday)) return 'Yesterday';
+
+  return date.toLocaleDateString('en-GB', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+    year: date.getFullYear() === now.getFullYear() ? undefined : 'numeric',
+  });
+}

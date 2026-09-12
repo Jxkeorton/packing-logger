@@ -8,6 +8,7 @@
   import { enhance } from '$app/forms';
   import { BURBLE_ROLE_LABELS } from '$lib/burble';
   import type { BurbleRole } from '$lib/burble';
+  import { dayLabel } from '$lib/format';
   import Spinner from './Spinner.svelte';
 
   interface PendingJump {
@@ -34,6 +35,8 @@
     handyCam?: boolean;
     hint: string;
     leftBoard: boolean;
+    /** When this slot was first seen on the board — what the day headers below group on. */
+    firstSeen: string;
   }
 
   let { pending }: { pending: PendingJump[] } = $props();
@@ -48,6 +51,28 @@
 
   const loadLabel = (jump: PendingJump) =>
     jump.loadNumber ? `${jump.plate} load ${jump.loadNumber}` : jump.loadName;
+
+  /**
+   * `pending` grouped into day headers, without disturbing the order it
+   * arrives in — leftBoard-confidence first, most recent within that (see
+   * sync.ts's pendingJumps). Nothing here ever purges an old entry, so
+   * this list can span months; the headers are what keep a growing
+   * backlog scannable instead of one undifferentiated pile. A run breaks
+   * into a fresh group whenever a jump's day differs from the one before
+   * it — same day can in principle recur in two separate runs (a jump
+   * still on the board today, listed below an already-landed one from
+   * earlier today), which just means two "Today" headers rather than one.
+   */
+  let groups = $derived.by(() => {
+    const result: { label: string; jumps: PendingJump[] }[] = [];
+    for (const jump of pending) {
+      const label = dayLabel(jump.firstSeen);
+      const current = result.at(-1);
+      if (current?.label === label) current.jumps.push(jump);
+      else result.push({ label, jumps: [jump] });
+    }
+    return result;
+  });
 </script>
 
 {#if pending.length > 0}
@@ -90,30 +115,35 @@
           }}
         >
           <ul class="m-0 mb-3 list-none p-0">
-            {#each pending as jump (jump.slotId)}
-              <li class="flex items-start gap-2.5 border-b border-line py-2.5 last:border-b-0">
-                <input
-                  type="checkbox"
-                  name="slotId"
-                  value={jump.slotId}
-                  checked={jump.leftBoard}
-                  class="mt-0.5 size-4 shrink-0"
-                  aria-label={`${BURBLE_ROLE_LABELS[jump.role]} on ${loadLabel(jump)}`}
-                />
-                <span class="flex-1 text-[13.5px] leading-snug">
-                  <span class="font-semibold">{BURBLE_ROLE_LABELS[jump.role]}</span>
-                  {#if jump.customerName}<span> with {jump.customerName}</span>{/if}
-                  {#if jump.handyCam}<span class="text-ink-soft"> · handy cam</span>{/if}
-                  <!-- The level is what tells two AFF slots on the same
-                       board apart, so it sits right on the row being
-                       ticked rather than only in the logbook entry it
-                       becomes. -->
-                  {#if jump.studentLevel}<span class="text-ink-soft"> · {jump.studentLevel}</span>{/if}
-                  <span class="block font-mono text-[11.5px] text-ink-soft">
-                    {loadLabel(jump)} · {jump.code} · {jump.hint}
-                  </span>
-                </span>
+            {#each groups as group (group.jumps[0].slotId)}
+              <li class="pt-3 pb-1 text-[11px] font-bold uppercase tracking-wide text-ink-soft first:pt-0">
+                {group.label}
               </li>
+              {#each group.jumps as jump (jump.slotId)}
+                <li class="flex items-start gap-2.5 border-b border-line py-2.5 last:border-b-0">
+                  <input
+                    type="checkbox"
+                    name="slotId"
+                    value={jump.slotId}
+                    checked={jump.leftBoard}
+                    class="mt-0.5 size-4 shrink-0"
+                    aria-label={`${BURBLE_ROLE_LABELS[jump.role]} on ${loadLabel(jump)}`}
+                  />
+                  <span class="flex-1 text-[13.5px] leading-snug">
+                    <span class="font-semibold">{BURBLE_ROLE_LABELS[jump.role]}</span>
+                    {#if jump.customerName}<span> with {jump.customerName}</span>{/if}
+                    {#if jump.handyCam}<span class="text-ink-soft"> · handy cam</span>{/if}
+                    <!-- The level is what tells two AFF slots on the same
+                         board apart, so it sits right on the row being
+                         ticked rather than only in the logbook entry it
+                         becomes. -->
+                    {#if jump.studentLevel}<span class="text-ink-soft"> · {jump.studentLevel}</span>{/if}
+                    <span class="block font-mono text-[11.5px] text-ink-soft">
+                      {loadLabel(jump)} · {jump.code} · {jump.hint}
+                    </span>
+                  </span>
+                </li>
+              {/each}
             {/each}
           </ul>
           <button
