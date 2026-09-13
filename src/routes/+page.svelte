@@ -600,6 +600,7 @@
       visibility={data.tandemVisibility}
       rates={data.rateSettings.tandem}
       handyCamBonusRate={data.rateSettings.handyCamBonusRate}
+      groundSchoolEntries={data.groundSchoolEntries}
     />
 
     <TandemHistoryPanel

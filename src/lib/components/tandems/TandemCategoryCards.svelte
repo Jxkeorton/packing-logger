@@ -9,8 +9,10 @@
     type Category,
     type DayState,
   } from '$lib/tandem';
-  import { CARD, CARD_TOP, CARD_LABEL, CARD_RATE, CARD_SUBTOTAL, CATEGORIES_LIST } from '$lib/ui-classes';
+  import { totalGroundSchoolEarnings, type GroundSchoolEntry } from '$lib/ground-school';
+  import { CARD, CARD_TOP, CARD_LABEL, CARD_RATE, CARD_SUBTOTAL, CATEGORIES_LIST, FORM_SAVE_BUTTON_SECONDARY } from '$lib/ui-classes';
   import TandemNameModal from './TandemNameModal.svelte';
+  import GroundSchoolModal from './GroundSchoolModal.svelte';
   import Spinner from '../Spinner.svelte';
 
   // `rates` comes from data.rateSettings.tandem (Settings > Work jumps >
@@ -21,11 +23,14 @@
     visibility,
     rates,
     handyCamBonusRate,
+    groundSchoolEntries,
   }: {
     tandemState: DayState;
     visibility: Record<Category, boolean>;
     rates: Record<Category, number>;
     handyCamBonusRate: number;
+    /** Today's ground school sessions — rendered beneath the AFF card only, see the `{#if category === 'aff'}` block below. */
+    groundSchoolEntries: GroundSchoolEntry[];
   } = $props();
 
   // Hiding a category is a display preference only (Settings > Work
@@ -77,6 +82,37 @@
     await invalidateAll();
     deletingAt = null;
   }
+
+  // Ground school isn't a tandem jump — no category, no rate to look up —
+  // so it gets its own small pair of handlers here rather than reusing
+  // addJump/deleteJump above, the same way its own ledger and actions are
+  // kept apart from the jump ones server-side (see $lib/server/ground-school.ts).
+  let addingGroundSchool = $state(false);
+  let submittingGroundSchool = $state(false);
+  let deletingGroundSchoolAt = $state<string | null>(null);
+
+  async function addGroundSchool(amount: number) {
+    if (submittingGroundSchool) return;
+    submittingGroundSchool = true;
+    try {
+      const formData = new FormData();
+      formData.set('amount', String(amount));
+      await fetch('?/addGroundSchool', { method: 'POST', body: formData });
+      addingGroundSchool = false;
+      await invalidateAll();
+    } finally {
+      submittingGroundSchool = false;
+    }
+  }
+
+  async function deleteGroundSchool(at: string) {
+    deletingGroundSchoolAt = at;
+    const formData = new FormData();
+    formData.set('at', at);
+    await fetch('?/deleteGroundSchool', { method: 'POST', body: formData });
+    await invalidateAll();
+    deletingGroundSchoolAt = null;
+  }
 </script>
 
 <section class={CATEGORIES_LIST}>
@@ -122,8 +158,52 @@
       </ul>
       <div class={CARD_SUBTOTAL}>£{(tandemState.counts[category] * rates[category]).toFixed(2)}</div>
     </section>
+
+    {#if category === 'aff'}
+      <!--
+        Ground school isn't a jump — it has no rate, no name, no level —
+        so it isn't a card of its own, just a smaller block tucked under
+        the AFF card it belongs to. Living inside this `{#each}` branch
+        means it only ever renders alongside a *visible* AFF card: hide
+        AFF from Settings > Work jumps and 'aff' drops out of
+        visibleCategories, taking this block with it, with no separate
+        visibility flag to keep in sync (see tandem-visibility.ts).
+      -->
+      <section class="ground-school-block">
+        <button type="button" class={FORM_SAVE_BUTTON_SECONDARY} onclick={() => (addingGroundSchool = true)}>
+          &plus; Add ground school
+        </button>
+        {#if groundSchoolEntries.length > 0}
+          <ul class="list-none mt-1.5 mb-0 p-0">
+            {#each groundSchoolEntries as entry (entry.at)}
+              <li class="tandem-jump-row">
+                <span class="tandem-jump-name">Ground school</span>
+                <span class="ground-school-amount">£{entry.amount.toFixed(2)}</span>
+                <button
+                  type="button"
+                  class="tandem-jump-delete"
+                  disabled={deletingGroundSchoolAt === entry.at}
+                  aria-label="Remove ground school entry"
+                  onclick={() => deleteGroundSchool(entry.at)}
+                >
+                  {#if deletingGroundSchoolAt === entry.at}<Spinner size={13} />{:else}&times;{/if}
+                </button>
+              </li>
+            {/each}
+          </ul>
+          <div class={CARD_SUBTOTAL}>£{totalGroundSchoolEarnings(groundSchoolEntries).toFixed(2)}</div>
+        {/if}
+      </section>
+    {/if}
   {/each}
 </section>
+
+<GroundSchoolModal
+  open={addingGroundSchool}
+  submitting={submittingGroundSchool}
+  onSubmit={addGroundSchool}
+  onClose={() => (addingGroundSchool = false)}
+/>
 
 <TandemNameModal
   open={pendingCategory !== null}
@@ -149,6 +229,23 @@
     color: var(--ink-soft);
     font-size: 13.5px;
     text-align: center;
+  }
+
+  /* Tucked under the AFF card, not a card of its own — a few px of
+     breathing room rather than the gap the category cards give each
+     other via CATEGORIES_LIST's own gap, which would make this read as
+     a sibling section instead of something belonging to AFF. */
+  .ground-school-block {
+    margin-top: 6px;
+    padding-left: 2px;
+  }
+
+  .ground-school-amount {
+    flex: none;
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--ink-soft);
   }
 
   .add-jump-btn {

@@ -21,11 +21,13 @@ import { readLogbookSettings } from '$lib/server/logbook-settings';
 import { pendingForClient, readSyncState } from '$lib/server/burble/sync';
 import { readFastestFive } from '$lib/server/times';
 import { authEnabled } from '$lib/server/auth';
+import { loadTodayEntries as loadGroundSchoolToday } from '$lib/server/ground-school';
 import { packingActions } from '$lib/server/actions/packing';
 import { tandemActions } from '$lib/server/actions/tandem';
 import { logbookActions } from '$lib/server/actions/logbook';
 import { configActions } from '$lib/server/actions/config';
 import { ratesActions } from '$lib/server/actions/rates';
+import { groundSchoolActions } from '$lib/server/actions/ground-school';
 
 export const load: PageServerLoad = async () => {
   // One parallel wave rather than ~10 serial R2 round-trips: every read
@@ -45,6 +47,7 @@ export const load: PageServerLoad = async () => {
     tabVisibility,
     logbookSettings,
     burbleState,
+    groundSchoolEntries,
   ] = await Promise.all([
     loadTodayStateForRender(),
     readFastestFive(),
@@ -56,6 +59,7 @@ export const load: PageServerLoad = async () => {
     readTabVisibility(),
     readLogbookSettings(),
     readSyncState(),
+    loadGroundSchoolToday(),
   ]);
 
   const { entries: logbookEntries, nextNumber: nextLogbookNumber } = await readLogbookAndNextNumber(
@@ -150,6 +154,7 @@ export const load: PageServerLoad = async () => {
     tandemDayJumps,
     tandemWeekRows,
     tandemMonthRows,
+    groundSchoolEntries,
     invoiceSettings,
     tandemVisibility,
     tabVisibility,
@@ -170,4 +175,5 @@ export const actions: Actions = {
   ...logbookActions,
   ...configActions,
   ...ratesActions,
+  ...groundSchoolActions,
 };
