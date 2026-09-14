@@ -10,6 +10,34 @@
 // the DZ's own config can change without warning.
 
 /**
+ * UK dropzones confirmed running Burble's public wall-display board, for
+ * the "Dropzone" picker in Settings — so most jumpers never have to go
+ * looking for the number Burble uses internally. Each id was checked by
+ * hand against `https://eu-displays.burblesoft.com/jmp?dz_id=<id>` (the
+ * same host $lib/server/burble/client.ts calls), which titles its page
+ * after the dropzone's own name.
+ *
+ * Not exhaustive — only dropzones actually on Burble can appear here at
+ * all, and Burble's own directory (fourway.org/dzlist.html, checked
+ * 2026-09-14) doesn't list every UK dropzone that has one, e.g. Skydive
+ * Jersey. Settings' "Other" option covers anything missing from this list.
+ */
+export interface KnownDropzone {
+  id: string;
+  name: string;
+}
+
+export const KNOWN_DROPZONES: KnownDropzone[] = [
+  { id: '531', name: 'Skydive Langar' },
+  { id: '398', name: 'Skydive Netheravon' },
+  { id: '2933', name: 'Skydive Hibaldstow' },
+  { id: '9134', name: 'Black Knights Parachute Centre' },
+  { id: '8494', name: 'Beccles Skydivers' },
+  { id: '8154', name: 'Sibson Skydivers' },
+  { id: '8144', name: 'Skydive GB Parachute Club' },
+];
+
+/**
  * What I was doing on a jump, as far as this app cares.
  *
  * Every value except 'solo' is also a Work-jumps Category ($lib/tandem.ts),

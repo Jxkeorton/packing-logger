@@ -8,7 +8,7 @@
   // SettingsRow.svelte, which wraps this in +page.svelte — this
   // component only ever renders its own content.
   import { enhance } from '$app/forms';
-  import { BURBLE_ROLE_LABELS } from '$lib/burble';
+  import { BURBLE_ROLE_LABELS, KNOWN_DROPZONES } from '$lib/burble';
   import type { BurbleCodeMapping } from '$lib/burble';
   import {
     PANEL_HINT,
@@ -42,6 +42,16 @@
   let addingCode = $state(false);
 
   const roles = Object.entries(BURBLE_ROLE_LABELS) as [keyof typeof BURBLE_ROLE_LABELS, string][];
+
+  // The <select> below is either a known dropzone's id, '' for none, or the
+  // sentinel 'other' — which swaps in a free-text id field for anything not
+  // in KNOWN_DROPZONES (Skydive Jersey, say). Seeded once from the saved
+  // value rather than $derived, same as baseJumps in SettingsPanel.svelte:
+  // this is a form default, not something that should jump around under the
+  // user while they're editing it.
+  const isKnownDropzone = (id: string) => KNOWN_DROPZONES.some((dz) => dz.id === id);
+  let dzSelection = $state(dzId && !isKnownDropzone(dzId) ? 'other' : dzId);
+  let customDzId = $state(dzId && !isKnownDropzone(dzId) ? dzId : '');
 </script>
 
 <div>
@@ -73,18 +83,35 @@
         </label>
 
         <label class={FIELD_LABEL_NARROW}>
-          <span>Dropzone id</span>
-          <input
-            type="text"
-            name="dzId"
-            class={FIELD_INPUT}
-            value={dzId}
-            inputmode="numeric"
-            placeholder="e.g. 531"
-            autocomplete="off"
-            maxlength="20"
-          />
+          <span>Dropzone</span>
+          <select
+            name={dzSelection === 'other' ? undefined : 'dzId'}
+            class={FIELD_SELECT}
+            bind:value={dzSelection}
+          >
+            <option value="">No dropzone selected</option>
+            {#each KNOWN_DROPZONES as dz (dz.id)}
+              <option value={dz.id}>{dz.name}</option>
+            {/each}
+            <option value="other">Other — enter the id manually</option>
+          </select>
         </label>
+
+        {#if dzSelection === 'other'}
+          <label class="{FIELD_LABEL_NARROW} -mt-1.5">
+            <span>Dropzone id</span>
+            <input
+              type="text"
+              name="dzId"
+              class={FIELD_INPUT}
+              bind:value={customDzId}
+              inputmode="numeric"
+              placeholder="e.g. 531"
+              autocomplete="off"
+              maxlength="20"
+            />
+          </label>
+        {/if}
 
         <label class={FIELD_LABEL}>
           <span>Your name on the board — one per line</span>
