@@ -250,11 +250,29 @@ describe('confirming an AFF jump', () => {
 
     const state = await loadTodayState();
     expect(state.counts.aff).toBe(2);
-    // Newest-seen first, so the level 1 (load 4) is committed ahead of
-    // the level 6 (load 2) — order aside, both levels have to survive.
     expect(state.entries.aff.map((j) => [j.name, j.level]).sort()).toEqual([
       ['Alex Marsh', 'Level 6'],
       ['Sam Okafor', 'Level 1'],
+    ]);
+  });
+
+  it('logs a batch of confirmed jumps in load order, not in confirmation-screen order', async () => {
+    // The confirmation screen shows the level 1 (load 4) ahead of the
+    // level 6 (load 2) — most-recently-seen first — but load 2 flew
+    // before load 4, and the logbook has to read that way regardless of
+    // which order the two slot ids are passed in here.
+    script(at(LANGAR_AFF, 1));
+    await syncOnce(AFFI);
+
+    const pending = pendingJumps(await readSyncState());
+    expect(pending.map((p) => p.loadNumber)).toEqual(['4', '2']);
+    await commitMatches(pending.map((p) => p.slotId));
+
+    // readLogbook is newest-first, so load 4 (the later load) comes first.
+    const entries = await readLogbook(0);
+    expect(entries.map((e) => e.description)).toEqual([
+      expect.stringContaining('load 4'),
+      expect.stringContaining('load 2'),
     ]);
   });
 

@@ -313,6 +313,12 @@ export interface CommitResult {
   skippedDuplicates: number;
 }
 
+/** Ascending sort key for a pending jump's load number — Infinity (sorts last) for one Burble didn't give a number. */
+function loadOrderKey(jump: PendingJump): number {
+  const n = Number(jump.loadNumber);
+  return jump.loadNumber !== '' && Number.isFinite(n) ? n : Infinity;
+}
+
 /**
  * Turn confirmed sightings into real records.
  *
@@ -324,7 +330,19 @@ export interface CommitResult {
 export async function commitMatches(slotIds: string[]): Promise<CommitResult> {
   const state = await readSyncState();
   const wanted = new Set(slotIds);
-  const toCommit = pendingJumps(state).filter((jump) => wanted.has(jump.slotId));
+  // pendingJumps() orders for the confirmation screen — leftBoard first,
+  // then most-recently-seen first — which has nothing to do with the
+  // order these jumps actually happened in. Confirming several at once
+  // used to just take that display order and stamp `at`s along it, so a
+  // whole day's manifest jumps could land in the logbook in reverse (load
+  // 15, then 13, then 11 — most-recently-seen first). Sort by load number
+  // instead: within one dropzone's day the board counts loads up, so
+  // ascending load number is the closest thing to a real timeline the
+  // board gives us. firstSeen (when this slot was first spotted) is the
+  // fallback for a load name Burble didn't number.
+  const toCommit = pendingJumps(state)
+    .filter((jump) => wanted.has(jump.slotId))
+    .sort((a, b) => loadOrderKey(a) - loadOrderKey(b) || (a.firstSeen < b.firstSeen ? -1 : 1));
 
   const date = todayKey();
   const existingTandemNames = await todayTandemKeys();
