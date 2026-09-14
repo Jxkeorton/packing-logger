@@ -1,25 +1,30 @@
 # Auto-logging jumps from the Burble manifest
 
+> **Revised 2026-09-14**: Phase 1's manual "Check the board" button
+> (`?/syncManifest`, `BurbleSyncPanel`) is removed. With Phase 3 running
+> reliably every 2 minutes, the on-demand poll was redundant — same as
+> Phase 2's removal below. Confirming stays a manual step via "Jumps to
+> confirm"; only the *on-demand look* is gone.
+>
 > **Revised 2026-08-29** after the jumper confirmed this DZ never sets
 > `Departed`: the commit rule no longer tries to prove a load flew. Any
 > sighting of your name becomes a pending jump, confirmed by hand after
 > landing via the "Jumps to confirm" menu above the tabs. See §3.
 >
-> **Status: built and verified.** Phase 1 (check by hand, confirm after
-> landing) and Phase 3 — a scheduler that runs when the app isn't open: a
-> Cloudflare Worker cron trigger hitting `/api/cron/burble-sync` every 2
-> min, plus `/api/burble-pending` so an open app picks up its writes
-> without a reload. See §4 and `cron.ts` / `../../../../worker/`.
+> **Status: built and verified.** Phase 3 — a scheduler that runs when the
+> app isn't open: a Cloudflare Worker cron trigger hitting
+> `/api/cron/burble-sync` every 2 min, plus `/api/burble-pending` so an
+> open app picks up its writes without a reload — is now the only way a
+> sync runs. See §4 and `cron.ts` / `../../../../worker/`.
 >
 > Phase 2 (a client-side "keep checking every 30s while this screen is
 > open" toggle) was built, then removed once Phase 3 landed — it only
 > worked with the screen awake and the cron covers the same ground
-> better. "Check the board" stays as the on-demand poll.
+> better.
 >
 > Code: `$lib/burble.ts` (matching), `client.ts` (HTTP), `sync.ts` (state
 > machine), `cron.ts` (the scheduled pass), `$lib/server/auto-log.ts`
-> (shared with the Tandems tab), and the two panels `BurbleSyncPanel` /
-> `BurbleSettingsPanel`. Tests across
+> (shared with the Tandems tab), and `BurbleSettingsPanel`. Tests across
 > `$lib/burble.test.ts`, `sync.test.ts` and `cron.test.ts`.
 
 A design for turning "my name is on the board" into logbook entries, with the
@@ -161,11 +166,14 @@ never re-offered.
 Given a missed poll means a missed jump — and a wrong poll means a wrong
 entry — I'd build it in this order:
 
-**Phase 1 — check by hand, confirm after landing.** A "Manifest" panel on
-the Logbook tab holds the *control* (check the board); the jumps
-themselves surface in a **"Jumps to confirm"** menu above the tabs, so
-it's visible from any tab. The intended workflow, and the one the app is
-built around:
+**Phase 1 — check by hand, confirm after landing (built, then removed).**
+A "Manifest" panel on the Logbook tab held the *control* (check the
+board); the jumps themselves surfaced in a **"Jumps to confirm"** menu
+above the tabs, so it was visible from any tab. Removed once Phase 3 made
+the on-demand look redundant — nothing calls `syncOnce()` client-side any
+more, only the cron does. "Jumps to confirm" is still exactly where the
+results show up; only the manual trigger is gone. The original intended
+workflow:
 
 1. Tap **Check the board** while you're manifested — before you board.
 2. Jump. Phone in the packing area, app closed, nothing running.
@@ -192,9 +200,8 @@ option below was written when this ran on Vercel Blob, before the R2 move
 made a Cloudflare account a given) POSTs to `/api/cron/burble-sync` every
 2 minutes during operating hours. That endpoint fetches each dropzone's
 board once and runs `syncOnce()` for every user at it. Still poll-only:
-it records sightings, exactly as the button does, and a human still
-commits. The window and per-DZ fan-out live in `cron.ts`; the trigger
-holds no logic.
+it records sightings, and a human still commits. The window and per-DZ
+fan-out live in `cron.ts`; the trigger holds no logic.
 
 The original analysis, kept for the reasoning:
 

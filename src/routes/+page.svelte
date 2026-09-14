@@ -33,7 +33,6 @@
   import RigBuilderPanel from '$lib/components/RigBuilderPanel.svelte';
   import SettingsPanel from '$lib/components/SettingsPanel.svelte';
   import SettingsRow from '$lib/components/SettingsRow.svelte';
-  import BurbleSyncPanel from '$lib/components/BurbleSyncPanel.svelte';
   import PendingJumpsMenu from '$lib/components/PendingJumpsMenu.svelte';
   import BurbleSettingsPanel from '$lib/components/BurbleSettingsPanel.svelte';
   import DownloadButton from '$lib/components/DownloadButton.svelte';
@@ -129,7 +128,6 @@
   // source of truth; this only ever runs *ahead* of it between loads.
   let livePending = $state<PageData['burblePending'] | null>(null);
   let liveUnmappedCodes = $state<string[] | null>(null);
-  let liveLastSyncAt = $state<string | null>(null);
 
   // Any real `load` — first paint, a commit/dismiss, an invalidateAll —
   // is fresher than the poll, so drop the live copy and defer to it.
@@ -137,7 +135,6 @@
     void data.burblePending;
     livePending = null;
     liveUnmappedCodes = null;
-    liveLastSyncAt = null;
   });
 
   async function refreshBurblePending() {
@@ -147,7 +144,6 @@
       const body = await res.json();
       livePending = body.pending;
       liveUnmappedCodes = body.unmappedCodes;
-      liveLastSyncAt = body.lastSyncAt;
     } catch {
       // offline, or a blip — keep showing whatever we already have
     }
@@ -177,7 +173,6 @@
 
   const burblePending = $derived(livePending ?? data.burblePending);
   const burbleUnmappedCodes = $derived(liveUnmappedCodes ?? data.burbleUnmappedCodes);
-  const burbleLastSyncAt = $derived(liveLastSyncAt ?? data.burbleLastSyncAt);
 
   // Same ghost-segments-on-a-glass-bar treatment as AppTabs.svelte.
   const subTabClass =
@@ -587,14 +582,6 @@
       </div>
     </header>
 
-    <BurbleSyncPanel
-      enabled={data.logbookSettings.burble.enabled}
-      pendingCount={burblePending.length}
-      unmappedCodes={burbleUnmappedCodes}
-      lastSyncAt={burbleLastSyncAt}
-      myNames={data.logbookSettings.burble.myNames}
-    />
-
     <TandemCategoryCards
       tandemState={data.tandemState}
       visibility={data.tandemVisibility}
@@ -627,17 +614,7 @@
       settings={data.logbookSettings}
       today={data.today}
       dateDisplay={data.dateDisplay}
-    >
-      {#snippet belowTrigger()}
-        <BurbleSyncPanel
-          enabled={data.logbookSettings.burble.enabled}
-          pendingCount={burblePending.length}
-          unmappedCodes={burbleUnmappedCodes}
-          lastSyncAt={burbleLastSyncAt}
-          myNames={data.logbookSettings.burble.myNames}
-        />
-      {/snippet}
-    </LogForm>
+    />
 
     <footer class={FOOT}>
       <DownloadButton href="/api/logbook-export.csv" filename="logbook.csv" label="Download full logbook (.csv)" />

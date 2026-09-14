@@ -1,7 +1,8 @@
 <script lang="ts">
   // Manifest sync configuration, on the shared Settings view. The
-  // running state (what's been seen, what's waiting) lives on the
-  // Logbook tab in BurbleSyncPanel — this is just the setup you do once.
+  // running state (what's been seen, what's waiting) shows up at the
+  // top of the app in PendingJumpsMenu — this is just the setup you do
+  // once.
   //
   // The row chrome (icon, label, chevron, expand/collapse) lives in
   // SettingsRow.svelte, which wraps this in +page.svelte — this
@@ -103,8 +104,7 @@
         </p>
 
         <p class="{PANEL_HINT} -mt-1.5">
-          The app checks the board on its own every couple of minutes while the dropzone's open. "Check the board" on
-          the Log tab does it on demand too.
+          The app checks the board on its own every couple of minutes while the dropzone's open.
         </p>
 
         <div class={FORM_ACTIONS}>

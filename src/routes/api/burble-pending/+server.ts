@@ -15,6 +15,5 @@ export const GET: RequestHandler = async () => {
   return json({
     pending: pendingForClient(state),
     unmappedCodes: state.unmappedCodes,
-    lastSyncAt: state.lastSyncAt,
   });
 };

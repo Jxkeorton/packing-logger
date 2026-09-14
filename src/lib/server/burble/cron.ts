@@ -5,9 +5,8 @@
 // ../../../../worker) POSTs to /api/cron/burble-sync every couple of
 // minutes, and this module is what that route calls.
 //
-// Still poll-only. A scheduled pass records sightings exactly as the
-// "Check the board" button does; committing to the logbook stays a
-// deliberate, human step (commitMatches).
+// Still poll-only. A scheduled pass only records sightings; committing
+// to the logbook stays a deliberate, human step (commitMatches).
 import { authMode } from '../auth';
 import { readLogbookSettings } from '../logbook-settings';
 import { runAsUser } from '../storage';

@@ -34,7 +34,7 @@ import {
   setBurbleCodeMapping,
   setBurbleSettings,
 } from '$lib/server/logbook-settings';
-import { clearUnmappedCodes, commitMatches, dismissMatch, syncOnce } from '$lib/server/burble/sync';
+import { clearUnmappedCodes, commitMatches, dismissMatch } from '$lib/server/burble/sync';
 import { oneLine, multiLine } from '$lib/server/form-utils';
 import { BURBLE_ROLES, type BurbleRole } from '$lib/burble';
 
@@ -275,12 +275,6 @@ export const logbookActions: Record<string, Action> = {
       dzId,
       myNames,
     });
-  },
-
-  syncManifest: async () => {
-    const outcome = await syncOnce();
-    if (!outcome.ok) return fail(400, { error: outcome.error ?? 'Sync failed' });
-    return { synced: true, boardLoads: outcome.boardLoads, skipped: outcome.skipped === true };
   },
 
   commitManifestJumps: async ({ request }) => {

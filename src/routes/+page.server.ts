@@ -164,7 +164,6 @@ export const load: PageServerLoad = async () => {
     logbookSettings,
     burblePending,
     burbleUnmappedCodes: burbleState.unmappedCodes,
-    burbleLastSyncAt: burbleState.lastSyncAt,
     showLogout: authEnabled(),
   };
 };
