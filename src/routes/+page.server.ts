@@ -10,7 +10,7 @@ import { toHistoryRow, todayKey, totalPacks, type DayState } from '$lib/packing'
 import { loadTodayStateForRender, readHistory } from '$lib/server/packing';
 import { groupByInvoiceMonth, groupByWeek } from '$lib/server/invoice';
 import { loadTodayStateAndHistory as loadTandemStateAndHistory } from '$lib/server/tandem';
-import { toHistoryRow as toTandemHistoryRow } from '$lib/tandem';
+import { toHistoryRow as toTandemHistoryRow, zeroCounts as zeroTandemCounts } from '$lib/tandem';
 import { groupByInvoiceMonth as groupTandemByInvoiceMonth, groupByWeek as groupTandemByWeek } from '$lib/server/tandem-invoice';
 import { readInvoiceSettings } from '$lib/server/invoice-settings';
 import { readTandemVisibility } from '$lib/server/tandem-visibility';
@@ -21,13 +21,29 @@ import { readLogbookSettings } from '$lib/server/logbook-settings';
 import { pendingForClient, readSyncState } from '$lib/server/burble/sync';
 import { readFastestFive } from '$lib/server/times';
 import { authEnabled } from '$lib/server/auth';
-import { loadTodayEntries as loadGroundSchoolToday } from '$lib/server/ground-school';
+import { totalGroundSchoolEarnings } from '$lib/ground-school';
+import {
+  loadTodayEntries as loadGroundSchoolToday,
+  readHistory as readGroundSchoolHistory,
+} from '$lib/server/ground-school';
+import { formatDateKey, invoiceMonthOf, mondayOf, parseDateKey } from '$lib/server/periods';
 import { packingActions } from '$lib/server/actions/packing';
 import { tandemActions } from '$lib/server/actions/tandem';
 import { logbookActions } from '$lib/server/actions/logbook';
 import { configActions } from '$lib/server/actions/config';
 import { ratesActions } from '$lib/server/actions/rates';
 import { groundSchoolActions } from '$lib/server/actions/ground-school';
+
+/** Same week-bucket key groupTandemByWeek uses internally (history-buckets.ts), so a ground school session lands in the same row as any jump earned the same week. */
+function weekKeyFor(date: string): string {
+  return formatDateKey(mondayOf(parseDateKey(date)));
+}
+
+/** Same invoice-month bucket key groupTandemByInvoiceMonth uses internally, so a ground school session lands in the same row as any jump earned the same invoice period. */
+function monthKeyFor(date: string): string {
+  const { year, month } = invoiceMonthOf(parseDateKey(date));
+  return `${year}-${String(month + 1).padStart(2, '0')}`;
+}
 
 export const load: PageServerLoad = async () => {
   // One parallel wave rather than ~10 serial R2 round-trips: every read
@@ -48,6 +64,7 @@ export const load: PageServerLoad = async () => {
     logbookSettings,
     burbleState,
     groundSchoolEntries,
+    groundSchoolHistory,
   ] = await Promise.all([
     loadTodayStateForRender(),
     readFastestFive(),
@@ -60,6 +77,7 @@ export const load: PageServerLoad = async () => {
     readLogbookSettings(),
     readSyncState(),
     loadGroundSchoolToday(),
+    readGroundSchoolHistory(),
   ]);
 
   const { entries: logbookEntries, nextNumber: nextLogbookNumber } = await readLogbookAndNextNumber(
@@ -109,21 +127,72 @@ export const load: PageServerLoad = async () => {
   // logged, no day-rollover phantom entry) — the filter's just here for
   // symmetry with packing and as a no-cost guard if that ever changes.
   const { state: tandemState, history: tandemFullHistory, dayJumps: tandemDayJumpsFull } = tandemBundle;
-  const tandemNonEmptyHistory = tandemFullHistory.filter((r) => r.totalJumps > 0);
-  const tandemDayRows = tandemNonEmptyHistory.slice(0, 14);
+
+  // Ground school doesn't fit the tandem Jump model (see $lib/ground-school.ts's
+  // doc comment) so it lives in its own ledger — but its earnings still
+  // belong in the work-jumps History tab, folded into whichever day/week/
+  // month they were earned in, the same way a handy-cam bonus rides along
+  // with its jump. Without this, a day that was *only* ground school (no
+  // instructor/videographer/AFF jump alongside it) would never appear in
+  // History at all: tandemFullHistory only ever gets a row when a jump is
+  // logged.
+  const today = todayKey();
+  const groundSchoolByDay = new Map<string, typeof groundSchoolHistory>();
+  const groundSchoolEarningsByDay = new Map<string, number>();
+  const groundSchoolEarningsByWeek = new Map<string, number>();
+  const groundSchoolEarningsByMonth = new Map<string, number>();
+  for (const entry of groundSchoolHistory) {
+    groundSchoolByDay.set(entry.date, [...(groundSchoolByDay.get(entry.date) ?? []), entry]);
+    groundSchoolEarningsByDay.set(entry.date, (groundSchoolEarningsByDay.get(entry.date) ?? 0) + entry.amount);
+    const weekKey = weekKeyFor(entry.date);
+    groundSchoolEarningsByWeek.set(weekKey, (groundSchoolEarningsByWeek.get(weekKey) ?? 0) + entry.amount);
+    const monthKey = monthKeyFor(entry.date);
+    groundSchoolEarningsByMonth.set(monthKey, (groundSchoolEarningsByMonth.get(monthKey) ?? 0) + entry.amount);
+  }
+  // Today's own sessions (loaded separately, same split as the jump ledger's
+  // own today/history divide) still belong in the current week/month total.
+  const todayGroundSchoolTotal = totalGroundSchoolEarnings(groundSchoolEntries);
+  if (todayGroundSchoolTotal > 0) {
+    const weekKey = weekKeyFor(today);
+    groundSchoolEarningsByWeek.set(weekKey, (groundSchoolEarningsByWeek.get(weekKey) ?? 0) + todayGroundSchoolTotal);
+    const monthKey = monthKeyFor(today);
+    groundSchoolEarningsByMonth.set(monthKey, (groundSchoolEarningsByMonth.get(monthKey) ?? 0) + todayGroundSchoolTotal);
+  }
+
+  // A day with a ground school session but no jump of its own isn't in
+  // tandemFullHistory yet — give it a zero-jump placeholder row so it
+  // survives the "was anything logged" filter below and gets bucketed into
+  // its week/month like any other day.
+  const groundSchoolOnlyRows = [...groundSchoolByDay.keys()]
+    .filter((date) => !tandemFullHistory.some((r) => r.date === date))
+    .map((date) => ({ date, counts: zeroTandemCounts(), totalJumps: 0, totalEarnings: 0 }));
+
+  const tandemNonEmptyHistory = [...tandemFullHistory, ...groundSchoolOnlyRows]
+    .filter((r) => r.totalJumps > 0 || (groundSchoolEarningsByDay.get(r.date) ?? 0) > 0)
+    .sort((a, b) => (a.date < b.date ? 1 : -1));
+  const tandemDayRows = tandemNonEmptyHistory.slice(0, 14).map((row) => ({
+    ...row,
+    totalEarnings: row.totalEarnings + (groundSchoolEarningsByDay.get(row.date) ?? 0),
+  }));
   // The individual jumps behind the Day tab's rows, narrowed to just the
   // dates it actually renders — tandemDayJumpsFull carries one entry per
   // date in the wider 400-day window loaded for the week/month rollups,
-  // most of which never reach the page.
+  // most of which never reach the page. Ground school sessions ride along
+  // the same way, keyed the same way, for the same reason.
   const tandemDayJumps = Object.fromEntries(
     tandemDayRows.map((row) => [row.date, tandemDayJumpsFull[row.date] ?? []]),
   );
+  const groundSchoolDayEntries = Object.fromEntries(
+    tandemDayRows.map((row) => [row.date, groundSchoolByDay.get(row.date) ?? []]),
+  );
   const tandemCombined = [...tandemNonEmptyHistory, toTandemHistoryRow(tandemState, rateSettings.tandem)];
   const tandemWeekRows = groupTandemByWeek(tandemCombined, rateSettings.tandem)
-    .filter((r) => r.isCurrent || r.totalJumps > 0)
+    .map((r) => ({ ...r, totalEarnings: r.totalEarnings + (groundSchoolEarningsByWeek.get(r.key) ?? 0) }))
+    .filter((r) => r.isCurrent || r.totalJumps > 0 || (groundSchoolEarningsByWeek.get(r.key) ?? 0) > 0)
     .slice(0, 12);
   const tandemMonthRows = groupTandemByInvoiceMonth(tandemCombined, rateSettings.tandem)
-    .filter((r) => r.isCurrent || r.totalJumps > 0)
+    .map((r) => ({ ...r, totalEarnings: r.totalEarnings + (groundSchoolEarningsByMonth.get(r.key) ?? 0) }))
+    .filter((r) => r.isCurrent || r.totalJumps > 0 || (groundSchoolEarningsByMonth.get(r.key) ?? 0) > 0)
     .slice(0, 12);
 
   // Manifest sync state (burbleState, read above) is *read* on a page
@@ -134,7 +203,6 @@ export const load: PageServerLoad = async () => {
   // returns this same shape for the open app to re-poll cheaply.
   const burblePending = pendingForClient(burbleState);
 
-  const today = todayKey();
   const dateDisplay = new Date(`${today}T00:00:00`).toLocaleDateString('en-GB', {
     weekday: 'long',
     day: 'numeric',
@@ -155,6 +223,7 @@ export const load: PageServerLoad = async () => {
     tandemWeekRows,
     tandemMonthRows,
     groundSchoolEntries,
+    groundSchoolDayEntries,
     invoiceSettings,
     tandemVisibility,
     tabVisibility,

@@ -65,6 +65,18 @@ export async function removeEntry(at: string): Promise<GroundSchoolEntry[]> {
 }
 
 /**
+ * Every past session — excludes today, which the Tandems tab already shows
+ * live via loadTodayEntries — sorted chronologically. The work-jumps
+ * History tab's data source, same "past only" split as tandem.ts's
+ * readHistory/dayJumpsFromJumps.
+ */
+export async function readHistory(): Promise<GroundSchoolEntry[]> {
+  const entries = await readEntries();
+  const today = todayKey();
+  return entries.filter((e) => e.date !== today).sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0));
+}
+
+/**
  * Every session within `startDate`..`endDate` (both YYYY-MM-DD, inclusive),
  * sorted chronologically — the invoice PDF's data source, same shape as
  * tandem.ts's jumpsInRange.

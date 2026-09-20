@@ -1,6 +1,7 @@
 <script lang="ts">
   import { invalidateAll } from '$app/navigation';
   import { CATEGORIES, CATEGORY_LABELS, type HistoryRow, type Jump } from '$lib/tandem';
+  import type { GroundSchoolEntry } from '$lib/ground-school';
   import type { AggregateRow } from '$lib/server/tandem-invoice';
   import { CATEGORY_TEXT_CLASS } from '$lib/category-colors';
   import { formatMoney as money } from '$lib/format';
@@ -27,12 +28,15 @@
     weekRows,
     monthRows,
     dayJumps,
+    groundSchoolDayEntries,
   }: {
     dayRows: HistoryRow[];
     weekRows: AggregateRow[];
     monthRows: AggregateRow[];
     /** Each day row's individual jumps, keyed by date — the Day tab's own row plus this is what makes an already-logged jump findable to edit (see toggleHandyCam), rather than just its counts. */
     dayJumps: Record<string, Jump[]>;
+    /** Each day row's ground school sessions, keyed by date the same way as dayJumps — its own small ledger (see $lib/ground-school.ts), so it isn't just another entry in dayJumps. Read-only here: unlike a jump, a session isn't edited from History. */
+    groundSchoolDayEntries: Record<string, GroundSchoolEntry[]>;
   } = $props();
 
   let open = $state(false);
@@ -42,6 +46,12 @@
   // open further down the table.
   let expandedDate = $state<string | null>(null);
   let togglingAt = $state<string | null>(null);
+  // Which jump's date is currently being edited — one at a time, same
+  // pattern as expandedDate above. Its draft value lives separately so
+  // typing into the date input doesn't touch anything until Save.
+  let editingDateAt = $state<string | null>(null);
+  let dateDraft = $state('');
+  let savingDate = $state(false);
 
   const weekView = $derived(
     weekRows.map((r) => ({ key: r.key, isCurrent: r.isCurrent, rangeLabel: r.rangeLabel, counts: r.counts, total: r.totalJumps, earnings: r.totalEarnings })),
@@ -84,6 +94,38 @@
   // already flagged — doesn't touch handyCam itself.
   function setAfterJump(jump: Jump, afterJump: boolean) {
     return postHandyCam(jump, true, afterJump);
+  }
+
+  // The fix for a jump filed under the wrong day — a backdated manifest
+  // confirmation used to land on the confirmation day rather than the day
+  // actually jumped (see burble/sync.ts's commitMatches), and a hand-typo
+  // is always possible too. Moves both halves of the jump (this Work-jumps
+  // row and its linked logbook entry, sharing one `at`) to the new date.
+  function startEditDate(jump: Jump) {
+    editingDateAt = jump.at;
+    dateDraft = jump.date;
+  }
+
+  function cancelEditDate() {
+    editingDateAt = null;
+  }
+
+  async function saveDate(jump: Jump) {
+    if (!dateDraft || savingDate) return;
+    savingDate = true;
+    try {
+      const formData = new FormData();
+      formData.set('at', jump.at);
+      formData.set('date', dateDraft);
+      await fetch('?/setTandemJumpDate', { method: 'POST', body: formData });
+      editingDateAt = null;
+      // The jump has likely just moved out of the day row it was shown
+      // under — collapse it rather than pointing at a now-stale expansion.
+      expandedDate = null;
+      await invalidateAll();
+    } finally {
+      savingDate = false;
+    }
   }
 </script>
 
@@ -163,7 +205,42 @@
                                     {#if togglingAt === jump.at}<Spinner size={11} />{:else}{jump.handyCam ? '✓ Handy cam' : '+ Handy cam'}{/if}
                                   </button>
                                 {/if}
+                                <button
+                                  type="button"
+                                  class="shrink-0 appearance-none border-0 bg-transparent p-0 text-[10.5px] font-semibold text-ink-soft underline cursor-pointer touch-manipulation disabled:opacity-60 disabled:cursor-default"
+                                  disabled={editingDateAt === jump.at}
+                                  onclick={() => startEditDate(jump)}
+                                >
+                                  Edit date
+                                </button>
                               </div>
+                              {#if editingDateAt === jump.at}
+                                <div class="mt-1.5 flex items-center gap-1.5">
+                                  <input
+                                    type="date"
+                                    class="h-8 px-2 rounded-[var(--radius-control)] border border-line-strong bg-canvas text-ink font-sans text-[12.5px]"
+                                    bind:value={dateDraft}
+                                    disabled={savingDate}
+                                  />
+                                  <button
+                                    type="button"
+                                    class="shrink-0 appearance-none rounded-full border-0 bg-gold px-2.5 py-1 text-[11px] font-bold text-white cursor-pointer touch-manipulation disabled:opacity-60 disabled:cursor-default flex items-center gap-1"
+                                    disabled={savingDate}
+                                    onclick={() => saveDate(jump)}
+                                  >
+                                    {#if savingDate}<Spinner size={10} />{/if}
+                                    Save
+                                  </button>
+                                  <button
+                                    type="button"
+                                    class="shrink-0 appearance-none rounded-full border border-line-strong bg-transparent px-2.5 py-1 text-[11px] font-semibold text-ink-soft cursor-pointer touch-manipulation disabled:opacity-60 disabled:cursor-default"
+                                    disabled={savingDate}
+                                    onclick={cancelEditDate}
+                                  >
+                                    Cancel
+                                  </button>
+                                </div>
+                              {/if}
                               {#if jump.category === 'instructor' && jump.handyCam}
                                 <label class="mt-1 ml-[26px] flex items-center gap-1.5 text-[11px] text-ink-soft cursor-pointer w-fit">
                                   <input
@@ -183,6 +260,17 @@
                             <li class="py-1.5 text-ink-soft text-[12px]">No jumps recorded.</li>
                           {/each}
                         </ul>
+                        {#if (groundSchoolDayEntries[row.date] ?? []).length > 0}
+                          <ul class="list-none m-0 py-1 px-2 border-t border-line bg-canvas">
+                            {#each groundSchoolDayEntries[row.date] as session (session.at)}
+                              <li class="py-1.5 border-t border-line first:border-t-0 text-[12.5px] font-sans flex items-center gap-2">
+                                <span class="shrink-0 font-mono text-[10px] font-bold uppercase text-ink-soft">GS</span>
+                                <span class="flex-1 min-w-0 truncate">Ground school</span>
+                                <span class="shrink-0 font-mono text-[11px]">{money(session.amount)}</span>
+                              </li>
+                            {/each}
+                          </ul>
+                        {/if}
                       </td>
                     </tr>
                   {/if}

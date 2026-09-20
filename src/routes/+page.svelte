@@ -588,6 +588,7 @@
       rates={data.rateSettings.tandem}
       handyCamBonusRate={data.rateSettings.handyCamBonusRate}
       groundSchoolEntries={data.groundSchoolEntries}
+      today={data.today}
     />
 
     <TandemHistoryPanel
@@ -595,6 +596,7 @@
       weekRows={data.tandemWeekRows}
       monthRows={data.tandemMonthRows}
       dayJumps={data.tandemDayJumps}
+      groundSchoolDayEntries={data.groundSchoolDayEntries}
     />
 
     {#if currentInvoiceMonth}
