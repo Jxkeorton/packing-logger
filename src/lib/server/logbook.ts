@@ -168,6 +168,21 @@ export async function updateEntry(at: string, input: EntryInput, baseJumps: numb
   return withNumbers(entries, baseJumps).reverse();
 }
 
+/**
+ * Correct just an entry's date, leaving everything else about it (its `at`
+ * included) untouched — for a jump that was logged, by hand or auto-logged
+ * from a linked ledger (a tandem jump, a manifest sync), under the wrong
+ * day. Returns null if no entry has that id.
+ */
+export async function setEntryDate(at: string, date: string, baseJumps: number): Promise<NumberedEntry[] | null> {
+  const entries = await readEntries();
+  const idx = entries.findIndex((e) => e.at === at);
+  if (idx === -1) return null;
+  entries[idx] = { ...entries[idx], date };
+  await writeEntries(entries);
+  return withNumbers(entries, baseJumps).reverse();
+}
+
 /** Delete a jump by id. Returns the newest-first, numbered list either way. */
 export async function removeEntry(at: string, baseJumps: number): Promise<NumberedEntry[]> {
   const entries = await readEntries();

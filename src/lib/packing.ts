@@ -43,13 +43,17 @@ export function zeroCounts(): Counts {
   return { tandem: 0, instructor: 0, student: 0, sport: 0 };
 }
 
+/** `date` as YYYY-MM-DD in local time. */
+export function dateKeyFor(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
 /** Today's date as YYYY-MM-DD in local time. */
 export function todayKey(): string {
-  const now = new Date();
-  const y = now.getFullYear();
-  const m = String(now.getMonth() + 1).padStart(2, '0');
-  const d = String(now.getDate()).padStart(2, '0');
-  return `${y}-${m}-${d}`;
+  return dateKeyFor(new Date());
 }
 
 export function totalPacks(counts: Counts): number {

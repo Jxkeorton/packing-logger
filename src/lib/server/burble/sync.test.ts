@@ -39,7 +39,7 @@ vi.mock('./client', () => ({
 const { syncOnce, readSyncState, pendingJumps, pendingForClient, flightHint, commitMatches, dismissMatch, forgetCommitted } =
   await import('./sync');
 const { readLogbook, removeEntry } = await import('../logbook');
-const { loadTodayState, removeJump } = await import('../tandem');
+const { jumpsInRange, loadTodayState, removeJump } = await import('../tandem');
 
 function fixture(name: string): BurbleLoadsResponse {
   return JSON.parse(readFileSync(path.join(process.cwd(), 'src/lib/server/burble/fixtures', name), 'utf-8'));
@@ -410,6 +410,35 @@ describe('confirming a tandem jump', () => {
     // Most deleted jumps were logged by hand from the Tandems tab, not
     // synced — this must not throw or touch state that isn't there.
     await expect(forgetCommitted('2026-01-01T00:00:00.000Z')).resolves.toBeUndefined();
+  });
+
+  it('dates the invoice line and logbook entry the day it was jumped, not the day it was confirmed', async () => {
+    // Seen on the board on the 1st, but the jumper doesn't get round to
+    // confirming it until the 2nd — a delay long enough to cross a day
+    // boundary is exactly the scenario the "backlog can span months"
+    // grouping (PendingJumpsMenu.svelte) exists for.
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date('2026-08-01T14:00:00.000Z'));
+      script(at(ON_CALL, 1));
+      await syncOnce(TI);
+
+      vi.setSystemTime(new Date('2026-08-02T09:00:00.000Z'));
+      const [jump] = pendingJumps(await readSyncState());
+      await commitMatches([jump.slotId]);
+
+      const jumped = await jumpsInRange('2026-08-01', '2026-08-01');
+      expect(jumped.instructor).toHaveLength(1);
+      expect(jumped.instructor[0].name).toBe('Miranda Walfield');
+
+      const confirmedDay = await jumpsInRange('2026-08-02', '2026-08-02');
+      expect(confirmedDay.instructor).toHaveLength(0);
+
+      const [entry] = await readLogbook(0);
+      expect(entry.date).toBe('2026-08-01');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('leaves unconfirmed jumps alone when only one is confirmed', async () => {

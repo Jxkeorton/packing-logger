@@ -18,7 +18,7 @@ vi.mock('./storage', () => ({
   },
 }));
 
-const { addJump, handyCamJumpsInRange, jumpsInRange, loadTodayState, readCsvFile, setDayEntries, setJumpHandyCam } =
+const { addJump, handyCamJumpsInRange, jumpsInRange, loadTodayState, readCsvFile, setDayEntries, setJumpDate, setJumpHandyCam } =
   await import('./tandem');
 const { todayKey } = await import('../packing');
 
@@ -113,6 +113,44 @@ describe('addJump', () => {
     const jump = (await loadTodayState()).entries.videographer[0];
     expect(jump.handyCam).toBe(false);
     expect(jump.handyCamAt).toBe('');
+  });
+
+  it('dates the jump under an explicit `date` rather than today, when given one', async () => {
+    // The manifest sync's fix for a backdated confirmation (see
+    // burble/sync.ts's commitMatches): the jump has to be filed under the
+    // day it actually happened, not whatever day `addJump` runs on.
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-08-05T09:00:00.000Z'));
+    await addJump('instructor', 'Jane Smith', '2026-08-01T10:00:00.000Z', '', false, '2026-08-01');
+
+    const [jump] = (await jumpsInRange('2026-08-01', '2026-08-01')).instructor;
+    expect(jump).toBeDefined();
+    expect(jump.date).toBe('2026-08-01');
+    expect((await jumpsInRange('2026-08-05', '2026-08-05')).instructor).toHaveLength(0);
+  });
+
+  it('defaults the date to today when none is given', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-08-05T09:00:00.000Z'));
+    await addJump('instructor', 'Jane Smith');
+    expect((await loadTodayState()).entries.instructor[0].date).toBe('2026-08-05');
+  });
+});
+
+describe('setJumpDate', () => {
+  it('moves a jump to the given date, leaving everything else about it unchanged', async () => {
+    const added = await addJump('instructor', 'Jane Smith', '2026-08-01T10:00:00.000Z', '', true);
+    const at = added.entries.instructor[0].at;
+
+    await setJumpDate(at, '2026-07-30');
+
+    expect((await jumpsInRange('2026-08-01', '2026-08-01')).instructor).toHaveLength(0);
+    const [jump] = (await jumpsInRange('2026-07-30', '2026-07-30')).instructor;
+    expect(jump).toMatchObject({ name: 'Jane Smith', handyCam: true, at });
+  });
+
+  it('no-ops on an unknown id', async () => {
+    await expect(setJumpDate('does-not-exist', '2026-07-30')).resolves.toBeDefined();
   });
 });
 

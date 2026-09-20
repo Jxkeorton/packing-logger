@@ -153,10 +153,13 @@ export async function loadTodayState(): Promise<DayState> {
 }
 
 /**
- * Record one jump for today under `category`, crediting `name`. `at`
- * defaults to now, but can be passed explicitly so a caller (the
- * tandem-jump route action) can share the same id with a linked record
- * in another ledger — the personal logbook's auto-logged tandem entries.
+ * Record one jump under `category`, crediting `name`. `at` defaults to
+ * now, but can be passed explicitly so a caller (the tandem-jump route
+ * action) can share the same id with a linked record in another ledger —
+ * the personal logbook's auto-logged tandem entries. `date` defaults to
+ * today but can likewise be overridden — the manifest sync backfills a
+ * jump confirmed after the fact under the day it actually happened, not
+ * the day it was confirmed.
  */
 export async function addJump(
   category: Category,
@@ -164,6 +167,7 @@ export async function addJump(
   at: string = new Date().toISOString(),
   level = '',
   handyCam = false,
+  date: string = todayKey(),
 ): Promise<DayState> {
   const jumps = await readJumps();
   const today = todayKey();
@@ -173,7 +177,7 @@ export async function addJump(
   // of row later and be rendered as if it meant something.
   const isHandyCam = category === 'instructor' && handyCam;
   jumps.push({
-    date: today,
+    date,
     category,
     name,
     level: category === 'aff' ? level : '',
@@ -229,6 +233,26 @@ export async function removeJump(at: string): Promise<DayState> {
  * `afterJump`, must not silently move an already-billed bonus into a
  * different invoice period.
  */
+/**
+ * Correct a single jump's date — the History tab's fix for a jump filed
+ * under the wrong day (see the manifest sync's PendingJump.firstSeen doc
+ * comment for the bug this exists to clean up after: a backdated
+ * confirmation used to get today's date instead of the day it actually
+ * flew). No-ops if `at` doesn't match anything. Returns today's state,
+ * same as removeJump/setJumpHandyCam — the day the jump *moved to* isn't
+ * necessarily today, so there's nothing more specific to hand back that
+ * the Tandems tab (which only ever displays today) could use.
+ */
+export async function setJumpDate(at: string, date: string): Promise<DayState> {
+  const jumps = await readJumps();
+  const index = jumps.findIndex((j) => j.at === at);
+  if (index !== -1) {
+    jumps[index] = { ...jumps[index], date };
+    await writeJumps(jumps);
+  }
+  return stateFor(jumps, todayKey());
+}
+
 export async function setJumpHandyCam(at: string, handyCam: boolean, afterJump = true): Promise<DayState> {
   const jumps = await readJumps();
   const index = jumps.findIndex((j) => j.at === at);

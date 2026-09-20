@@ -24,6 +24,7 @@
     rates,
     handyCamBonusRate,
     groundSchoolEntries,
+    today,
   }: {
     tandemState: DayState;
     visibility: Record<Category, boolean>;
@@ -31,6 +32,8 @@
     handyCamBonusRate: number;
     /** Today's ground school sessions — rendered beneath the AFF card only, see the `{#if category === 'aff'}` block below. */
     groundSchoolEntries: GroundSchoolEntry[];
+    /** Today's date (YYYY-MM-DD) — what the "+ Add jump" modal's date field defaults to. */
+    today: string;
   } = $props();
 
   // Hiding a category is a display preference only (Settings > Work
@@ -55,7 +58,7 @@
   const modalNameLabel = $derived(isAff ? 'Student name' : 'Customer name');
   const modalNamePlaceholder = $derived(isAff ? 'e.g. Alex Marsh' : 'e.g. Jane Smith');
 
-  async function addJump(name: string, staff: string, level: string, handyCam: boolean) {
+  async function addJump(name: string, staff: string, level: string, handyCam: boolean, date: string) {
     const category = pendingCategory;
     if (!category || addingJump) return;
     addingJump = true;
@@ -66,6 +69,7 @@
       formData.set('staff', staff);
       formData.set('level', level);
       if (handyCam) formData.set('handyCam', 'on');
+      formData.set('date', date);
       await fetch('?/addTandemJump', { method: 'POST', body: formData });
       pendingCategory = null;
       await invalidateAll();
@@ -214,6 +218,7 @@
   levelOptions={isAff ? AFF_LEVELS : undefined}
   showHandyCam={pendingCategory === 'instructor'}
   {handyCamBonusRate}
+  {today}
   submitting={addingJump}
   onSubmit={addJump}
   onClose={() => (pendingCategory = null)}

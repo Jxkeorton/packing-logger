@@ -24,8 +24,8 @@
 // Nothing here writes a jump on its own. syncOnce() only records sightings;
 // committing is a separate, explicit step (see commitMatches).
 import { readText, writeText } from '../storage';
-import { todayKey } from '../../packing';
-import { addJump, loadTodayState } from '../tandem';
+import { dateKeyFor } from '../../packing';
+import { addJump, jumpsInRange } from '../tandem';
 import { OTHER_STAFF_LABELS } from '../../tandem';
 import { autoLogJump } from '../auto-log';
 import { readLogbookSettings, type BurbleSettings } from '../logbook-settings';
@@ -344,8 +344,20 @@ export async function commitMatches(slotIds: string[]): Promise<CommitResult> {
     .filter((jump) => wanted.has(jump.slotId))
     .sort((a, b) => loadOrderKey(a) - loadOrderKey(b) || (a.firstSeen < b.firstSeen ? -1 : 1));
 
-  const date = todayKey();
-  const existingTandemNames = await todayTandemKeys();
+  // Keyed by date rather than a single fixed "today", since a confirmed
+  // backlog can span months (see pendingJumps' doc comment) — each slot
+  // has to be checked, and recorded, against the day it actually
+  // happened, not the day it's being confirmed. Built lazily and cached
+  // per date as we go, so a batch spanning several days doesn't re-read
+  // the whole jumps file once per slot.
+  const existingTandemNamesByDate = new Map<string, Set<string>>();
+  async function tandemNamesFor(date: string): Promise<Set<string>> {
+    const cached = existingTandemNamesByDate.get(date);
+    if (cached) return cached;
+    const names = await tandemKeysOnDate(date);
+    existingTandemNamesByDate.set(date, names);
+    return names;
+  }
 
   const committed = { ...state.committed };
   const pending = { ...state.pending };
@@ -357,6 +369,11 @@ export async function commitMatches(slotIds: string[]): Promise<CommitResult> {
     // each one along a millisecond rather than risking a collision when a
     // whole load is confirmed in one tap.
     const at = new Date(Date.now() + index).toISOString();
+    // The day this slot was first spotted on the board — i.e. the day it
+    // was actually jumped, regardless of how long it then sat awaiting
+    // confirmation. Same field the "Jumps to confirm" day headers group
+    // on (see PendingJumpsMenu.svelte), so the two stay in step.
+    const date = dateKeyFor(new Date(slot.firstSeen));
 
     // 'solo' is the one role with no Work-jumps card behind it (sport,
     // staff duty) — everything else is paid work and gets a jump on the
@@ -374,6 +391,7 @@ export async function commitMatches(slotIds: string[]): Promise<CommitResult> {
       // tapped in by hand on the Tandems tab. Two jumps with the same
       // customer name on one day is legitimate, so this is a safety net
       // for the common case, not a proof.
+      const existingTandemNames = await tandemNamesFor(date);
       const key = tandemKey(slot.role, slot.customerName);
       if (existingTandemNames.has(key)) {
         skippedDuplicates += 1;
@@ -389,7 +407,7 @@ export async function commitMatches(slotIds: string[]): Promise<CommitResult> {
       // an instructor match to begin with (see mergeSelfFilmed), so
       // addJump's own category guard is what actually protects every
       // other role.
-      await addJump(slot.role, slot.customerName, at, slot.studentLevel ?? '', slot.handyCam ?? false);
+      await addJump(slot.role, slot.customerName, at, slot.studentLevel ?? '', slot.handyCam ?? false, date);
       await autoLogJump({
         jumpTypeName: slot.jumpTypeName,
         date,
@@ -451,16 +469,12 @@ function tandemKey(role: BurbleRole, customerName: string): string {
   return `${role}::${customerName.trim().toLowerCase()}`;
 }
 
-/**
- * Tandem jumps already recorded today, as `role::customer` keys. Commits
- * are always dated today (addJump stamps todayKey() itself), so today's
- * state is the whole comparison set.
- */
-async function todayTandemKeys(): Promise<Set<string>> {
-  const state = await loadTodayState();
+/** Tandem jumps already recorded on `date`, as `role::customer` keys. */
+async function tandemKeysOnDate(date: string): Promise<Set<string>> {
+  const entries = await jumpsInRange(date, date);
   const keys = new Set<string>();
-  for (const category of Object.keys(state.entries) as (keyof typeof state.entries)[]) {
-    for (const jump of state.entries[category]) {
+  for (const category of Object.keys(entries) as (keyof typeof entries)[]) {
+    for (const jump of entries[category]) {
       keys.add(tandemKey(category as BurbleRole, jump.name));
     }
   }

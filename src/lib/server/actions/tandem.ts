@@ -4,8 +4,9 @@
 // `load` after success, so state/history/week/month refresh together).
 import { fail, type Action } from '@sveltejs/kit';
 import { CATEGORIES, CATEGORY_ACTION_LABELS, OTHER_STAFF_LABELS, TANDEM_JUMP_TYPES, type Category } from '$lib/tandem';
-import { addJump, removeJump, setJumpHandyCam } from '$lib/server/tandem';
-import { removeEntry as removeLogbookEntry } from '$lib/server/logbook';
+import { todayKey } from '$lib/packing';
+import { addJump, removeJump, setJumpDate, setJumpHandyCam } from '$lib/server/tandem';
+import { removeEntry as removeLogbookEntry, setEntryDate as setLogbookEntryDate } from '$lib/server/logbook';
 import { readLogbookSettings } from '$lib/server/logbook-settings';
 import { autoLogJump } from '$lib/server/auto-log';
 import { forgetCommitted } from '$lib/server/burble/sync';
@@ -16,6 +17,7 @@ import { oneLine, multiLine } from '$lib/server/form-utils';
 const MAX_NAME_LENGTH = 80;
 /** Long enough for anything the board prints ("Level 6", "Consol") with room to spare. */
 const MAX_LEVEL_LENGTH = 40;
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 // A tandem instructor/camera jump is also a jump in its own right, so
 // logging one here auto-adds a matching entry to the personal logbook —
@@ -91,16 +93,41 @@ export const tandemActions: Record<string, Action> = {
     // category the same way it drops a level outside 'aff'.
     const handyCam = formData.get('handyCam') === 'on';
 
+    // Defaults to today, so the common case — logging a jump as it
+    // happens — needs nothing extra. A caller can backdate this to log a
+    // jump that was missed at the time (the History tab's "+ Add
+    // previous jump"), which is also the fix for a jump that was
+    // confirmed off the manifest a day or more after it actually flew
+    // (see commitMatches in burble/sync.ts) and needs re-dating.
+    const rawDate = oneLine(formData.get('date'), 10);
+    const date = DATE_RE.test(rawDate) ? rawDate : todayKey();
+
     const at = new Date().toISOString();
-    const state = await addJump(category as Category, cleanName, at, cleanLevel, handyCam);
-    await autoLogTandemJump(
-      category as Category,
-      cleanName,
-      cleanStaff,
-      category === 'aff' ? cleanLevel : '',
-      state.date,
-      at,
-    );
+    await addJump(category as Category, cleanName, at, cleanLevel, handyCam, date);
+    await autoLogTandemJump(category as Category, cleanName, cleanStaff, category === 'aff' ? cleanLevel : '', date, at);
+  },
+
+  // The History tab's fix for a jump filed under the wrong day — moves
+  // both halves of an invoiceable jump (the Work-jumps ledger row and, if
+  // one exists, its auto-logged logbook entry) to the given date, keeping
+  // everything else about either record unchanged.
+  setTandemJumpDate: async ({ request }) => {
+    const formData = await request.formData();
+    const at = String(formData.get('at') ?? '');
+    if (!at) return fail(400, { error: 'at is required' });
+    const date = oneLine(formData.get('date'), 10);
+    if (!DATE_RE.test(date)) return fail(400, { error: 'date must be YYYY-MM-DD' });
+
+    await setJumpDate(at, date);
+    // Same `at` as the auto-logged logbook entry, if one exists — kept in
+    // step the same way deleteTandemJump keeps the two in step. A no-op
+    // for a jump that predates auto-logging, or was never a work jump.
+    try {
+      const settings = await readLogbookSettings();
+      await setLogbookEntryDate(at, date, settings.baseJumps);
+    } catch (err) {
+      console.error("Failed to update the auto-logged logbook entry's date", err);
+    }
   },
 
   deleteTandemJump: async ({ request }) => {

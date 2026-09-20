@@ -14,7 +14,8 @@ vi.mock('./storage', () => ({
   },
 }));
 
-const { addEntry, nextJumpNumber, readCsvFile, readLogbook, removeEntry, updateEntry } = await import('./logbook');
+const { addEntry, nextJumpNumber, readCsvFile, readLogbook, removeEntry, setEntryDate, updateEntry } =
+  await import('./logbook');
 
 beforeEach(() => {
   store.clear();
@@ -104,6 +105,34 @@ describe('updateEntry', () => {
   it('returns null for an id that does not exist', async () => {
     await addEntry(entryInput(), 0, 'at-1');
     expect(await updateEntry('nonexistent', entryInput(), 0)).toBeNull();
+  });
+});
+
+describe('setEntryDate', () => {
+  it('changes only the date, keeping the rest of the entry and its `at` unchanged', async () => {
+    await addEntry(entryInput({ date: '2026-08-01', place: 'Langar', description: 'Sport jump' }), 0, 'at-1');
+
+    const result = await setEntryDate('at-1', '2026-07-30', 0);
+
+    expect(result).not.toBeNull();
+    expect(result).toHaveLength(1);
+    expect(result![0]).toMatchObject({ at: 'at-1', date: '2026-07-30', place: 'Langar', description: 'Sport jump' });
+  });
+
+  it('renumbers when the new date moves the entry past another', async () => {
+    await addEntry(entryInput({ date: '2026-08-01' }), 0, 'at-1');
+    await addEntry(entryInput({ date: '2026-08-02' }), 0, 'at-2');
+
+    await setEntryDate('at-1', '2026-08-03', 0);
+
+    const byAt = Object.fromEntries((await readLogbook(0)).map((e) => [e.at, e.number]));
+    expect(byAt['at-2']).toBe(1);
+    expect(byAt['at-1']).toBe(2);
+  });
+
+  it('returns null for an id that does not exist', async () => {
+    await addEntry(entryInput(), 0, 'at-1');
+    expect(await setEntryDate('nonexistent', '2026-07-30', 0)).toBeNull();
   });
 });
 

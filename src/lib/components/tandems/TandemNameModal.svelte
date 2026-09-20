@@ -14,6 +14,7 @@
     levelOptions,
     showHandyCam = false,
     handyCamBonusRate,
+    today,
     submitting = false,
     onSubmit,
     onClose,
@@ -36,6 +37,8 @@
     showHandyCam?: boolean;
     /** The live bonus rate, for the checkbox's own label — only read when showHandyCam is true. */
     handyCamBonusRate?: number;
+    /** Today's date (YYYY-MM-DD) — what the date field defaults to on open. */
+    today: string;
     /**
      * True while the caller's own onSubmit is still in flight — this
      * component doesn't own that request (TandemCategoryCards does, via
@@ -45,7 +48,7 @@
      * logged the same jump twice.
      */
     submitting?: boolean;
-    onSubmit: (name: string, staff: string, level: string, handyCam: boolean) => void;
+    onSubmit: (name: string, staff: string, level: string, handyCam: boolean, date: string) => void;
     onClose: () => void;
   } = $props();
 
@@ -53,6 +56,11 @@
   let staff = $state('');
   let level = $state('');
   let handyCam = $state(false);
+  // Defaults to today — the common case, logging a jump as it happens —
+  // but stays editable so a jump that was missed at the time (or one
+  // confirmed off the manifest a day late — see burble/sync.ts's
+  // commitMatches) can be filed under the day it actually happened.
+  let date = $state('');
   let inputEl: HTMLInputElement | undefined = $state();
 
   $effect(() => {
@@ -66,6 +74,7 @@
       // choice instead.
       level = '';
       handyCam = false;
+      date = today;
       inputEl?.focus();
     }
   });
@@ -76,9 +85,10 @@
     const trimmed = name.trim();
     if (!trimmed) return;
     if (levelOptions && !level) return; // matches the select's own `required`
+    if (!date) return; // matches the date input's own `required`
     // The other staff member stays optional — plenty of jumps go up without
     // a camera, and a solo instructor shouldn't be blocked on filling it in.
-    onSubmit(trimmed, staff.trim(), levelOptions ? level : '', showHandyCam && handyCam);
+    onSubmit(trimmed, staff.trim(), levelOptions ? level : '', showHandyCam && handyCam, date);
   }
 
   // Both inputs are styled identically; named once so they stay that way.
@@ -137,6 +147,10 @@
           maxlength="80"
           bind:value={staff}
         />
+        <label class="block mt-3.5 mb-1 text-[13px] font-bold" for="tandemJumpDate">
+          Date <span class="font-normal text-ink-soft">(defaults to today)</span>
+        </label>
+        <input id="tandemJumpDate" type="date" class={FIELD} required bind:value={date} />
         {#if showHandyCam}
           <label class="flex items-center gap-2 mt-3.5 text-[13.5px] font-medium cursor-pointer">
             <input type="checkbox" class="w-[18px] h-[18px] accent-gold" bind:checked={handyCam} />
