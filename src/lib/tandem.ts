@@ -3,8 +3,13 @@
 export const CATEGORIES = ['instructor', 'videographer', 'aff'] as const;
 export type Category = (typeof CATEGORIES)[number];
 
+// "Instructor" on its own reads as ambiguous once there's an "AFF
+// Instructor" category sitting right next to it — the card header, the
+// confirm modal, the invoice section heading and the Settings toggle list
+// all show these two side by side, so the plain-language one has to spell
+// out "Tandem" too rather than leaving it to be inferred.
 export const CATEGORY_LABELS: Record<Category, string> = {
-  instructor: 'Instructor',
+  instructor: 'Tandem Instructor',
   videographer: 'Videographer',
   aff: 'AFF Instructor',
 };
@@ -16,7 +21,7 @@ export const CATEGORY_LABELS: Record<Category, string> = {
  * AFF is an initialism and has to stay shouting.
  */
 export const CATEGORY_ACTION_LABELS: Record<Category, string> = {
-  instructor: 'instructor',
+  instructor: 'tandem instructor',
   videographer: 'videographer',
   aff: 'AFF',
 };
@@ -67,7 +72,7 @@ export const TANDEM_JUMP_TYPES: Record<Category, string> = {
  */
 export const OTHER_STAFF_LABELS: Record<Category, string> = {
   instructor: 'Camera flyer',
-  videographer: 'Instructor',
+  videographer: 'Tandem instructor',
   aff: 'Second instructor',
 };
 

@@ -97,7 +97,9 @@
   // glance. Anything else — a hand-logged jump of any type — gets none.
   function tandemBadge(jumpType: string): { label: string; kind: string } | null {
     if (jumpType === TANDEM_JUMP_TYPES.videographer) return { label: 'Camera', kind: 'camera' };
-    if (jumpType === TANDEM_JUMP_TYPES.instructor) return { label: 'Instructor', kind: 'instructor' };
+    // 'Instructor' alone would read as ambiguous next to an AFF Instructor
+    // entry's jump type, so the badge spells out which one this is.
+    if (jumpType === TANDEM_JUMP_TYPES.instructor) return { label: 'Tandem Instructor', kind: 'instructor' };
     return null;
   }
 
