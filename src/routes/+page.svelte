@@ -183,12 +183,6 @@
   // {id, name, detail?} row, same as the real app's ReferenceListPanel.astro.
   // $derived (not computed once) so these stay current after any action
   // re-runs `load` — no separate "refresh" step anywhere.
-  // The invoice month that's still filling up — the one the "Export
-  // monthly invoice" button targets. tandemMonthRows always keeps its
-  // isCurrent row (today's own jump row seeds that bucket even at zero),
-  // so this is only ever null in the theoretical case it's missing.
-  const currentInvoiceMonth = $derived(data.tandemMonthRows.find((r) => r.isCurrent) ?? null);
-
   const places = $derived(data.logbookSettings.places.map((p) => ({ id: p.id, name: p.name })));
   const aircraft = $derived(data.logbookSettings.aircraft.map((ac) => ({ id: ac.id, name: ac.plate })));
   const jumpTypes = $derived(data.logbookSettings.jumpTypes.map((jt) => ({ id: jt.id, name: jt.name })));
@@ -624,8 +618,8 @@
       today={data.today}
     />
 
-    {#if currentInvoiceMonth}
-      <MonthlyInvoiceButton monthKey={currentInvoiceMonth.key} rangeLabel={currentInvoiceMonth.rangeLabel} />
+    {#if data.tandemMonthRows.length > 0}
+      <MonthlyInvoiceButton months={data.tandemMonthRows} />
     {/if}
 
     <TandemHistoryPanel
