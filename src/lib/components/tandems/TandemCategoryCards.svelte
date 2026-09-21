@@ -126,23 +126,25 @@
     </p>
   {/if}
   {#each visibleCategories as category (category)}
-    <section
-      class={CARD}
+    <div
+      class="{CARD} card-clickable"
       data-tandem-category={category}
       style={`--accent: var(--${category}); --accent-soft: var(--${category}-soft)`}
+      role="button"
+      tabindex="0"
+      aria-label={`Add ${CATEGORY_ACTION_LABELS[category]} jump`}
+      onclick={() => (pendingCategory = category)}
+      onkeydown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          pendingCategory = category;
+        }
+      }}
     >
       <div class={CARD_TOP}>
         <div class="card-title-group">
           <h2 class={CARD_LABEL}>{CATEGORY_LABELS[category]}</h2>
-          <button
-            type="button"
-            class="add-jump-icon-btn"
-            style={`--accent: var(--${category})`}
-            aria-label={`Add ${CATEGORY_ACTION_LABELS[category]} jump`}
-            onclick={() => (pendingCategory = category)}
-          >
-            &plus;
-          </button>
+          <span class="add-jump-icon-btn" style={`--accent: var(--${category})`} aria-hidden="true">&plus;</span>
         </div>
         <span class={CARD_RATE}>£{rates[category].toFixed(2)} / jump</span>
       </div>
@@ -158,7 +160,10 @@
                 class="tandem-jump-delete"
                 disabled={deletingAt === jump.at}
                 aria-label={`Remove ${jump.name}`}
-                onclick={() => deleteJump(jump.at)}
+                onclick={(e) => {
+                  e.stopPropagation();
+                  deleteJump(jump.at);
+                }}
               >
                 {#if deletingAt === jump.at}<Spinner size={13} />{:else}&times;{/if}
               </button>
@@ -167,7 +172,7 @@
         </ul>
         <div class={CARD_SUBTOTAL}>£{(tandemState.counts[category] * rates[category]).toFixed(2)}</div>
       {/if}
-    </section>
+    </div>
 
     {#if category === 'aff'}
       <!--
@@ -178,18 +183,23 @@
         drops out of visibleCategories, taking this panel with it, with no
         separate visibility flag to keep in sync (see tandem-visibility.ts).
       -->
-      <section class={CARD}>
+      <div
+        class="{CARD} card-clickable"
+        role="button"
+        tabindex="0"
+        aria-label="Add ground school"
+        onclick={() => (addingGroundSchool = true)}
+        onkeydown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            addingGroundSchool = true;
+          }
+        }}
+      >
         <div class={CARD_TOP}>
           <div class="card-title-group">
             <h2 class={CARD_LABEL}>Ground school</h2>
-            <button
-              type="button"
-              class="add-jump-icon-btn"
-              aria-label="Add ground school"
-              onclick={() => (addingGroundSchool = true)}
-            >
-              &plus;
-            </button>
+            <span class="add-jump-icon-btn" aria-hidden="true">&plus;</span>
           </div>
         </div>
         {#if groundSchoolEntries.length > 0}
@@ -203,7 +213,10 @@
                   class="tandem-jump-delete"
                   disabled={deletingGroundSchoolAt === entry.at}
                   aria-label="Remove ground school entry"
-                  onclick={() => deleteGroundSchool(entry.at)}
+                  onclick={(e) => {
+                    e.stopPropagation();
+                    deleteGroundSchool(entry.at);
+                  }}
                 >
                   {#if deletingGroundSchoolAt === entry.at}<Spinner size={13} />{:else}&times;{/if}
                 </button>
@@ -212,7 +225,7 @@
           </ul>
           <div class={CARD_SUBTOTAL}>£{totalGroundSchoolEarnings(groundSchoolEntries).toFixed(2)}</div>
         {/if}
-      </section>
+      </div>
     {/if}
   {/each}
 </section>
@@ -266,9 +279,6 @@
   }
 
   .add-jump-icon-btn {
-    appearance: none;
-    border: 0;
-    border-radius: 999px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -279,6 +289,13 @@
     line-height: 1;
     color: white;
     background: var(--accent, var(--ink-soft));
+    border-radius: 999px;
+  }
+
+  /* The whole card is the tap target now (the plus icon is just a
+     visual hint of what tapping does), so the affordance and focus
+     ring live on the card itself rather than on the icon. */
+  .card-clickable {
     cursor: pointer;
     touch-action: manipulation;
     transition:
@@ -286,12 +303,12 @@
       filter 80ms ease;
   }
 
-  .add-jump-icon-btn:active {
-    transform: scale(0.9);
-    filter: brightness(0.95);
+  .card-clickable:active {
+    transform: scale(0.99);
+    filter: brightness(0.98);
   }
 
-  .add-jump-icon-btn:focus-visible {
+  .card-clickable:focus-visible {
     outline: 3px solid var(--gold);
     outline-offset: 2px;
   }
