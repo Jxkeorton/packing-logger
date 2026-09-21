@@ -10,7 +10,7 @@
     type DayState,
   } from '$lib/tandem';
   import { totalGroundSchoolEarnings, type GroundSchoolEntry } from '$lib/ground-school';
-  import { CARD, CARD_TOP, CARD_LABEL, CARD_RATE, CARD_SUBTOTAL, CATEGORIES_LIST, FORM_SAVE_BUTTON_SECONDARY } from '$lib/ui-classes';
+  import { CARD, CARD_TOP, CARD_LABEL, CARD_RATE, CARD_SUBTOTAL, CATEGORIES_LIST } from '$lib/ui-classes';
   import TandemNameModal from './TandemNameModal.svelte';
   import GroundSchoolModal from './GroundSchoolModal.svelte';
   import Spinner from '../Spinner.svelte';
@@ -132,16 +132,22 @@
       style={`--accent: var(--${category}); --accent-soft: var(--${category}-soft)`}
     >
       <div class={CARD_TOP}>
-        <h2 class={CARD_LABEL}>{CATEGORY_LABELS[category]}</h2>
+        <div class="card-title-group">
+          <h2 class={CARD_LABEL}>{CATEGORY_LABELS[category]}</h2>
+          <button
+            type="button"
+            class="add-jump-icon-btn"
+            style={`--accent: var(--${category})`}
+            aria-label={`Add ${CATEGORY_ACTION_LABELS[category]} jump`}
+            onclick={() => (pendingCategory = category)}
+          >
+            &plus;
+          </button>
+        </div>
         <span class={CARD_RATE}>£{rates[category].toFixed(2)} / jump</span>
       </div>
-      <button type="button" class="add-jump-btn" style={`--accent: var(--${category})`} onclick={() => (pendingCategory = category)}>
-        &plus; Add {CATEGORY_ACTION_LABELS[category]} jump
-      </button>
-      <ul class="list-none mt-1 mb-0 p-0">
-        {#if tandemState.entries[category].length === 0}
-          <li class="tandem-jump-empty">No jumps logged yet today.</li>
-        {:else}
+      {#if tandemState.entries[category].length > 0}
+        <ul class="list-none mt-1 mb-0 p-0">
           {#each tandemState.entries[category] as jump (jump.at)}
             <li class="tandem-jump-row">
               <span class="tandem-jump-name">{jump.name}</span>
@@ -158,27 +164,36 @@
               </button>
             </li>
           {/each}
-        {/if}
-      </ul>
-      <div class={CARD_SUBTOTAL}>£{(tandemState.counts[category] * rates[category]).toFixed(2)}</div>
+        </ul>
+        <div class={CARD_SUBTOTAL}>£{(tandemState.counts[category] * rates[category]).toFixed(2)}</div>
+      {/if}
     </section>
 
     {#if category === 'aff'}
       <!--
         Ground school isn't a jump — it has no rate, no name, no level —
-        so it isn't a card of its own, just a smaller block tucked under
-        the AFF card it belongs to. Living inside this `{#each}` branch
-        means it only ever renders alongside a *visible* AFF card: hide
-        AFF from Settings > Work jumps and 'aff' drops out of
-        visibleCategories, taking this block with it, with no separate
-        visibility flag to keep in sync (see tandem-visibility.ts).
+        so it gets its own small panel rather than a category card. Living
+        inside this `{#each}` branch means it only ever renders alongside a
+        *visible* AFF card: hide AFF from Settings > Work jumps and 'aff'
+        drops out of visibleCategories, taking this panel with it, with no
+        separate visibility flag to keep in sync (see tandem-visibility.ts).
       -->
-      <section class="ground-school-block">
-        <button type="button" class={FORM_SAVE_BUTTON_SECONDARY} onclick={() => (addingGroundSchool = true)}>
-          &plus; Add ground school
-        </button>
+      <section class={CARD}>
+        <div class={CARD_TOP}>
+          <div class="card-title-group">
+            <h2 class={CARD_LABEL}>Ground school</h2>
+            <button
+              type="button"
+              class="add-jump-icon-btn"
+              aria-label="Add ground school"
+              onclick={() => (addingGroundSchool = true)}
+            >
+              &plus;
+            </button>
+          </div>
+        </div>
         {#if groundSchoolEntries.length > 0}
-          <ul class="list-none mt-1.5 mb-0 p-0">
+          <ul class="list-none mt-1 mb-0 p-0">
             {#each groundSchoolEntries as entry (entry.at)}
               <li class="tandem-jump-row">
                 <span class="tandem-jump-name">Ground school</span>
@@ -236,15 +251,6 @@
     text-align: center;
   }
 
-  /* Tucked under the AFF card, not a card of its own — a few px of
-     breathing room rather than the gap the category cards give each
-     other via CATEGORIES_LIST's own gap, which would make this read as
-     a sibling section instead of something belonging to AFF. */
-  .ground-school-block {
-    margin-top: 6px;
-    padding-left: 2px;
-  }
-
   .ground-school-amount {
     flex: none;
     font-family: var(--font-mono);
@@ -253,18 +259,26 @@
     color: var(--ink-soft);
   }
 
-  .add-jump-btn {
+  .card-title-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .add-jump-icon-btn {
     appearance: none;
     border: 0;
-    border-radius: 0.75rem;
-    width: 100%;
-    height: 46px;
-    margin-top: 10px;
-    font-family: var(--font-display);
-    font-weight: 700;
-    font-size: 14.5px;
+    border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    flex: none;
+    font-size: 16px;
+    line-height: 1;
     color: white;
-    background: var(--accent);
+    background: var(--accent, var(--ink-soft));
     cursor: pointer;
     touch-action: manipulation;
     transition:
@@ -272,12 +286,12 @@
       filter 80ms ease;
   }
 
-  .add-jump-btn:active {
-    transform: scale(0.97);
+  .add-jump-icon-btn:active {
+    transform: scale(0.9);
     filter: brightness(0.95);
   }
 
-  .add-jump-btn:focus-visible {
+  .add-jump-icon-btn:focus-visible {
     outline: 3px solid var(--gold);
     outline-offset: 2px;
   }
@@ -350,11 +364,4 @@
     outline: none;
   }
 
-  .tandem-jump-empty {
-    margin: 0;
-    padding: 9px 2px;
-    border-top: 1px solid var(--line);
-    color: var(--ink-soft);
-    font-size: 13px;
-  }
 </style>
