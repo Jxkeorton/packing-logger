@@ -62,6 +62,8 @@
     SETTINGS_TITLE,
     SETTINGS_GROUP_LABEL,
     SETTINGS_GROUP,
+    SETTINGS_ROW_BUTTON,
+    SETTINGS_ROW_ICON,
   } from '$lib/ui-classes';
   import type { PageData } from './$types';
 
@@ -511,6 +513,23 @@
         {/snippet}
       </SettingsRow>
     </div>
+
+    {#if data.showLogout}
+      <h2 class={SETTINGS_GROUP_LABEL}>Account</h2>
+      <div class={SETTINGS_GROUP}>
+        <form method="POST" action="/api/logout">
+          <button type="submit" class="{SETTINGS_ROW_BUTTON} text-danger">
+            <span class={SETTINGS_ROW_ICON} style="background:var(--danger)" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3" />
+                <path stroke-linecap="round" stroke-linejoin="round" d="M10 16l5-4-5-4M14.5 12H3" />
+              </svg>
+            </span>
+            <span class="flex-1">Log out</span>
+          </button>
+        </form>
+      </div>
+    {/if}
   </div>
 
   <!-- Packing -->
@@ -628,17 +647,4 @@
       dateDisplay={data.dateDisplay}
     />
   </div>
-
-  {#if data.showLogout}
-    <footer class="text-center">
-      <form class="mt-2.5" method="POST" action="/api/logout">
-        <button
-          type="submit"
-          class="appearance-none border-0 bg-transparent text-ink-soft font-[inherit] text-[12.5px] cursor-pointer p-0 hover:text-danger"
-        >
-          Log out
-        </button>
-      </form>
-    </footer>
-  {/if}
 </div>
