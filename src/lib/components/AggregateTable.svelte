@@ -49,7 +49,7 @@
     </thead>
     <tbody>
       {#each rows as row, i (row.key)}
-        <tr class={HISTORY_TBODY_ROW} class:current-row={row.isCurrent} class:bg-canvas={i % 2 === 1}>
+        <tr class="{HISTORY_TBODY_ROW} {i % 2 === 1 ? 'bg-ink/5' : ''}" class:current-row={row.isCurrent}>
           <td class={HISTORY_CELL_LEFT}>
             {#if row.isCurrent}
               <span class="block font-sans font-bold text-gold text-xs">{currentLabel}</span>

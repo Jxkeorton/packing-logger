@@ -85,9 +85,13 @@ export const CARD_LABEL = 'm-0 text-[17px] font-bold tracking-[-0.01em]';
 export const CARD_RATE = 'font-mono text-xs text-ink-soft';
 export const CARD_SUBTOTAL = 'mt-1 text-right font-mono text-[13px] text-ink-soft';
 
-// ---- Always-open bordered panel (History) ----
+// ---- Always-open, uncontained panel (History) ----
+// No card chrome (no bg-panel/border/rounded) — it sits directly on the
+// page's own canvas background rather than reading as another card
+// among the category cards above it. Row contrast instead comes from
+// HISTORY_TBODY_ROW's own striping (an ink overlay, not a background
+// swap), which still shows up against canvas or panel alike.
 
-export const TOGGLE_SECTION = 'bg-panel border border-line rounded-card overflow-hidden';
 export const PANEL_TITLE = 'm-0 px-4 py-3.5 font-sans font-semibold text-[15px] text-ink';
 export const TOGGLE_PANEL = 'border-t border-line pt-1 pb-2';
 export const TOGGLE_PANEL_PADDED = 'px-4 pt-3.5 pb-4';

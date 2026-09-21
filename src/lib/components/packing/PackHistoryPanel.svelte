@@ -4,7 +4,6 @@
   import { CATEGORY_TEXT_CLASS } from '$lib/category-colors';
   import { formatMoney as money } from '$lib/format';
   import {
-    TOGGLE_SECTION,
     PANEL_TITLE,
     TOGGLE_PANEL,
     HISTORY_TABS,
@@ -36,7 +35,7 @@
   );
 </script>
 
-<section class={TOGGLE_SECTION}>
+<section>
   <h2 class={PANEL_TITLE}>History</h2>
 
   <div class={TOGGLE_PANEL}>
@@ -64,7 +63,7 @@
             </thead>
             <tbody>
               {#each dayRows as row, i (row.date)}
-                <tr class={HISTORY_TBODY_ROW} class:bg-canvas={i % 2 === 1}>
+                <tr class="{HISTORY_TBODY_ROW} {i % 2 === 1 ? 'bg-ink/5' : ''}">
                   <td class={HISTORY_CELL_LEFT}>{row.date}</td>
                   {#each CATEGORIES as c (c)}
                     <td class="{HISTORY_CELL_RIGHT} {CATEGORY_TEXT_CLASS[c]}">{row.counts[c]}</td>
