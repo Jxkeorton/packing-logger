@@ -5,7 +5,7 @@
   // the one anyone actually exports most of the time. Same fetch-the-bytes
   // download + failed-state pattern as DownloadButton.svelte.
   import { downloadFile } from '$lib/client/download';
-  import { FORM_SAVE_BUTTON, PANEL_HINT } from '$lib/ui-classes';
+  import { FORM_SAVE_BUTTON } from '$lib/ui-classes';
   import Spinner from '../Spinner.svelte';
 
   // `months` is tandemMonthRows straight from the page load — newest
@@ -77,7 +77,7 @@
     >
       &lsaquo;
     </button>
-    <span class="{PANEL_HINT} mb-0">{month.rangeLabel}</span>
+    <span class="m-0 text-[12.5px] text-ink-soft">{month.rangeLabel}</span>
     <button
       type="button"
       class="month-nav-btn"
