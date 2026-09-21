@@ -7,8 +7,7 @@
   import { formatMoney as money } from '$lib/format';
   import {
     TOGGLE_SECTION,
-    TOGGLE_BUTTON,
-    TOGGLE_ICON,
+    PANEL_TITLE,
     TOGGLE_PANEL,
     HISTORY_TABS,
     HISTORY_TAB,
@@ -39,7 +38,6 @@
     groundSchoolDayEntries: Record<string, GroundSchoolEntry[]>;
   } = $props();
 
-  let open = $state(false);
   let activeView = $state<'day' | 'week' | 'month'>('day');
   // Which date's row is expanded to show its individual jumps — one at a
   // time, so opening a new day doesn't leave the last one's list sitting
@@ -130,39 +128,36 @@
 </script>
 
 <section class={TOGGLE_SECTION}>
-  <button type="button" class={TOGGLE_BUTTON} aria-expanded={open} onclick={() => (open = !open)}>
-    <span>History</span>
-    <span class={TOGGLE_ICON} class:rotate-90={open}>&rsaquo;</span>
-  </button>
+  <h2 class={PANEL_TITLE}>History</h2>
 
-  {#if open}
-    <div class={TOGGLE_PANEL}>
-      <div class={HISTORY_TABS} role="tablist" aria-label="Group tandem history by">
-        <button type="button" role="tab" class={HISTORY_TAB} aria-selected={activeView === 'day'} onclick={() => (activeView = 'day')}>Day</button>
-        <button type="button" role="tab" class={HISTORY_TAB} aria-selected={activeView === 'week'} onclick={() => (activeView = 'week')}>Week</button>
-        <button type="button" role="tab" class={HISTORY_TAB} aria-selected={activeView === 'month'} onclick={() => (activeView = 'month')}>Month</button>
-      </div>
+  <div class={TOGGLE_PANEL}>
+    <div class={HISTORY_TABS} role="tablist" aria-label="Group tandem history by">
+      <button type="button" role="tab" class={HISTORY_TAB} aria-selected={activeView === 'day'} onclick={() => (activeView = 'day')}>Day</button>
+      <button type="button" role="tab" class={HISTORY_TAB} aria-selected={activeView === 'week'} onclick={() => (activeView = 'week')}>Week</button>
+      <button type="button" role="tab" class={HISTORY_TAB} aria-selected={activeView === 'month'} onclick={() => (activeView = 'month')}>Month</button>
+    </div>
 
-      {#if activeView === 'day'}
-        {#if dayRows.length === 0}
-          <p class={HISTORY_EMPTY}>Nothing logged yet before today.</p>
-        {:else}
-          <div class={HISTORY_SCROLL}>
-            <table class={HISTORY_TABLE}>
-              <thead>
-                <tr class={HISTORY_THEAD_ROW}>
-                  <th scope="col" class={HISTORY_CELL_LEFT}>Date</th>
-                  {#each CATEGORIES as c (c)}
-                    <th scope="col" class="{HISTORY_CELL_RIGHT} {CATEGORY_TEXT_CLASS[c]}">{CATEGORY_LABELS[c].slice(0, 3)}</th>
-                  {/each}
-                  <th scope="col" class={HISTORY_CELL_RIGHT}>Jumps</th>
-                  <th scope="col" class={HISTORY_CELL_RIGHT}>Earned</th>
-                </tr>
-              </thead>
-              <tbody>
-                {#each dayRows as row (row.date)}
-                  {@const isExpanded = expandedDate === row.date}
-                  <tr class={HISTORY_TBODY_ROW}>
+    {#if activeView === 'day'}
+      {#if dayRows.length === 0}
+        <p class={HISTORY_EMPTY}>Nothing logged yet before today.</p>
+      {:else}
+        <div class={HISTORY_SCROLL}>
+          <table class={HISTORY_TABLE}>
+            <thead>
+              <tr class={HISTORY_THEAD_ROW}>
+                <th scope="col" class={HISTORY_CELL_LEFT}>Date</th>
+                {#each CATEGORIES as c (c)}
+                  <th scope="col" class="{HISTORY_CELL_RIGHT} {CATEGORY_TEXT_CLASS[c]}">{CATEGORY_LABELS[c].slice(0, 3)}</th>
+                {/each}
+                <th scope="col" class={HISTORY_CELL_RIGHT}>Jumps</th>
+                <th scope="col" class={HISTORY_CELL_RIGHT}>Earned</th>
+              </tr>
+            </thead>
+            <tbody>
+              {#each dayRows as row, i (row.date)}
+                {@const isExpanded = expandedDate === row.date}
+                {@const isStriped = i % 2 === 1}
+                <tr class={HISTORY_TBODY_ROW} class:bg-canvas={isStriped}>
                     <td class={HISTORY_CELL_LEFT}>
                       <button
                         type="button"
@@ -181,7 +176,7 @@
                     <td class={HISTORY_CELL_RIGHT}>{money(row.totalEarnings)}</td>
                   </tr>
                   {#if isExpanded}
-                    <tr>
+                    <tr class:bg-canvas={isStriped}>
                       <td colspan={DAY_COLSPAN} class="p-0 border-b border-line">
                         <ul class="list-none m-0 py-1 px-2 bg-canvas">
                           {#each dayJumps[row.date] ?? [] as jump (jump.at)}
@@ -291,5 +286,4 @@
         />
       {/if}
     </div>
-  {/if}
 </section>

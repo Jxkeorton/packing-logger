@@ -85,12 +85,10 @@ export const CARD_LABEL = 'm-0 text-[17px] font-bold tracking-[-0.01em]';
 export const CARD_RATE = 'font-mono text-xs text-ink-soft';
 export const CARD_SUBTOTAL = 'mt-1 text-right font-mono text-[13px] text-ink-soft';
 
-// ---- Collapsible toggle-panel (History, Invoice details, Places, ...) ----
+// ---- Always-open bordered panel (History) ----
 
 export const TOGGLE_SECTION = 'bg-panel border border-line rounded-card overflow-hidden';
-export const TOGGLE_BUTTON =
-  'group w-full flex items-center justify-between bg-transparent border-0 px-4 py-3.5 font-sans font-semibold text-[15px] text-ink cursor-pointer';
-export const TOGGLE_ICON = 'transition-transform duration-150 ease text-xl text-ink-soft group-aria-expanded:rotate-90';
+export const PANEL_TITLE = 'm-0 px-4 py-3.5 font-sans font-semibold text-[15px] text-ink';
 export const TOGGLE_PANEL = 'border-t border-line pt-1 pb-2';
 export const TOGGLE_PANEL_PADDED = 'px-4 pt-3.5 pb-4';
 
