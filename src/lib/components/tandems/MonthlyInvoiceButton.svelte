@@ -5,7 +5,7 @@
   // that's the one anyone actually exports. Same fetch-the-bytes download
   // + failed-state pattern as DownloadButton.svelte.
   import { downloadFile } from '$lib/client/download';
-  import { FORM_SAVE_BUTTON_SECONDARY, PANEL_HINT } from '$lib/ui-classes';
+  import { FORM_SAVE_BUTTON, PANEL_HINT } from '$lib/ui-classes';
   import Spinner from '../Spinner.svelte';
 
   let { monthKey, rangeLabel }: { monthKey: string; rangeLabel: string } = $props();
@@ -29,8 +29,8 @@
 <div class="flex flex-col items-center gap-1.5">
   <button
     type="button"
-    class="{FORM_SAVE_BUTTON_SECONDARY} w-full flex items-center justify-center gap-2 border-danger!"
-    class:text-danger={failed}
+    class="{FORM_SAVE_BUTTON} w-full flex items-center justify-center gap-2"
+    class:bg-danger={failed}
     disabled={busy}
     onclick={handleClick}
   >

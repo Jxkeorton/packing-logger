@@ -54,7 +54,6 @@
     TOTALS_VALUE_INK,
     TOTALS_LABEL,
     TOTALS_DIVIDER,
-    FOOT,
     FIELD_LABEL,
     FIELD_LABEL_NARROW,
     FIELD_INPUT,
@@ -493,6 +492,25 @@
         {/snippet}
       </SettingsRow>
     </div>
+
+    <h2 class={SETTINGS_GROUP_LABEL}>Downloads</h2>
+    <div class={SETTINGS_GROUP}>
+      <SettingsRow label="CSV exports" iconColor="var(--ink-soft)">
+        {#snippet icon()}
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 3v12m0 0-4-4m4 4 4-4" />
+            <path stroke-linecap="round" d="M4 19h16" />
+          </svg>
+        {/snippet}
+        {#snippet children()}
+          <div class="flex flex-col items-start gap-2.5">
+            <DownloadButton href="/api/export.csv" filename="packing-log.csv" label="Download full packing log (.csv)" />
+            <DownloadButton href="/api/tandem-export.csv" filename="tandem-log.csv" label="Download full tandem log (.csv)" />
+            <DownloadButton href="/api/logbook-export.csv" filename="logbook.csv" label="Download full logbook (.csv)" />
+          </div>
+        {/snippet}
+      </SettingsRow>
+    </div>
   </div>
 
   <!-- Packing -->
@@ -551,10 +569,6 @@
       <PackCategoryCards bind:counts={packingCounts} rates={data.rateSettings.packing} onAdjust={scheduleHistoryRefresh} />
 
       <PackHistoryPanel dayRows={data.dayRows} weekRows={data.weekRows} monthRows={data.monthRows} />
-
-      <footer class={FOOT}>
-        <DownloadButton href="/api/export.csv" filename="packing-log.csv" label="Download full log (.csv)" />
-      </footer>
     </div>
 
     <div class={APP_VIEW} hidden={packingSubTab !== 'timer'}>
@@ -591,6 +605,10 @@
       today={data.today}
     />
 
+    {#if currentInvoiceMonth}
+      <MonthlyInvoiceButton monthKey={currentInvoiceMonth.key} rangeLabel={currentInvoiceMonth.rangeLabel} />
+    {/if}
+
     <TandemHistoryPanel
       dayRows={data.tandemDayRows}
       weekRows={data.tandemWeekRows}
@@ -598,14 +616,6 @@
       dayJumps={data.tandemDayJumps}
       groundSchoolDayEntries={data.groundSchoolDayEntries}
     />
-
-    {#if currentInvoiceMonth}
-      <MonthlyInvoiceButton monthKey={currentInvoiceMonth.key} rangeLabel={currentInvoiceMonth.rangeLabel} />
-    {/if}
-
-    <footer class={FOOT}>
-      <DownloadButton href="/api/tandem-export.csv" filename="tandem-log.csv" label="Download full tandem log (.csv)" />
-    </footer>
   </div>
 
   <!-- Logbook -->
@@ -617,10 +627,6 @@
       today={data.today}
       dateDisplay={data.dateDisplay}
     />
-
-    <footer class={FOOT}>
-      <DownloadButton href="/api/logbook-export.csv" filename="logbook.csv" label="Download full logbook (.csv)" />
-    </footer>
   </div>
 
   {#if data.showLogout}
