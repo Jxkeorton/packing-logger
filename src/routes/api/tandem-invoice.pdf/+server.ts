@@ -5,6 +5,7 @@ import { formatDateKey, rangeLabel } from '$lib/server/periods';
 import { claimInvoiceRef, readInvoiceSettings } from '$lib/server/invoice-settings';
 import { readRateSettings } from '$lib/server/rate-settings';
 import { entriesInRange as groundSchoolEntriesInRange } from '$lib/server/ground-school';
+import { entriesInRange as miscEntriesInRange } from '$lib/server/misc-entries';
 import { buildTandemInvoicePdf } from '$lib/server/invoice-pdf';
 
 const MONTH_KEY_RE = /^\d{4}-\d{2}$/;
@@ -34,14 +35,16 @@ export const GET: RequestHandler = async ({ url }) => {
   const startKey = formatDateKey(start);
   const endKey = formatDateKey(end);
 
-  const [jumpsByCategory, handyCamJumps, settings, rateSettings, ref, groundSchoolEntries] = await Promise.all([
-    jumpsInRange(startKey, endKey),
-    handyCamJumpsInRange(startKey, endKey),
-    readInvoiceSettings(),
-    readRateSettings(),
-    claimInvoiceRef(),
-    groundSchoolEntriesInRange(startKey, endKey),
-  ]);
+  const [jumpsByCategory, handyCamJumps, settings, rateSettings, ref, groundSchoolEntries, miscEntries] =
+    await Promise.all([
+      jumpsInRange(startKey, endKey),
+      handyCamJumpsInRange(startKey, endKey),
+      readInvoiceSettings(),
+      readRateSettings(),
+      claimInvoiceRef(),
+      groundSchoolEntriesInRange(startKey, endKey),
+      miscEntriesInRange(startKey, endKey),
+    ]);
 
   // The employer wants the Ultimate package, bought upfront, kept apart
   // from a bonus the customer bought once they were already home — see
@@ -62,6 +65,7 @@ export const GET: RequestHandler = async ({ url }) => {
     handyCamAfterJumpJumps,
     handyCamBonusRate: rateSettings.handyCamBonusRate,
     groundSchoolEntries,
+    miscEntries,
   });
 
   const filenameSafeName = settings.fromName.trim().replace(/\s+/g, '_') || 'Tandem';

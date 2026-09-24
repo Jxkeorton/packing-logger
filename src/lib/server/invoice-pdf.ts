@@ -33,6 +33,7 @@
 import PDFDocument from 'pdfkit';
 import { CATEGORIES, CATEGORY_LABELS, type Category, type Jump } from '../tandem';
 import type { GroundSchoolEntry } from '../ground-school';
+import type { MiscEntry } from '../misc-entries';
 import { formatMoney as money } from '../format';
 import type { InvoiceSettings } from './invoice-settings';
 import robotoRegularBase64 from './fonts/roboto-regular.base64.txt?raw';
@@ -68,6 +69,14 @@ export interface InvoicePdfOptions {
    * only when non-empty, right after the jump categories above.
    */
   groundSchoolEntries: GroundSchoolEntry[];
+  /**
+   * Miscellaneous entries billing into this invoice period (from
+   * misc-entries.ts's entriesInRange) — the generic sibling of
+   * groundSchoolEntries above: each carries its own label and amount
+   * rather than fitting a Category or a fixed session name. Renders as
+   * its own section, only when non-empty, right after ground school.
+   */
+  miscEntries: MiscEntry[];
 }
 
 const MARGIN = 50;
@@ -94,20 +103,22 @@ export function buildSummaryLine(counts: {
   handyCamPackage: number;
   handyCamAfterJump: number;
   groundSchool: number;
+  misc: number;
 }): string {
-  // AFF, ground school and each handy-cam kind only earn a mention when
-  // there were some — an invoice month with none of them reads exactly as
-  // it always did, rather than growing a permanent "and 0 AFF instructing
-  // jump(s)". Built as a list and joined, rather than each clause carrying
-  // its own trailing comma, so two extras in a row don't run into each
-  // other ("…(package),, plus…") — only ever one comma, right before
-  // "this period", and only when there's at least one extra to introduce
-  // it.
+  // AFF, ground school, misc and each handy-cam kind only earn a mention
+  // when there were some — an invoice month with none of them reads
+  // exactly as it always did, rather than growing a permanent "and 0 AFF
+  // instructing jump(s)". Built as a list and joined, rather than each
+  // clause carrying its own trailing comma, so two extras in a row don't
+  // run into each other ("…(package),, plus…") — only ever one comma,
+  // right before "this period", and only when there's at least one extra
+  // to introduce it.
   const extras: string[] = [];
   if (counts.affing > 0) extras.push(`${counts.affing} AFF instructing jump(s)`);
   if (counts.handyCamPackage > 0) extras.push(`${counts.handyCamPackage} handy cam bonus(es) (package)`);
   if (counts.handyCamAfterJump > 0) extras.push(`${counts.handyCamAfterJump} handy cam bonus(es) (after jump)`);
   if (counts.groundSchool > 0) extras.push(`${counts.groundSchool} ground school session(s)`);
+  if (counts.misc > 0) extras.push(`${counts.misc} miscellaneous item(s)`);
   return (
     `${counts.instructing} tandem instructing jump(s) and ${counts.videoing} videographer jump(s)` +
     (extras.length > 0 ? `, plus ${extras.join(', plus ')},` : '') +
@@ -337,6 +348,53 @@ export async function buildTandemInvoicePdf(opts: InvoicePdfOptions): Promise<Bu
 
   total += renderGroundSchoolSection(opts.groundSchoolEntries);
 
+  // ---- Miscellaneous ----
+  // The generic sibling of the ground school section above: each entry
+  // carries its own label (rather than a fixed name like "Ground school
+  // session") alongside its own amount, since this ledger covers whatever
+  // doesn't fit a Category — "B licence evening" and anything after it —
+  // without needing its own section coded here.
+  function renderMiscSection(entries: MiscEntry[]): number {
+    if (entries.length === 0) return 0;
+    if (y > doc.page.height - MARGIN - 100) {
+      doc.addPage();
+      y = MARGIN;
+    }
+
+    doc.font('Body-Bold').fontSize(10.5).fillColor(NAVY);
+    doc.text('Miscellaneous', MARGIN, y, { lineBreak: false });
+    y += 16;
+
+    doc.font('Body').fontSize(9.5);
+    let subtotal = 0;
+    for (const entry of entries) {
+      if (y > doc.page.height - MARGIN - 60) {
+        doc.addPage();
+        y = MARGIN;
+      }
+      doc.text(formatJumpDate(entry.date), MARGIN, y, { width: dateColW, lineBreak: false });
+      doc.text(entry.label, MARGIN + dateColW, y, { width: nameColW - 8, lineBreak: false });
+      doc.text(money(entry.amount), MARGIN + dateColW + nameColW, y, { width: amountColW, align: 'right', lineBreak: false });
+      y += 14;
+      subtotal += entry.amount;
+    }
+
+    y += 2;
+    doc.font('Body-Bold');
+    doc.text(`${entries.length} item(s)`, MARGIN, y, {
+      width: pageWidth - amountColW,
+      align: 'right',
+      lineBreak: false,
+    });
+    doc.text(money(subtotal), MARGIN + pageWidth - amountColW, y, { width: amountColW, align: 'right', lineBreak: false });
+    doc.font('Body');
+    y += 24;
+
+    return subtotal;
+  }
+
+  total += renderMiscSection(opts.miscEntries);
+
   // ---- Handy cam footage (two sections, not one) ----
   // The employer wants the Ultimate package, bought upfront, kept apart on
   // the invoice from a bonus the customer bought once they were already
@@ -405,6 +463,7 @@ export async function buildTandemInvoicePdf(opts: InvoicePdfOptions): Promise<Bu
     handyCamPackage: opts.handyCamPackageJumps.length,
     handyCamAfterJump: opts.handyCamAfterJumpJumps.length,
     groundSchool: opts.groundSchoolEntries.length,
+    misc: opts.miscEntries.length,
   });
   doc.font('Body').fontSize(8).fillColor(MUTED).text(summary, MARGIN, y, { lineBreak: false });
 

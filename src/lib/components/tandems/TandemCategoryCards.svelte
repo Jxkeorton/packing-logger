@@ -9,10 +9,11 @@
     type Category,
     type DayState,
   } from '$lib/tandem';
-  import { totalGroundSchoolEarnings, type GroundSchoolEntry } from '$lib/ground-school';
+  import { totalMiscEarnings, type MiscEntry } from '$lib/misc-entries';
+  import type { TandemVisibility } from '$lib/server/tandem-visibility';
   import { CARD, CARD_TOP, CARD_LABEL, CARD_RATE, CARD_SUBTOTAL, CATEGORIES_LIST } from '$lib/ui-classes';
   import TandemNameModal from './TandemNameModal.svelte';
-  import GroundSchoolModal from './GroundSchoolModal.svelte';
+  import MiscEntryModal from './MiscEntryModal.svelte';
   import Spinner from '../Spinner.svelte';
 
   // `rates` comes from data.rateSettings.tandem (Settings > Work jumps >
@@ -23,24 +24,27 @@
     visibility,
     rates,
     handyCamBonusRate,
-    groundSchoolEntries,
+    miscEntries,
     today,
   }: {
     tandemState: DayState;
-    visibility: Record<Category, boolean>;
+    visibility: TandemVisibility;
     rates: Record<Category, number>;
     handyCamBonusRate: number;
-    /** Today's ground school sessions — rendered beneath the AFF card only, see the `{#if category === 'aff'}` block below. */
-    groundSchoolEntries: GroundSchoolEntry[];
+    /** Today's miscellaneous entries — rendered as their own panel beneath every category card, see the block after the `{#each}` loop below. */
+    miscEntries: MiscEntry[];
     /** Today's date (YYYY-MM-DD) — what the "+ Add jump" modal's date field defaults to. */
     today: string;
   } = $props();
 
-  // Hiding a category is a display preference only (Settings > Work
-  // jumps) — it never touches tandemState itself, so a jump logged
-  // earlier today under a category since hidden still counts fully
-  // toward the totals above this list; it just doesn't get its own card.
+  // Hiding a category (or Miscellaneous) is a display preference only
+  // (Settings > Work jumps) — it never touches tandemState/the misc
+  // ledger itself, so anything logged earlier today under it still counts
+  // fully toward the totals above this list; it just doesn't get its own
+  // card. Miscellaneous has its own `misc` flag rather than riding along
+  // with `aff`'s — see tandem-visibility.ts's doc comment.
   const visibleCategories = $derived(CATEGORIES.filter((c) => visibility[c]));
+  const everythingHidden = $derived(visibleCategories.length === 0 && !visibility.misc);
 
   let pendingCategory = $state<Category | null>(null);
   let deletingAt = $state<string | null>(null);
@@ -87,40 +91,85 @@
     deletingAt = null;
   }
 
-  // Ground school isn't a tandem jump — no category, no rate to look up —
-  // so it gets its own small pair of handlers here rather than reusing
-  // addJump/deleteJump above, the same way its own ledger and actions are
-  // kept apart from the jump ones server-side (see $lib/server/ground-school.ts).
-  let addingGroundSchool = $state(false);
-  let submittingGroundSchool = $state(false);
-  let deletingGroundSchoolAt = $state<string | null>(null);
+  // Ground school used to have its own card here, right about where this
+  // comment sits — removed since staff only run one every month or so, and
+  // Miscellaneous (below) covers it just as well: log it as a "Ground
+  // school" entry there instead. The ledger, actions and invoice section
+  // behind that old card are all still very much alive (see
+  // $lib/server/ground-school.ts) — only the "add a new one" affordance is
+  // gone, so every session logged before this change still shows up in
+  // History and bills correctly. Nothing to migrate.
 
-  async function addGroundSchool(amount: number) {
-    if (submittingGroundSchool) return;
-    submittingGroundSchool = true;
+  // Miscellaneous is the generic escape hatch ground school (above) is a
+  // special case of: anything that doesn't fit a Category and isn't worth
+  // wiring up a whole new panel for — a label the instructor types, plus
+  // what they earned.
+  let addingMiscEntry = $state(false);
+  let editingMiscEntry = $state<MiscEntry | null>(null);
+  let submittingMiscEntry = $state(false);
+  let deletingMiscEntryAt = $state<string | null>(null);
+
+  // One modal instance covers both add and edit (see MiscEntryModal's
+  // `mode` prop) — which of the two flows fired is remembered by whether
+  // editingMiscEntry is set, not by a separate piece of state.
+  const miscModalOpen = $derived(addingMiscEntry || editingMiscEntry !== null);
+
+  async function addMiscEntry(label: string, amount: number) {
+    if (submittingMiscEntry) return;
+    submittingMiscEntry = true;
     try {
       const formData = new FormData();
+      formData.set('label', label);
       formData.set('amount', String(amount));
-      await fetch('?/addGroundSchool', { method: 'POST', body: formData });
-      addingGroundSchool = false;
+      await fetch('?/addMiscEntry', { method: 'POST', body: formData });
+      addingMiscEntry = false;
       await invalidateAll();
     } finally {
-      submittingGroundSchool = false;
+      submittingMiscEntry = false;
     }
   }
 
-  async function deleteGroundSchool(at: string) {
-    deletingGroundSchoolAt = at;
+  async function editMiscEntry(at: string, label: string, amount: number) {
+    if (submittingMiscEntry) return;
+    submittingMiscEntry = true;
+    try {
+      const formData = new FormData();
+      formData.set('at', at);
+      formData.set('label', label);
+      formData.set('amount', String(amount));
+      await fetch('?/editMiscEntry', { method: 'POST', body: formData });
+      editingMiscEntry = null;
+      await invalidateAll();
+    } finally {
+      submittingMiscEntry = false;
+    }
+  }
+
+  function submitMiscModal(label: string, amount: number) {
+    if (editingMiscEntry) {
+      editMiscEntry(editingMiscEntry.at, label, amount);
+    } else {
+      addMiscEntry(label, amount);
+    }
+  }
+
+  function closeMiscModal() {
+    addingMiscEntry = false;
+    editingMiscEntry = null;
+  }
+
+  async function deleteMiscEntry(at: string) {
+    deletingMiscEntryAt = at;
     const formData = new FormData();
     formData.set('at', at);
-    await fetch('?/deleteGroundSchool', { method: 'POST', body: formData });
+    await fetch('?/deleteMiscEntry', { method: 'POST', body: formData });
     await invalidateAll();
-    deletingGroundSchoolAt = null;
+    deletingMiscEntryAt = null;
   }
 </script>
 
 <section class={CATEGORIES_LIST}>
-  {#if visibleCategories.length === 0}
+  {#if everythingHidden}
     <p class="visibility-empty">
       Every section is hidden — turn one back on under <strong>Settings &rarr; Work jumps</strong>.
     </p>
@@ -173,68 +222,80 @@
         <div class={CARD_SUBTOTAL}>£{(tandemState.counts[category] * rates[category]).toFixed(2)}</div>
       {/if}
     </div>
-
-    {#if category === 'aff'}
-      <!--
-        Ground school isn't a jump — it has no rate, no name, no level —
-        so it gets its own small panel rather than a category card. Living
-        inside this `{#each}` branch means it only ever renders alongside a
-        *visible* AFF card: hide AFF from Settings > Work jumps and 'aff'
-        drops out of visibleCategories, taking this panel with it, with no
-        separate visibility flag to keep in sync (see tandem-visibility.ts).
-      -->
-      <div
-        class="{CARD} card-clickable"
-        role="button"
-        tabindex="0"
-        aria-label="Add ground school"
-        onclick={() => (addingGroundSchool = true)}
-        onkeydown={(e) => {
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-            addingGroundSchool = true;
-          }
-        }}
-      >
-        <div class={CARD_TOP}>
-          <div class="card-title-group">
-            <h2 class={CARD_LABEL}>Ground school</h2>
-            <span class="add-jump-icon-btn" aria-hidden="true">&plus;</span>
-          </div>
-        </div>
-        {#if groundSchoolEntries.length > 0}
-          <ul class="list-none mt-1 mb-0 p-0">
-            {#each groundSchoolEntries as entry (entry.at)}
-              <li class="tandem-jump-row">
-                <span class="tandem-jump-name">Ground school</span>
-                <span class="ground-school-amount">£{entry.amount.toFixed(2)}</span>
-                <button
-                  type="button"
-                  class="tandem-jump-delete"
-                  disabled={deletingGroundSchoolAt === entry.at}
-                  aria-label="Remove ground school entry"
-                  onclick={(e) => {
-                    e.stopPropagation();
-                    deleteGroundSchool(entry.at);
-                  }}
-                >
-                  {#if deletingGroundSchoolAt === entry.at}<Spinner size={13} />{:else}&times;{/if}
-                </button>
-              </li>
-            {/each}
-          </ul>
-          <div class={CARD_SUBTOTAL}>£{totalGroundSchoolEarnings(groundSchoolEntries).toFixed(2)}</div>
-        {/if}
-      </div>
-    {/if}
   {/each}
+
+  {#if visibility.misc}
+    <!--
+      Miscellaneous isn't tied to any one category — unlike ground school
+      it doesn't live under AFF specifically, and it has its own
+      visibility flag (visibility.misc) rather than piggybacking on
+      `aff`'s — so it renders once, after every visible category card,
+      gated on its own flag, rather than inside the `{#each}` above.
+    -->
+    <div
+      class="{CARD} card-clickable"
+      role="button"
+      tabindex="0"
+      aria-label="Add miscellaneous entry"
+      onclick={() => (addingMiscEntry = true)}
+      onkeydown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          addingMiscEntry = true;
+        }
+      }}
+    >
+      <div class={CARD_TOP}>
+        <div class="card-title-group">
+          <h2 class={CARD_LABEL}>Miscellaneous</h2>
+          <span class="add-jump-icon-btn" aria-hidden="true">&plus;</span>
+        </div>
+      </div>
+      {#if miscEntries.length > 0}
+        <ul class="list-none mt-1 mb-0 p-0">
+          {#each miscEntries as entry (entry.at)}
+            <li class="tandem-jump-row">
+              <button
+                type="button"
+                class="entry-edit-trigger"
+                aria-label={`Edit ${entry.label}`}
+                onclick={(e) => {
+                  e.stopPropagation();
+                  editingMiscEntry = entry;
+                }}
+              >
+                <span class="tandem-jump-name">{entry.label}</span>
+                <span class="entry-amount">£{entry.amount.toFixed(2)}</span>
+              </button>
+              <button
+                type="button"
+                class="tandem-jump-delete"
+                disabled={deletingMiscEntryAt === entry.at}
+                aria-label={`Remove ${entry.label}`}
+                onclick={(e) => {
+                  e.stopPropagation();
+                  deleteMiscEntry(entry.at);
+                }}
+              >
+                {#if deletingMiscEntryAt === entry.at}<Spinner size={13} />{:else}&times;{/if}
+              </button>
+            </li>
+          {/each}
+        </ul>
+        <div class={CARD_SUBTOTAL}>£{totalMiscEarnings(miscEntries).toFixed(2)}</div>
+      {/if}
+    </div>
+  {/if}
 </section>
 
-<GroundSchoolModal
-  open={addingGroundSchool}
-  submitting={submittingGroundSchool}
-  onSubmit={addGroundSchool}
-  onClose={() => (addingGroundSchool = false)}
+<MiscEntryModal
+  open={miscModalOpen}
+  mode={editingMiscEntry ? 'edit' : 'add'}
+  initialLabel={editingMiscEntry?.label ?? ''}
+  initialAmount={editingMiscEntry ? String(editingMiscEntry.amount) : ''}
+  submitting={submittingMiscEntry}
+  onSubmit={submitMiscModal}
+  onClose={closeMiscModal}
 />
 
 <TandemNameModal
@@ -264,7 +325,7 @@
     text-align: center;
   }
 
-  .ground-school-amount {
+  .entry-amount {
     flex: none;
     font-family: var(--font-mono);
     font-size: 12.5px;
@@ -321,6 +382,36 @@
     padding: 9px 2px;
     border-top: 1px solid var(--line);
     font-size: 13.5px;
+  }
+
+  /* Only the Miscellaneous panel's rows have this — a real <button>
+     wrapping the label+amount (rather than the whole <li>, which can't
+     take an interactive role) that reopens MiscEntryModal pre-filled, the
+     same way tapping a category card opens it empty. The delete button
+     stays a separate sibling, same as every other row. */
+  .entry-edit-trigger {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    appearance: none;
+    border: none;
+    background: transparent;
+    padding: 2px 4px;
+    margin: -2px -4px;
+    border-radius: 6px;
+    font: inherit;
+    color: inherit;
+    text-align: left;
+    cursor: pointer;
+    touch-action: manipulation;
+  }
+
+  .entry-edit-trigger:hover,
+  .entry-edit-trigger:focus-visible {
+    background: var(--line);
+    outline: none;
   }
 
   .tandem-jump-name {

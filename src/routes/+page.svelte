@@ -614,7 +614,7 @@
       visibility={data.tandemVisibility}
       rates={data.rateSettings.tandem}
       handyCamBonusRate={data.rateSettings.handyCamBonusRate}
-      groundSchoolEntries={data.groundSchoolEntries}
+      miscEntries={data.miscEntries}
       today={data.today}
     />
 
@@ -628,6 +628,7 @@
       monthRows={data.tandemMonthRows}
       dayJumps={data.tandemDayJumps}
       groundSchoolDayEntries={data.groundSchoolDayEntries}
+      miscDayEntries={data.miscDayEntries}
     />
   </div>
 

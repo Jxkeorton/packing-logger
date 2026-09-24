@@ -6,9 +6,14 @@ import { describe, expect, it } from 'vitest';
 import { buildSummaryLine, buildTandemInvoicePdf } from './invoice-pdf';
 import type { Category, Jump } from '../tandem';
 import type { GroundSchoolEntry } from '../ground-school';
+import type { MiscEntry } from '../misc-entries';
 
 function groundSchool(amount: number): GroundSchoolEntry {
   return { date: '2026-09-06', amount, at: '2026-09-06T10:00:00.000Z' };
+}
+
+function misc(label: string, amount: number): MiscEntry {
+  return { date: '2026-09-06', label, amount, at: '2026-09-06T10:00:00.000Z' };
 }
 
 function jump(category: Category, name: string, level = ''): Jump {
@@ -39,6 +44,7 @@ async function build(
   handyCamPackageJumps: Jump[] = [],
   handyCamAfterJumpJumps: Jump[] = [],
   groundSchoolEntries: GroundSchoolEntry[] = [],
+  miscEntries: MiscEntry[] = [],
 ) {
   return buildTandemInvoicePdf({
     ref: 1,
@@ -52,6 +58,7 @@ async function build(
     handyCamAfterJumpJumps,
     handyCamBonusRate: 20,
     groundSchoolEntries,
+    miscEntries,
   });
 }
 
@@ -136,10 +143,33 @@ describe('buildTandemInvoicePdf', () => {
     // added to the total can't produce an identically sized PDF.
     expect(withSessions.length).toBeGreaterThan(without.length);
   });
+
+  it('renders a miscellaneous section, and folds its amount into the total', async () => {
+    const without = await build({ instructor: [], videographer: [], aff: [jump('aff', 'Alex Marsh', 'Level 6')] });
+    const withEntries = await build(
+      { instructor: [], videographer: [], aff: [jump('aff', 'Alex Marsh', 'Level 6')] },
+      [],
+      [],
+      [],
+      [misc('B licence evening', 40), misc('B licence evening', 40)],
+    );
+
+    expect(withEntries.subarray(0, 5).toString()).toBe('%PDF-');
+    // Same reasoning as the ground-school-section test above.
+    expect(withEntries.length).toBeGreaterThan(without.length);
+  });
 });
 
 describe('buildSummaryLine', () => {
-  const base = { instructing: 5, videoing: 2, affing: 0, handyCamPackage: 0, handyCamAfterJump: 0, groundSchool: 0 };
+  const base = {
+    instructing: 5,
+    videoing: 2,
+    affing: 0,
+    handyCamPackage: 0,
+    handyCamAfterJump: 0,
+    groundSchool: 0,
+    misc: 0,
+  };
 
   it('mentions only instructor and videographer counts when there are no extras', () => {
     expect(buildSummaryLine(base)).toBe('5 tandem instructing jump(s) and 2 videographer jump(s) this period.');
@@ -155,11 +185,18 @@ describe('buildSummaryLine', () => {
     // The exact regression this guards: each clause used to carry its own
     // trailing comma, so stacking the two handy-cam ones produced
     // "…(package),, plus…".
-    const line = buildSummaryLine({ ...base, affing: 3, handyCamPackage: 1, handyCamAfterJump: 2, groundSchool: 4 });
+    const line = buildSummaryLine({
+      ...base,
+      affing: 3,
+      handyCamPackage: 1,
+      handyCamAfterJump: 2,
+      groundSchool: 4,
+      misc: 1,
+    });
     expect(line).toBe(
       '5 tandem instructing jump(s) and 2 videographer jump(s), plus 3 AFF instructing jump(s), ' +
         'plus 1 handy cam bonus(es) (package), plus 2 handy cam bonus(es) (after jump), ' +
-        'plus 4 ground school session(s), this period.',
+        'plus 4 ground school session(s), plus 1 miscellaneous item(s), this period.',
     );
     expect(line).not.toContain(',,');
   });

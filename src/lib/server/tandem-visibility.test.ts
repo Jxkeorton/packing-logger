@@ -19,52 +19,64 @@ beforeEach(() => {
 });
 
 describe('readTandemVisibility', () => {
-  it('defaults every category to visible when nothing has been saved yet', async () => {
-    expect(await readTandemVisibility()).toEqual({ instructor: true, videographer: true, aff: true });
+  it('defaults every category (and misc) to visible when nothing has been saved yet', async () => {
+    expect(await readTandemVisibility()).toEqual({ instructor: true, videographer: true, aff: true, misc: true });
   });
 
   it('shows a category added after the file was written, rather than hiding it', async () => {
     // What every existing install's tandem-visibility.json looks like:
-    // saved before AFF existed, so it has no key for it. A missing key
-    // has to read as the default (visible), or adding a category would
-    // silently hide it from everyone who had ever touched this screen.
+    // saved before AFF (and later misc) existed, so it has no key for
+    // them. A missing key has to read as the default (visible), or adding
+    // a category would silently hide it from everyone who had ever
+    // touched this screen.
     store.set('tandem-visibility.json', JSON.stringify({ instructor: true, videographer: false }));
-    expect(await readTandemVisibility()).toEqual({ instructor: true, videographer: false, aff: true });
+    expect(await readTandemVisibility()).toEqual({ instructor: true, videographer: false, aff: true, misc: true });
   });
 
   it('falls back to the defaults for corrupt saved JSON', async () => {
     store.set('tandem-visibility.json', 'not json');
-    expect(await readTandemVisibility()).toEqual({ instructor: true, videographer: true, aff: true });
+    expect(await readTandemVisibility()).toEqual({ instructor: true, videographer: true, aff: true, misc: true });
   });
 
   it('falls back to the defaults for a saved value that is not an object', async () => {
     store.set('tandem-visibility.json', '"nope"');
-    expect(await readTandemVisibility()).toEqual({ instructor: true, videographer: true, aff: true });
+    expect(await readTandemVisibility()).toEqual({ instructor: true, videographer: true, aff: true, misc: true });
   });
 
   it('fills in a missing or non-boolean category from the defaults, keeping the rest', async () => {
     store.set('tandem-visibility.json', JSON.stringify({ instructor: false, videographer: 'nope' }));
-    expect(await readTandemVisibility()).toEqual({ instructor: false, videographer: true, aff: true });
+    expect(await readTandemVisibility()).toEqual({ instructor: false, videographer: true, aff: true, misc: true });
   });
 });
 
 describe('setTandemVisibility', () => {
-  it('turns one category off without touching the other', async () => {
+  it('turns one category off without touching the others', async () => {
     const result = await setTandemVisibility('videographer', false);
-    expect(result).toEqual({ instructor: true, videographer: false, aff: true });
-    expect(await readTandemVisibility()).toEqual({ instructor: true, videographer: false, aff: true });
+    expect(result).toEqual({ instructor: true, videographer: false, aff: true, misc: true });
+    expect(await readTandemVisibility()).toEqual({ instructor: true, videographer: false, aff: true, misc: true });
   });
 
   it('can turn a previously hidden category back on', async () => {
     await setTandemVisibility('instructor', false);
     const result = await setTandemVisibility('instructor', true);
-    expect(result).toEqual({ instructor: true, videographer: true, aff: true });
+    expect(result).toEqual({ instructor: true, videographer: true, aff: true, misc: true });
   });
 
   it('persists several categories hidden at once, one call at a time', async () => {
     await setTandemVisibility('instructor', false);
     await setTandemVisibility('videographer', false);
     const result = await setTandemVisibility('aff', false);
-    expect(result).toEqual({ instructor: false, videographer: false, aff: false });
+    expect(result).toEqual({ instructor: false, videographer: false, aff: false, misc: true });
+  });
+
+  it('hides misc independently of aff — turning one off leaves the other on', async () => {
+    const hideMisc = await setTandemVisibility('misc', false);
+    expect(hideMisc).toEqual({ instructor: true, videographer: true, aff: true, misc: false });
+
+    const hideAffToo = await setTandemVisibility('aff', false);
+    expect(hideAffToo).toEqual({ instructor: true, videographer: true, aff: false, misc: false });
+
+    const showAffAgain = await setTandemVisibility('aff', true);
+    expect(showAffAgain).toEqual({ instructor: true, videographer: true, aff: true, misc: false });
   });
 });

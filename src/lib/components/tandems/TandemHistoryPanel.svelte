@@ -2,6 +2,7 @@
   import { invalidateAll } from '$app/navigation';
   import { CATEGORIES, CATEGORY_LABELS, type HistoryRow, type Jump } from '$lib/tandem';
   import type { GroundSchoolEntry } from '$lib/ground-school';
+  import type { MiscEntry } from '$lib/misc-entries';
   import type { AggregateRow } from '$lib/server/tandem-invoice';
   import { CATEGORY_TEXT_CLASS } from '$lib/category-colors';
   import { formatMoney as money } from '$lib/format';
@@ -27,14 +28,17 @@
     monthRows,
     dayJumps,
     groundSchoolDayEntries,
+    miscDayEntries,
   }: {
     dayRows: HistoryRow[];
     weekRows: AggregateRow[];
     monthRows: AggregateRow[];
     /** Each day row's individual jumps, keyed by date — the Day tab's own row plus this is what makes an already-logged jump findable to edit (see toggleHandyCam), rather than just its counts. */
     dayJumps: Record<string, Jump[]>;
-    /** Each day row's ground school sessions, keyed by date the same way as dayJumps — its own small ledger (see $lib/ground-school.ts), so it isn't just another entry in dayJumps. Read-only here: unlike a jump, a session isn't edited from History. */
+    /** Each day row's ground school sessions, keyed by date the same way as dayJumps — its own small ledger (see $lib/ground-school.ts), so it isn't just another entry in dayJumps. Deletable here (a mis-logged session), but never edited — there's no add path left either since the panel it used to come from was retired, so amount/label don't apply. */
     groundSchoolDayEntries: Record<string, GroundSchoolEntry[]>;
+    /** Each day row's miscellaneous entries, keyed by date the same way as groundSchoolDayEntries — its own ledger (see $lib/misc-entries.ts). Editable and deletable here, same as a mis-logged session above. */
+    miscDayEntries: Record<string, MiscEntry[]>;
   } = $props();
 
   let activeView = $state<'day' | 'week' | 'month'>('day');
@@ -49,6 +53,18 @@
   let editingDateAt = $state<string | null>(null);
   let dateDraft = $state('');
   let savingDate = $state(false);
+
+  // Deleting a stray ground school session or misc entry — same
+  // fetch-then-invalidateAll pattern as everything else in this file,
+  // rather than a <form>. Ground school has no edit path (see the doc
+  // comment on groundSchoolDayEntries above); misc gets its own inline
+  // edit, just below.
+  let deletingGroundSchoolAt = $state<string | null>(null);
+  let deletingMiscAt = $state<string | null>(null);
+  let editingMiscAt = $state<string | null>(null);
+  let miscLabelDraft = $state('');
+  let miscAmountDraft = $state('');
+  let savingMiscEdit = $state(false);
 
   const weekView = $derived(
     weekRows.map((r) => ({ key: r.key, isCurrent: r.isCurrent, rangeLabel: r.rangeLabel, counts: r.counts, total: r.totalJumps, earnings: r.totalEarnings })),
@@ -122,6 +138,60 @@
       await invalidateAll();
     } finally {
       savingDate = false;
+    }
+  }
+
+  async function deleteGroundSchoolSession(at: string) {
+    deletingGroundSchoolAt = at;
+    try {
+      const formData = new FormData();
+      formData.set('at', at);
+      await fetch('?/deleteGroundSchool', { method: 'POST', body: formData });
+      await invalidateAll();
+    } finally {
+      deletingGroundSchoolAt = null;
+    }
+  }
+
+  async function deleteMiscEntryRow(at: string) {
+    deletingMiscAt = at;
+    try {
+      const formData = new FormData();
+      formData.set('at', at);
+      await fetch('?/deleteMiscEntry', { method: 'POST', body: formData });
+      await invalidateAll();
+    } finally {
+      deletingMiscAt = null;
+    }
+  }
+
+  // Same shape as startEditDate/saveDate/cancelEditDate above, for a misc
+  // entry's label and amount instead of a jump's date.
+  function startEditMisc(entry: MiscEntry) {
+    editingMiscAt = entry.at;
+    miscLabelDraft = entry.label;
+    miscAmountDraft = String(entry.amount);
+  }
+
+  function cancelEditMisc() {
+    editingMiscAt = null;
+  }
+
+  async function saveMiscEdit(entry: MiscEntry) {
+    const label = miscLabelDraft.trim();
+    const amount = Number(miscAmountDraft);
+    if (!label || !Number.isFinite(amount) || amount <= 0 || savingMiscEdit) return;
+    savingMiscEdit = true;
+    try {
+      const formData = new FormData();
+      formData.set('at', entry.at);
+      formData.set('label', label);
+      formData.set('amount', String(amount));
+      await fetch('?/editMiscEntry', { method: 'POST', body: formData });
+      editingMiscAt = null;
+      await invalidateAll();
+    } finally {
+      savingMiscEdit = false;
     }
   }
 </script>
@@ -261,6 +331,82 @@
                                 <span class="shrink-0 font-mono text-[10px] font-bold uppercase text-ink-soft">GS</span>
                                 <span class="flex-1 min-w-0 truncate">Ground school</span>
                                 <span class="shrink-0 font-mono text-[11px]">{money(session.amount)}</span>
+                                <button
+                                  type="button"
+                                  class="shrink-0 appearance-none border-0 bg-transparent p-0 text-[10.5px] font-semibold text-ink-soft underline cursor-pointer touch-manipulation disabled:opacity-60 disabled:cursor-default"
+                                  disabled={deletingGroundSchoolAt === session.at}
+                                  aria-label="Remove ground school entry"
+                                  onclick={() => deleteGroundSchoolSession(session.at)}
+                                >
+                                  {#if deletingGroundSchoolAt === session.at}<Spinner size={10} />{:else}Remove{/if}
+                                </button>
+                              </li>
+                            {/each}
+                          </ul>
+                        {/if}
+                        {#if (miscDayEntries[row.date] ?? []).length > 0}
+                          <ul class="list-none m-0 py-1 px-2 border-t border-line bg-canvas">
+                            {#each miscDayEntries[row.date] as entry (entry.at)}
+                              <li class="py-1.5 border-t border-line first:border-t-0 text-[12.5px] font-sans">
+                                <div class="flex items-center gap-2">
+                                  <span class="shrink-0 font-mono text-[10px] font-bold uppercase text-ink-soft">MISC</span>
+                                  <span class="flex-1 min-w-0 truncate">{entry.label}</span>
+                                  <span class="shrink-0 font-mono text-[11px]">{money(entry.amount)}</span>
+                                  <button
+                                    type="button"
+                                    class="shrink-0 appearance-none border-0 bg-transparent p-0 text-[10.5px] font-semibold text-ink-soft underline cursor-pointer touch-manipulation disabled:opacity-60 disabled:cursor-default"
+                                    disabled={editingMiscAt === entry.at}
+                                    onclick={() => startEditMisc(entry)}
+                                  >
+                                    Edit
+                                  </button>
+                                  <button
+                                    type="button"
+                                    class="shrink-0 appearance-none border-0 bg-transparent p-0 text-[10.5px] font-semibold text-ink-soft underline cursor-pointer touch-manipulation disabled:opacity-60 disabled:cursor-default"
+                                    disabled={deletingMiscAt === entry.at}
+                                    aria-label={`Remove ${entry.label}`}
+                                    onclick={() => deleteMiscEntryRow(entry.at)}
+                                  >
+                                    {#if deletingMiscAt === entry.at}<Spinner size={10} />{:else}Remove{/if}
+                                  </button>
+                                </div>
+                                {#if editingMiscAt === entry.at}
+                                  <div class="mt-1.5 flex items-center gap-1.5">
+                                    <input
+                                      type="text"
+                                      class="h-8 min-w-0 flex-1 px-2 rounded-[var(--radius-control)] border border-line-strong bg-canvas text-ink font-sans text-[12.5px]"
+                                      maxlength="80"
+                                      bind:value={miscLabelDraft}
+                                      disabled={savingMiscEdit}
+                                    />
+                                    <input
+                                      type="number"
+                                      inputmode="decimal"
+                                      step="0.01"
+                                      min="0.01"
+                                      class="h-8 w-20 px-2 rounded-[var(--radius-control)] border border-line-strong bg-canvas text-ink font-sans text-[12.5px]"
+                                      bind:value={miscAmountDraft}
+                                      disabled={savingMiscEdit}
+                                    />
+                                    <button
+                                      type="button"
+                                      class="shrink-0 appearance-none rounded-full border-0 bg-gold px-2.5 py-1 text-[11px] font-bold text-white cursor-pointer touch-manipulation disabled:opacity-60 disabled:cursor-default flex items-center gap-1"
+                                      disabled={savingMiscEdit}
+                                      onclick={() => saveMiscEdit(entry)}
+                                    >
+                                      {#if savingMiscEdit}<Spinner size={10} />{/if}
+                                      Save
+                                    </button>
+                                    <button
+                                      type="button"
+                                      class="shrink-0 appearance-none rounded-full border border-line-strong bg-transparent px-2.5 py-1 text-[11px] font-semibold text-ink-soft cursor-pointer touch-manipulation disabled:opacity-60 disabled:cursor-default"
+                                      disabled={savingMiscEdit}
+                                      onclick={cancelEditMisc}
+                                    >
+                                      Cancel
+                                    </button>
+                                  </div>
+                                {/if}
                               </li>
                             {/each}
                           </ul>

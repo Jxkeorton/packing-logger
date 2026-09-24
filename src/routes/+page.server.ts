@@ -26,6 +26,8 @@ import {
   loadTodayEntries as loadGroundSchoolToday,
   readHistory as readGroundSchoolHistory,
 } from '$lib/server/ground-school';
+import { totalMiscEarnings } from '$lib/misc-entries';
+import { loadTodayEntries as loadMiscToday, readHistory as readMiscHistory } from '$lib/server/misc-entries';
 import { formatDateKey, invoiceMonthOf, mondayOf, parseDateKey } from '$lib/server/periods';
 import { packingActions } from '$lib/server/actions/packing';
 import { tandemActions } from '$lib/server/actions/tandem';
@@ -33,16 +35,56 @@ import { logbookActions } from '$lib/server/actions/logbook';
 import { configActions } from '$lib/server/actions/config';
 import { ratesActions } from '$lib/server/actions/rates';
 import { groundSchoolActions } from '$lib/server/actions/ground-school';
+import { miscEntryActions } from '$lib/server/actions/misc-entries';
 
-/** Same week-bucket key groupTandemByWeek uses internally (history-buckets.ts), so a ground school session lands in the same row as any jump earned the same week. */
+/** Same week-bucket key groupTandemByWeek uses internally (history-buckets.ts), so a ground school session or misc entry lands in the same row as any jump earned the same week. */
 function weekKeyFor(date: string): string {
   return formatDateKey(mondayOf(parseDateKey(date)));
 }
 
-/** Same invoice-month bucket key groupTandemByInvoiceMonth uses internally, so a ground school session lands in the same row as any jump earned the same invoice period. */
+/** Same invoice-month bucket key groupTandemByInvoiceMonth uses internally, so a ground school session or misc entry lands in the same row as any jump earned the same invoice period. */
 function monthKeyFor(date: string): string {
   const { year, month } = invoiceMonthOf(parseDateKey(date));
   return `${year}-${String(month + 1).padStart(2, '0')}`;
+}
+
+/**
+ * Ground school and misc entries are both "amount, no jump" ledgers that
+ * still need to ride along with the work-jumps History tab's day/week/month
+ * rollups — see the doc comment above the ground-school folding logic this
+ * replaces. Shared here now that there are two of them, rather than
+ * duplicating the same loop a second time.
+ */
+interface ExtraLedgerRollup<E> {
+  byDay: Map<string, E[]>;
+  earningsByDay: Map<string, number>;
+  earningsByWeek: Map<string, number>;
+  earningsByMonth: Map<string, number>;
+}
+
+function foldExtraLedger<E extends { date: string; amount: number }>(history: E[]): ExtraLedgerRollup<E> {
+  const byDay = new Map<string, E[]>();
+  const earningsByDay = new Map<string, number>();
+  const earningsByWeek = new Map<string, number>();
+  const earningsByMonth = new Map<string, number>();
+  for (const entry of history) {
+    byDay.set(entry.date, [...(byDay.get(entry.date) ?? []), entry]);
+    earningsByDay.set(entry.date, (earningsByDay.get(entry.date) ?? 0) + entry.amount);
+    const weekKey = weekKeyFor(entry.date);
+    earningsByWeek.set(weekKey, (earningsByWeek.get(weekKey) ?? 0) + entry.amount);
+    const monthKey = monthKeyFor(entry.date);
+    earningsByMonth.set(monthKey, (earningsByMonth.get(monthKey) ?? 0) + entry.amount);
+  }
+  return { byDay, earningsByDay, earningsByWeek, earningsByMonth };
+}
+
+/** Today's own entries (loaded separately, same split as the jump ledger's own today/history divide) still belong in the current week/month total. */
+function addTodayTotal<E>(rollup: ExtraLedgerRollup<E>, todayTotal: number, today: string): void {
+  if (todayTotal <= 0) return;
+  const weekKey = weekKeyFor(today);
+  rollup.earningsByWeek.set(weekKey, (rollup.earningsByWeek.get(weekKey) ?? 0) + todayTotal);
+  const monthKey = monthKeyFor(today);
+  rollup.earningsByMonth.set(monthKey, (rollup.earningsByMonth.get(monthKey) ?? 0) + todayTotal);
 }
 
 export const load: PageServerLoad = async () => {
@@ -65,6 +107,8 @@ export const load: PageServerLoad = async () => {
     burbleState,
     groundSchoolEntries,
     groundSchoolHistory,
+    miscEntries,
+    miscHistory,
   ] = await Promise.all([
     loadTodayStateForRender(),
     readFastestFive(),
@@ -78,6 +122,8 @@ export const load: PageServerLoad = async () => {
     readSyncState(),
     loadGroundSchoolToday(),
     readGroundSchoolHistory(),
+    loadMiscToday(),
+    readMiscHistory(),
   ]);
 
   const { entries: logbookEntries, nextNumber: nextLogbookNumber } = await readLogbookAndNextNumber(
@@ -128,71 +174,85 @@ export const load: PageServerLoad = async () => {
   // symmetry with packing and as a no-cost guard if that ever changes.
   const { state: tandemState, history: tandemFullHistory, dayJumps: tandemDayJumpsFull } = tandemBundle;
 
-  // Ground school doesn't fit the tandem Jump model (see $lib/ground-school.ts's
-  // doc comment) so it lives in its own ledger — but its earnings still
-  // belong in the work-jumps History tab, folded into whichever day/week/
-  // month they were earned in, the same way a handy-cam bonus rides along
-  // with its jump. Without this, a day that was *only* ground school (no
+  // Ground school and misc entries don't fit the tandem Jump model (see
+  // $lib/ground-school.ts's and $lib/misc-entries.ts's doc comments) so
+  // they live in their own ledgers — but their earnings still belong in
+  // the work-jumps History tab, folded into whichever day/week/month they
+  // were earned in, the same way a handy-cam bonus rides along with its
+  // jump. Without this, a day that was *only* ground school or misc (no
   // instructor/videographer/AFF jump alongside it) would never appear in
   // History at all: tandemFullHistory only ever gets a row when a jump is
   // logged.
   const today = todayKey();
-  const groundSchoolByDay = new Map<string, typeof groundSchoolHistory>();
-  const groundSchoolEarningsByDay = new Map<string, number>();
-  const groundSchoolEarningsByWeek = new Map<string, number>();
-  const groundSchoolEarningsByMonth = new Map<string, number>();
-  for (const entry of groundSchoolHistory) {
-    groundSchoolByDay.set(entry.date, [...(groundSchoolByDay.get(entry.date) ?? []), entry]);
-    groundSchoolEarningsByDay.set(entry.date, (groundSchoolEarningsByDay.get(entry.date) ?? 0) + entry.amount);
-    const weekKey = weekKeyFor(entry.date);
-    groundSchoolEarningsByWeek.set(weekKey, (groundSchoolEarningsByWeek.get(weekKey) ?? 0) + entry.amount);
-    const monthKey = monthKeyFor(entry.date);
-    groundSchoolEarningsByMonth.set(monthKey, (groundSchoolEarningsByMonth.get(monthKey) ?? 0) + entry.amount);
-  }
-  // Today's own sessions (loaded separately, same split as the jump ledger's
-  // own today/history divide) still belong in the current week/month total.
-  const todayGroundSchoolTotal = totalGroundSchoolEarnings(groundSchoolEntries);
-  if (todayGroundSchoolTotal > 0) {
-    const weekKey = weekKeyFor(today);
-    groundSchoolEarningsByWeek.set(weekKey, (groundSchoolEarningsByWeek.get(weekKey) ?? 0) + todayGroundSchoolTotal);
-    const monthKey = monthKeyFor(today);
-    groundSchoolEarningsByMonth.set(monthKey, (groundSchoolEarningsByMonth.get(monthKey) ?? 0) + todayGroundSchoolTotal);
+  const groundSchoolRollup = foldExtraLedger(groundSchoolHistory);
+  addTodayTotal(groundSchoolRollup, totalGroundSchoolEarnings(groundSchoolEntries), today);
+  const miscRollup = foldExtraLedger(miscHistory);
+  addTodayTotal(miscRollup, totalMiscEarnings(miscEntries), today);
+
+  function extraEarnings(maps: [Map<string, number>, Map<string, number>], key: string): number {
+    return (maps[0].get(key) ?? 0) + (maps[1].get(key) ?? 0);
   }
 
-  // A day with a ground school session but no jump of its own isn't in
-  // tandemFullHistory yet — give it a zero-jump placeholder row so it
-  // survives the "was anything logged" filter below and gets bucketed into
-  // its week/month like any other day.
-  const groundSchoolOnlyRows = [...groundSchoolByDay.keys()]
+  // A day with a ground school session or misc entry but no jump of its
+  // own isn't in tandemFullHistory yet — give it a zero-jump placeholder
+  // row so it survives the "was anything logged" filter below and gets
+  // bucketed into its week/month like any other day.
+  const extraOnlyDates = new Set([...groundSchoolRollup.byDay.keys(), ...miscRollup.byDay.keys()]);
+  const extraOnlyRows = [...extraOnlyDates]
     .filter((date) => !tandemFullHistory.some((r) => r.date === date))
     .map((date) => ({ date, counts: zeroTandemCounts(), totalJumps: 0, totalEarnings: 0 }));
 
-  const tandemNonEmptyHistory = [...tandemFullHistory, ...groundSchoolOnlyRows]
-    .filter((r) => r.totalJumps > 0 || (groundSchoolEarningsByDay.get(r.date) ?? 0) > 0)
+  const tandemNonEmptyHistory = [...tandemFullHistory, ...extraOnlyRows]
+    .filter(
+      (r) =>
+        r.totalJumps > 0 || extraEarnings([groundSchoolRollup.earningsByDay, miscRollup.earningsByDay], r.date) > 0,
+    )
     .sort((a, b) => (a.date < b.date ? 1 : -1));
   const tandemDayRows = tandemNonEmptyHistory.slice(0, 14).map((row) => ({
     ...row,
-    totalEarnings: row.totalEarnings + (groundSchoolEarningsByDay.get(row.date) ?? 0),
+    totalEarnings:
+      row.totalEarnings + extraEarnings([groundSchoolRollup.earningsByDay, miscRollup.earningsByDay], row.date),
   }));
   // The individual jumps behind the Day tab's rows, narrowed to just the
   // dates it actually renders — tandemDayJumpsFull carries one entry per
   // date in the wider 400-day window loaded for the week/month rollups,
-  // most of which never reach the page. Ground school sessions ride along
-  // the same way, keyed the same way, for the same reason.
+  // most of which never reach the page. Ground school sessions and misc
+  // entries ride along the same way, keyed the same way, for the same
+  // reason.
   const tandemDayJumps = Object.fromEntries(
     tandemDayRows.map((row) => [row.date, tandemDayJumpsFull[row.date] ?? []]),
   );
   const groundSchoolDayEntries = Object.fromEntries(
-    tandemDayRows.map((row) => [row.date, groundSchoolByDay.get(row.date) ?? []]),
+    tandemDayRows.map((row) => [row.date, groundSchoolRollup.byDay.get(row.date) ?? []]),
+  );
+  const miscDayEntries = Object.fromEntries(
+    tandemDayRows.map((row) => [row.date, miscRollup.byDay.get(row.date) ?? []]),
   );
   const tandemCombined = [...tandemNonEmptyHistory, toTandemHistoryRow(tandemState, rateSettings.tandem)];
   const tandemWeekRows = groupTandemByWeek(tandemCombined, rateSettings.tandem)
-    .map((r) => ({ ...r, totalEarnings: r.totalEarnings + (groundSchoolEarningsByWeek.get(r.key) ?? 0) }))
-    .filter((r) => r.isCurrent || r.totalJumps > 0 || (groundSchoolEarningsByWeek.get(r.key) ?? 0) > 0)
+    .map((r) => ({
+      ...r,
+      totalEarnings: r.totalEarnings + extraEarnings([groundSchoolRollup.earningsByWeek, miscRollup.earningsByWeek], r.key),
+    }))
+    .filter(
+      (r) =>
+        r.isCurrent ||
+        r.totalJumps > 0 ||
+        extraEarnings([groundSchoolRollup.earningsByWeek, miscRollup.earningsByWeek], r.key) > 0,
+    )
     .slice(0, 12);
   const tandemMonthRows = groupTandemByInvoiceMonth(tandemCombined, rateSettings.tandem)
-    .map((r) => ({ ...r, totalEarnings: r.totalEarnings + (groundSchoolEarningsByMonth.get(r.key) ?? 0) }))
-    .filter((r) => r.isCurrent || r.totalJumps > 0 || (groundSchoolEarningsByMonth.get(r.key) ?? 0) > 0)
+    .map((r) => ({
+      ...r,
+      totalEarnings:
+        r.totalEarnings + extraEarnings([groundSchoolRollup.earningsByMonth, miscRollup.earningsByMonth], r.key),
+    }))
+    .filter(
+      (r) =>
+        r.isCurrent ||
+        r.totalJumps > 0 ||
+        extraEarnings([groundSchoolRollup.earningsByMonth, miscRollup.earningsByMonth], r.key) > 0,
+    )
     .slice(0, 12);
 
   // Manifest sync state (burbleState, read above) is *read* on a page
@@ -224,6 +284,8 @@ export const load: PageServerLoad = async () => {
     tandemMonthRows,
     groundSchoolEntries,
     groundSchoolDayEntries,
+    miscEntries,
+    miscDayEntries,
     invoiceSettings,
     tandemVisibility,
     tabVisibility,
@@ -244,4 +306,5 @@ export const actions: Actions = {
   ...configActions,
   ...ratesActions,
   ...groundSchoolActions,
+  ...miscEntryActions,
 };
