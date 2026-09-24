@@ -350,13 +350,25 @@ export async function commitMatches(slotIds: string[]): Promise<CommitResult> {
   // happened, not the day it's being confirmed. Built lazily and cached
   // per date as we go, so a batch spanning several days doesn't re-read
   // the whole jumps file once per slot.
-  const existingTandemNamesByDate = new Map<string, Set<string>>();
-  async function tandemNamesFor(date: string): Promise<Set<string>> {
-    const cached = existingTandemNamesByDate.get(date);
+  //
+  // Counts, not a Set: an AFF instructor jumping with the same student
+  // twice in a day (a re-do, or a second level taught later) is entirely
+  // normal, and role::name alone can't tell that apart from an actual
+  // duplicate. What it *can* tell apart is "how many jumps under this key
+  // were already on the books before this batch started" — that's the
+  // count this map holds. Each slot here checks out one of those, if any
+  // are left, and only a slot with none left to check out is a genuine
+  // duplicate (almost always: the same booking already tapped in by hand
+  // on the Tandems tab). A key never seen before starts at zero, so two
+  // freshly-synced slots for the same student both commit — there being
+  // two of them is exactly the fact the sync captured.
+  const existingTandemCountsByDate = new Map<string, Map<string, number>>();
+  async function tandemCountsFor(date: string): Promise<Map<string, number>> {
+    const cached = existingTandemCountsByDate.get(date);
     if (cached) return cached;
-    const names = await tandemKeysOnDate(date);
-    existingTandemNamesByDate.set(date, names);
-    return names;
+    const counts = await tandemKeyCountsOnDate(date);
+    existingTandemCountsByDate.set(date, counts);
+    return counts;
   }
 
   const committed = { ...state.committed };
@@ -387,18 +399,23 @@ export async function commitMatches(slotIds: string[]): Promise<CommitResult> {
         aircraftPlate: slot.plate,
       });
     } else {
-      // Guard against logging the same tandem twice when it was already
-      // tapped in by hand on the Tandems tab. Two jumps with the same
-      // customer name on one day is legitimate, so this is a safety net
-      // for the common case, not a proof.
-      const existingTandemNames = await tandemNamesFor(date);
+      // Guard against logging the same tandem (or AFF) jump twice when it
+      // was already tapped in by hand on the Tandems tab. Two — or more —
+      // jumps with the same customer name and role on one day is entirely
+      // legitimate (an AFF instructor re-doing a level, or teaching a
+      // second one later the same day), so this only checks out against
+      // jumps that predate this batch; it never treats one freshly-synced
+      // slot as a duplicate of another. Safety net for the common case,
+      // not a proof.
+      const existingTandemCounts = await tandemCountsFor(date);
       const key = tandemKey(slot.role, slot.customerName);
-      if (existingTandemNames.has(key)) {
+      const remaining = existingTandemCounts.get(key) ?? 0;
+      if (remaining > 0) {
+        existingTandemCounts.set(key, remaining - 1);
         skippedDuplicates += 1;
         delete pending[slot.slotId];
         continue;
       }
-      existingTandemNames.add(key);
       // The level rides along for an AFF jump and is '' for everything
       // else — addJump drops it on any other category anyway. `?? ''`
       // rather than a bare read: a sighting captured before this field
@@ -469,16 +486,17 @@ function tandemKey(role: BurbleRole, customerName: string): string {
   return `${role}::${customerName.trim().toLowerCase()}`;
 }
 
-/** Tandem jumps already recorded on `date`, as `role::customer` keys. */
-async function tandemKeysOnDate(date: string): Promise<Set<string>> {
+/** How many jumps already recorded on `date` carry each `role::customer` key. */
+async function tandemKeyCountsOnDate(date: string): Promise<Map<string, number>> {
   const entries = await jumpsInRange(date, date);
-  const keys = new Set<string>();
+  const counts = new Map<string, number>();
   for (const category of Object.keys(entries) as (keyof typeof entries)[]) {
     for (const jump of entries[category]) {
-      keys.add(tandemKey(category as BurbleRole, jump.name));
+      const key = tandemKey(category as BurbleRole, jump.name);
+      counts.set(key, (counts.get(key) ?? 0) + 1);
     }
   }
-  return keys;
+  return counts;
 }
 
 function manifestDescription(slot: PendingJump): string {

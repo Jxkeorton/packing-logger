@@ -39,7 +39,7 @@ vi.mock('./client', () => ({
 const { syncOnce, readSyncState, pendingJumps, pendingForClient, flightHint, commitMatches, dismissMatch, forgetCommitted } =
   await import('./sync');
 const { readLogbook, removeEntry } = await import('../logbook');
-const { jumpsInRange, loadTodayState, removeJump } = await import('../tandem');
+const { addJump, jumpsInRange, loadTodayState, removeJump } = await import('../tandem');
 
 function fixture(name: string): BurbleLoadsResponse {
   return JSON.parse(readFileSync(path.join(process.cwd(), 'src/lib/server/burble/fixtures', name), 'utf-8'));
@@ -68,6 +68,22 @@ function withTimeLeft(response: BurbleLoadsResponse, timeLeft: number): BurbleLo
   const loads = (response.loads as unknown[]).map((l) =>
     l && !Array.isArray(l) && typeof l === 'object' ? { ...l, time_left: timeLeft } : l,
   );
+  return { ...response, loads };
+}
+
+/** Renames a customer/student across every load in a fixture — for building a same-student-twice-in-a-day capture out of a two-load one. */
+function renameStudent(response: BurbleLoadsResponse, from: string, to: string): BurbleLoadsResponse {
+  const loads = (response.loads as unknown[]).map((l) => {
+    if (!l || Array.isArray(l) || typeof l !== 'object') return l;
+    const load = l as Record<string, unknown>;
+    const groups = (load.groups as unknown[]).map((g) =>
+      (g as unknown[]).map((p) => {
+        const person = p as Record<string, unknown>;
+        return person.name === from ? { ...person, name: to } : person;
+      }),
+    );
+    return { ...load, groups };
+  });
   return { ...response, loads };
 }
 
@@ -311,6 +327,48 @@ describe('confirming an AFF jump', () => {
     const state = await readSyncState();
     expect(pendingJumps(state)).toHaveLength(0);
     expect(state.unmappedCodes).toEqual([]);
+  });
+
+  it('logs every jump with a repeat student on the same day, not just the first', async () => {
+    // Same capture as above, except Sam Okafor (load 4, Level 1) is also
+    // the student on load 2 in place of Alex Marsh — the same instructor
+    // jumping with the same student twice in a day, which is routine
+    // (a re-do, or a second level taught later). Both are real, distinct
+    // jumps and both must land, not just whichever gets confirmed first.
+    script(at(renameStudent(LANGAR_AFF, 'Alex Marsh', 'Sam Okafor'), 1));
+    await syncOnce(AFFI);
+
+    const pending = pendingJumps(await readSyncState());
+    expect(pending).toHaveLength(2);
+    expect(await commitMatches(pending.map((p) => p.slotId))).toEqual({ logged: 2, skippedDuplicates: 0 });
+
+    const state = await loadTodayState();
+    expect(state.counts.aff).toBe(2);
+    expect(state.entries.aff.map((j) => [j.name, j.level]).sort()).toEqual([
+      ['Sam Okafor', 'Level 1'],
+      ['Sam Okafor', 'Level 6'],
+    ]);
+  });
+
+  it('still catches a jump already logged by hand before the sync was confirmed', async () => {
+    script(at(LANGAR_AFF, 1));
+    await syncOnce(AFFI);
+    const pending = pendingJumps(await readSyncState());
+    const level1 = pending.find((p) => p.studentLevel === 'Level 1');
+    if (!level1) throw new Error('fixture missing the Level 1 slot');
+
+    // Sam Okafor's Level 1 jump was already tapped in by hand on the
+    // Tandems tab before the manifest sync was confirmed — the exact case
+    // the guard exists for, distinct from two freshly-synced slots.
+    await addJump('aff', level1.customerName, new Date().toISOString(), 'Level 1');
+
+    expect(await commitMatches(pending.map((p) => p.slotId))).toEqual({ logged: 1, skippedDuplicates: 1 });
+
+    const state = await loadTodayState();
+    expect(state.entries.aff.map((j) => [j.name, j.level]).sort()).toEqual([
+      ['Alex Marsh', 'Level 6'],
+      ['Sam Okafor', 'Level 1'],
+    ]);
   });
 });
 
