@@ -9,6 +9,7 @@
 // where you'd cross out and renumber rather than leave a hole.
 import { readText, writeText } from './storage';
 import { csvEscape, parseCsvRows } from './csv';
+import { byAt } from './ledger';
 
 export interface LogbookEntry {
   date: string; // YYYY-MM-DD, local time
@@ -78,7 +79,7 @@ async function readEntries(): Promise<LogbookEntry[]> {
 function sortAscending(entries: LogbookEntry[]): LogbookEntry[] {
   return [...entries].sort((a, b) => {
     if (a.date !== b.date) return a.date < b.date ? -1 : 1;
-    return a.at < b.at ? -1 : a.at > b.at ? 1 : 0;
+    return byAt(a, b);
   });
 }
 

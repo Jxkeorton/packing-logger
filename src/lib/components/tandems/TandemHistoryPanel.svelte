@@ -1,5 +1,6 @@
 <script lang="ts">
   import { invalidateAll } from '$app/navigation';
+  import { postAction } from '$lib/client/post-action';
   import { CATEGORIES, CATEGORY_LABELS, type HistoryRow, type Jump } from '$lib/tandem';
   import type { GroundSchoolEntry } from '$lib/ground-school';
   import type { MiscEntry } from '$lib/misc-entries';
@@ -83,11 +84,7 @@
   async function postHandyCam(jump: Jump, handyCam: boolean, afterJump: boolean) {
     togglingAt = jump.at;
     try {
-      const formData = new FormData();
-      formData.set('at', jump.at);
-      if (handyCam) formData.set('handyCam', 'on');
-      if (afterJump) formData.set('afterJump', 'on');
-      await fetch('?/setTandemJumpHandyCam', { method: 'POST', body: formData });
+      await postAction('setTandemJumpHandyCam', { at: jump.at, handyCam, afterJump });
       await invalidateAll();
     } finally {
       togglingAt = null;
@@ -127,10 +124,7 @@
     if (!dateDraft || savingDate) return;
     savingDate = true;
     try {
-      const formData = new FormData();
-      formData.set('at', jump.at);
-      formData.set('date', dateDraft);
-      await fetch('?/setTandemJumpDate', { method: 'POST', body: formData });
+      await postAction('setTandemJumpDate', { at: jump.at, date: dateDraft });
       editingDateAt = null;
       // The jump has likely just moved out of the day row it was shown
       // under — collapse it rather than pointing at a now-stale expansion.
@@ -144,9 +138,7 @@
   async function deleteGroundSchoolSession(at: string) {
     deletingGroundSchoolAt = at;
     try {
-      const formData = new FormData();
-      formData.set('at', at);
-      await fetch('?/deleteGroundSchool', { method: 'POST', body: formData });
+      await postAction('deleteGroundSchool', { at });
       await invalidateAll();
     } finally {
       deletingGroundSchoolAt = null;
@@ -156,9 +148,7 @@
   async function deleteMiscEntryRow(at: string) {
     deletingMiscAt = at;
     try {
-      const formData = new FormData();
-      formData.set('at', at);
-      await fetch('?/deleteMiscEntry', { method: 'POST', body: formData });
+      await postAction('deleteMiscEntry', { at });
       await invalidateAll();
     } finally {
       deletingMiscAt = null;
@@ -183,11 +173,7 @@
     if (!label || !Number.isFinite(amount) || amount <= 0 || savingMiscEdit) return;
     savingMiscEdit = true;
     try {
-      const formData = new FormData();
-      formData.set('at', entry.at);
-      formData.set('label', label);
-      formData.set('amount', String(amount));
-      await fetch('?/editMiscEntry', { method: 'POST', body: formData });
+      await postAction('editMiscEntry', { at: entry.at, label, amount });
       editingMiscAt = null;
       await invalidateAll();
     } finally {

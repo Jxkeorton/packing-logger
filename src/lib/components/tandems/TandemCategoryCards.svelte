@@ -1,5 +1,6 @@
 <script lang="ts">
   import { invalidateAll } from '$app/navigation';
+  import { postAction } from '$lib/client/post-action';
   import {
     AFF_LEVELS,
     CATEGORIES,
@@ -67,14 +68,7 @@
     if (!category || addingJump) return;
     addingJump = true;
     try {
-      const formData = new FormData();
-      formData.set('category', category);
-      formData.set('name', name);
-      formData.set('staff', staff);
-      formData.set('level', level);
-      if (handyCam) formData.set('handyCam', 'on');
-      formData.set('date', date);
-      await fetch('?/addTandemJump', { method: 'POST', body: formData });
+      await postAction('addTandemJump', { category, name, staff, level, handyCam, date });
       pendingCategory = null;
       await invalidateAll();
     } finally {
@@ -84,24 +78,19 @@
 
   async function deleteJump(at: string) {
     deletingAt = at;
-    const formData = new FormData();
-    formData.set('at', at);
-    await fetch('?/deleteTandemJump', { method: 'POST', body: formData });
+    await postAction('deleteTandemJump', { at });
     await invalidateAll();
     deletingAt = null;
   }
 
-  // Ground school used to have its own card here, right about where this
-  // comment sits — removed since staff only run one every month or so, and
-  // Miscellaneous (below) covers it just as well: log it as a "Ground
-  // school" entry there instead. The ledger, actions and invoice section
-  // behind that old card are all still very much alive (see
-  // $lib/server/ground-school.ts) — only the "add a new one" affordance is
-  // gone, so every session logged before this change still shows up in
-  // History and bills correctly. Nothing to migrate.
+  // Ground school used to have its own card here — retired for good, since
+  // staff only run one every month or so and Miscellaneous (below) covers
+  // it just as well: log it as a "Ground school" entry there. Sessions
+  // logged before then still show in History (deletable) and bill on the
+  // invoice (see $lib/server/ground-school.ts). Nothing to migrate.
 
-  // Miscellaneous is the generic escape hatch ground school (above) is a
-  // special case of: anything that doesn't fit a Category and isn't worth
+  // Miscellaneous is the generic escape hatch ground school was a special
+  // case of: anything that doesn't fit a Category and isn't worth
   // wiring up a whole new panel for — a label the instructor types, plus
   // what they earned.
   let addingMiscEntry = $state(false);
@@ -118,10 +107,7 @@
     if (submittingMiscEntry) return;
     submittingMiscEntry = true;
     try {
-      const formData = new FormData();
-      formData.set('label', label);
-      formData.set('amount', String(amount));
-      await fetch('?/addMiscEntry', { method: 'POST', body: formData });
+      await postAction('addMiscEntry', { label, amount });
       addingMiscEntry = false;
       await invalidateAll();
     } finally {
@@ -133,11 +119,7 @@
     if (submittingMiscEntry) return;
     submittingMiscEntry = true;
     try {
-      const formData = new FormData();
-      formData.set('at', at);
-      formData.set('label', label);
-      formData.set('amount', String(amount));
-      await fetch('?/editMiscEntry', { method: 'POST', body: formData });
+      await postAction('editMiscEntry', { at, label, amount });
       editingMiscEntry = null;
       await invalidateAll();
     } finally {
@@ -160,9 +142,7 @@
 
   async function deleteMiscEntry(at: string) {
     deletingMiscEntryAt = at;
-    const formData = new FormData();
-    formData.set('at', at);
-    await fetch('?/deleteMiscEntry', { method: 'POST', body: formData });
+    await postAction('deleteMiscEntry', { at });
     await invalidateAll();
     deletingMiscEntryAt = null;
   }

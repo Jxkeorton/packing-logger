@@ -14,9 +14,14 @@ vi.mock('./storage', () => ({
   },
 }));
 
-const { addEntry, entriesInRange, loadTodayEntries, removeEntry } = await import('./ground-school');
+const { entriesInRange, loadTodayEntries, removeEntry } = await import('./ground-school');
 
 const ENTRIES_KEY = 'ground-school.csv';
+
+/** Nothing in the app adds a ground school session any more, so tests seed the CSV directly. */
+function seed(...rows: string[]): void {
+  store.set(ENTRIES_KEY, `date,amount,at\n${rows.join('\n')}\n`);
+}
 
 beforeEach(() => {
   store.clear();
@@ -28,15 +33,9 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-describe('addEntry / loadTodayEntries', () => {
-  it('records a session for today and reads it back', async () => {
-    await addEntry(75);
-    expect(await loadTodayEntries()).toEqual([{ date: '2026-09-06', amount: 75, at: '2026-09-06T12:00:00.000Z' }]);
-  });
-
-  it('keeps several sessions from the same day, oldest first', async () => {
-    await addEntry(50, '2026-09-06T09:00:00.000Z');
-    await addEntry(30, '2026-09-06T08:00:00.000Z');
+describe('loadTodayEntries', () => {
+  it("returns today's sessions, oldest first", async () => {
+    seed('2026-09-06,50.00,2026-09-06T09:00:00.000Z', '2026-09-06,30.00,2026-09-06T08:00:00.000Z');
     expect(await loadTodayEntries()).toEqual([
       { date: '2026-09-06', amount: 30, at: '2026-09-06T08:00:00.000Z' },
       { date: '2026-09-06', amount: 50, at: '2026-09-06T09:00:00.000Z' },
@@ -44,34 +43,26 @@ describe('addEntry / loadTodayEntries', () => {
   });
 
   it('does not surface a session logged on a different day', async () => {
-    // addEntry always dates a session by *today*, the same as
-    // addJump/setDayEntries in tandem.ts — `at` is just the id, not a way
-    // to backfill a past date. So "a different day" means the clock was
-    // somewhere else when it was added, not a different `at` today.
-    vi.setSystemTime(new Date('2026-09-05T09:00:00.000Z'));
-    await addEntry(40);
-    vi.setSystemTime(new Date('2026-09-06T12:00:00.000Z'));
+    seed('2026-09-05,40.00,2026-09-05T09:00:00.000Z');
     expect(await loadTodayEntries()).toEqual([]);
   });
 
-  it('round-trips a decimal amount through the CSV without drift', async () => {
-    await addEntry(37.5);
-    expect(store.get(ENTRIES_KEY)).toContain('37.50');
+  it('reads a decimal amount without drift', async () => {
+    seed('2026-09-06,37.50,2026-09-06T09:00:00.000Z');
     expect((await loadTodayEntries())[0].amount).toBe(37.5);
   });
 });
 
 describe('removeEntry', () => {
   it('removes one session by its at id, leaving the rest', async () => {
-    await addEntry(50, '2026-09-06T09:00:00.000Z');
-    await addEntry(30, '2026-09-06T10:00:00.000Z');
+    seed('2026-09-06,50.00,2026-09-06T09:00:00.000Z', '2026-09-06,30.00,2026-09-06T10:00:00.000Z');
     const remaining = await removeEntry('2026-09-06T09:00:00.000Z');
     expect(remaining).toEqual([{ date: '2026-09-06', amount: 30, at: '2026-09-06T10:00:00.000Z' }]);
     expect(await loadTodayEntries()).toEqual(remaining);
   });
 
   it('is a no-op for an id that does not exist', async () => {
-    await addEntry(50, '2026-09-06T09:00:00.000Z');
+    seed('2026-09-06,50.00,2026-09-06T09:00:00.000Z');
     const before = store.get(ENTRIES_KEY);
     await removeEntry('does-not-exist');
     expect(store.get(ENTRIES_KEY)).toBe(before);
@@ -80,9 +71,7 @@ describe('removeEntry', () => {
 
 describe('entriesInRange', () => {
   it('returns only sessions within the inclusive date range, sorted chronologically', async () => {
-    // entriesInRange filters on `date`, not `at` — seed the CSV directly
-    // with rows dated on different days rather than addEntry (which
-    // always dates a session by whatever "today" is at call time).
+    // entriesInRange filters on `date`, not `at`.
     store.set(
       ENTRIES_KEY,
       'date,amount,at\n' +

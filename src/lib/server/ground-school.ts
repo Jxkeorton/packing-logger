@@ -5,63 +5,35 @@
 // $lib/server/tandem.ts's jump ledger, minus everything that ledger
 // needs and this one doesn't: no category, no name, no legacy header
 // migrations to carry forward — this is a brand new file.
-import { readText, writeText } from './storage';
-import { todayKey } from '../packing';
-import { parseCsvRows } from './csv';
+//
+// Read/delete only: the "add ground school" panel was retired for good
+// (Miscellaneous covers it — log it there as a "Ground school" entry), so
+// nothing creates new sessions. What's already logged still shows in
+// History and bills on the invoice, and can still be deleted.
+import { createLedger } from './ledger';
 import type { GroundSchoolEntry } from '../ground-school';
 
 export type { GroundSchoolEntry };
 
-const ENTRIES_KEY = 'ground-school.csv';
-const ENTRIES_HEADER = 'date,amount,at';
-
-async function readEntries(): Promise<GroundSchoolEntry[]> {
-  const raw = await readText(ENTRIES_KEY);
-  if (!raw) return [];
-  const entries: GroundSchoolEntry[] = [];
-  for (const row of parseCsvRows(raw)) {
-    if (row.join(',') === ENTRIES_HEADER) continue;
-    const [date, amountStr, at] = row;
+const ledger = createLedger<GroundSchoolEntry>({
+  key: 'ground-school.csv',
+  header: 'date,amount,at',
+  parseRow: ([date, amountStr, at]) => {
     const amount = Number(amountStr);
-    if (!date || !at || !Number.isFinite(amount)) continue;
-    entries.push({ date, amount, at });
-  }
-  return entries;
-}
-
-async function writeEntries(entries: GroundSchoolEntry[]): Promise<void> {
-  const sorted = [...entries].sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0));
-  const body = sorted.map((e) => [e.date, e.amount.toFixed(2), e.at].join(',')).join('\n');
-  await writeText(ENTRIES_KEY, `${ENTRIES_HEADER}\n${body}\n`);
-}
-
-function entriesFor(entries: GroundSchoolEntry[], date: string): GroundSchoolEntry[] {
-  return entries.filter((e) => e.date === date).sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0));
-}
+    if (!date || !at || !Number.isFinite(amount)) return null;
+    return { date, amount, at };
+  },
+  formatRow: (e) => [e.date, e.amount.toFixed(2), e.at],
+});
 
 /** Today's ground school sessions — the live view the Tandems tab renders. */
-export async function loadTodayEntries(): Promise<GroundSchoolEntry[]> {
-  const entries = await readEntries();
-  return entriesFor(entries, todayKey());
-}
-
-/** Record one ground school session for today, earning `amount`. */
-export async function addEntry(amount: number, at: string = new Date().toISOString()): Promise<GroundSchoolEntry[]> {
-  const entries = await readEntries();
-  const today = todayKey();
-  entries.push({ date: today, amount, at });
-  await writeEntries(entries);
-  return entriesFor(entries, today);
+export function loadTodayEntries(): Promise<GroundSchoolEntry[]> {
+  return ledger.today();
 }
 
 /** Remove one session by its `at` timestamp (its id) — undoes a mis-tapped amount. */
-export async function removeEntry(at: string): Promise<GroundSchoolEntry[]> {
-  const entries = await readEntries();
-  const remaining = entries.filter((e) => e.at !== at);
-  if (remaining.length !== entries.length) {
-    await writeEntries(remaining);
-  }
-  return entriesFor(remaining, todayKey());
+export function removeEntry(at: string): Promise<GroundSchoolEntry[]> {
+  return ledger.remove(at);
 }
 
 /**
@@ -70,10 +42,8 @@ export async function removeEntry(at: string): Promise<GroundSchoolEntry[]> {
  * History tab's data source, same "past only" split as tandem.ts's
  * readHistory/dayJumpsFromJumps.
  */
-export async function readHistory(): Promise<GroundSchoolEntry[]> {
-  const entries = await readEntries();
-  const today = todayKey();
-  return entries.filter((e) => e.date !== today).sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0));
+export function readHistory(): Promise<GroundSchoolEntry[]> {
+  return ledger.history();
 }
 
 /**
@@ -81,9 +51,6 @@ export async function readHistory(): Promise<GroundSchoolEntry[]> {
  * sorted chronologically — the invoice PDF's data source, same shape as
  * tandem.ts's jumpsInRange.
  */
-export async function entriesInRange(startDate: string, endDate: string): Promise<GroundSchoolEntry[]> {
-  const entries = await readEntries();
-  return entries
-    .filter((e) => e.date >= startDate && e.date <= endDate)
-    .sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0));
+export function entriesInRange(startDate: string, endDate: string): Promise<GroundSchoolEntry[]> {
+  return ledger.inRange(startDate, endDate);
 }

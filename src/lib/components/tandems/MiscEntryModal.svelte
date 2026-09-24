@@ -1,10 +1,10 @@
 <script lang="ts">
-  // A sibling of GroundSchoolModal — same reasoning (no rate to look up, so
-  // the instructor keys in what they actually earned), plus one extra
-  // field: what it was for, since unlike ground school this ledger covers
-  // anything that doesn't fit a category. "B licence evening" is the first
-  // real use of it, but the label is free text on purpose — a new kind of
-  // work shouldn't need a new panel coded for it.
+  // A much smaller sibling of TandemNameModal — there's no rate to look
+  // up, so the instructor keys in what they actually earned, plus what it
+  // was for, since this ledger covers anything that doesn't fit a
+  // category. "B licence evening" is the first real use of it, but the
+  // label is free text on purpose — a new kind of work shouldn't need a
+  // new panel coded for it.
   import Spinner from '../Spinner.svelte';
 
   let {
@@ -23,7 +23,7 @@
     initialAmount?: string;
     /**
      * True while the caller's own onSubmit is still in flight — same
-     * reason GroundSchoolModal takes this: the request lives in
+     * reason TandemNameModal takes this: the request lives in
      * TandemCategoryCards, not here, so this component can't derive it
      * itself the way a `use:enhance` callback would.
      */

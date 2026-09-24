@@ -6,6 +6,7 @@
 import { readText, writeText } from './storage';
 import { todayKey } from '../packing';
 import { csvEscape, parseCsvRows } from './csv';
+import { byAt } from './ledger';
 import { readRateSettings } from './rate-settings';
 import {
   CATEGORIES,
@@ -109,7 +110,7 @@ async function readJumps(): Promise<Jump[]> {
 }
 
 async function writeJumps(jumps: Jump[]): Promise<void> {
-  const sorted = [...jumps].sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0));
+  const sorted = [...jumps].sort(byAt);
   const body = sorted
     .map((j) =>
       [
@@ -319,7 +320,7 @@ export async function setDayEntries(
 export async function readCsvFile(): Promise<string> {
   const jumps = await readJumps();
   const rates = await readRateSettings();
-  const sorted = [...jumps].sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0));
+  const sorted = [...jumps].sort(byAt);
   const header = 'date,category,name,level,amount,handyCam,handyCamType,handyCamBonus,at';
   const body = sorted
     .map((j) =>
@@ -379,7 +380,7 @@ function dayJumpsFromJumps(jumps: Jump[], limit: number): Record<string, Jump[]>
   const dates = [...byDate.keys()].sort().reverse().slice(0, limit);
   const out: Record<string, Jump[]> = {};
   for (const date of dates) {
-    out[date] = byDate.get(date)!.sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0));
+    out[date] = byDate.get(date)!.sort(byAt);
   }
   return out;
 }
@@ -425,7 +426,7 @@ export async function jumpsInRange(startDate: string, endDate: string): Promise<
     if (j.date >= startDate && j.date <= endDate) out[j.category].push(j);
   }
   for (const category of CATEGORIES) {
-    out[category].sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0));
+    out[category].sort(byAt);
   }
   return out;
 }
@@ -446,6 +447,6 @@ export async function handyCamJumpsInRange(startDate: string, endDate: string): 
     const bonusDate = j.handyCamAt.slice(0, 10);
     return bonusDate >= startDate && bonusDate <= endDate;
   });
-  out.sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0));
+  out.sort(byAt);
   return out;
 }

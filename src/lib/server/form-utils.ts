@@ -1,9 +1,6 @@
-// Small helpers shared by every action module under lib/server/actions/ —
-// the FormData equivalent of the main app's lib/api-response.ts, which
-// existed to dedupe the same "trim, collapse newlines, cap length" logic
-// that was copy-pasted across pages/api/{places,equipment,aircraft,
-// jump-types,tandem-adjust}.ts. Same idea here, just built in from the
-// start instead of extracted after the fact.
+// Small helpers shared by every action module under lib/server/actions/,
+// so the same "trim, collapse newlines, cap length" (and money) parsing
+// isn't copy-pasted per action with slightly different rules each time.
 
 /** Trims, collapses embedded line breaks to a space, and caps length — for a single-line field. */
 export function oneLine(value: FormDataEntryValue | null, maxLength: number): string {
@@ -20,4 +17,20 @@ export function multiLine(value: FormDataEntryValue | null, maxLength: number): 
 /** A required plain string field — '' if missing or not a string. */
 export function requiredString(value: FormDataEntryValue | null): string {
   return typeof value === 'string' ? value : '';
+}
+
+/** A sanity ceiling, not a real-world price — catches a fat-fingered extra digit rather than billing it. */
+const MAX_AMOUNT = 100000;
+
+/**
+ * A positive money amount in pounds, rounded to the nearest penny — or null
+ * if it's missing, non-numeric, zero/negative or over MAX_AMOUNT. Rounded
+ * because a numeric-keyboard input can carry more precision than money has
+ * (e.g. typing "12.005"), and the invoice should never show a fractional
+ * penny.
+ */
+export function parseAmount(value: FormDataEntryValue | null): number | null {
+  const amount = Number(value);
+  if (!Number.isFinite(amount) || amount <= 0 || amount > MAX_AMOUNT) return null;
+  return Math.round(amount * 100) / 100;
 }

@@ -4,9 +4,11 @@
 //
 // Ground school doesn't fit the tandem Jump model: there's no fixed rate
 // to look up (RATES.aff), because a ground school session's price varies
-// session to session — the instructor keys in what they actually earned
-// each time, on the "+ Add ground school" modal, rather than picking a
-// category rate. So this is its own small ledger, not another Category.
+// session to session — the instructor keyed in what they actually earned
+// each time rather than picking a category rate. So this is its own small
+// ledger, not another Category. New sessions are no longer added (the
+// panel was retired in favour of Miscellaneous); existing ones are kept
+// so History and past invoices stay complete.
 
 export interface GroundSchoolEntry {
   date: string; // YYYY-MM-DD, local time

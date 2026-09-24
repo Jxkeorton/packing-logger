@@ -8,6 +8,7 @@
   // requestSubmit(), which risks submitting before Svelte's batched
   // reactivity has actually written the value to the DOM.
   import { invalidateAll } from '$app/navigation';
+  import { postAction } from '$lib/client/post-action';
   import { formatDuration, formatWhen } from '$lib/format';
   import type { PackTime } from '$lib/server/times';
 
@@ -24,9 +25,7 @@
   }
 
   async function savePackTime(ms: number) {
-    const formData = new FormData();
-    formData.set('ms', String(ms));
-    await fetch('?/recordPackTime', { method: 'POST', body: formData });
+    await postAction('recordPackTime', { ms });
     await invalidateAll();
   }
 
@@ -47,9 +46,7 @@
 
   async function deleteTime(at: string) {
     deletingAt = at;
-    const formData = new FormData();
-    formData.set('at', at);
-    await fetch('?/deletePackTime', { method: 'POST', body: formData });
+    await postAction('deletePackTime', { at });
     await invalidateAll();
     deletingAt = null;
   }
