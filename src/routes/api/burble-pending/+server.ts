@@ -8,12 +8,13 @@
 // signed-in user's own ledger.
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { pendingForClient, readSyncState } from '$lib/server/burble/sync';
+import { manifestedForClient, pendingForClient, readSyncState } from '$lib/server/burble/sync';
 
 export const GET: RequestHandler = async () => {
   const state = await readSyncState();
   return json({
     pending: pendingForClient(state),
+    manifested: manifestedForClient(state),
     unmappedCodes: state.unmappedCodes,
   });
 };

@@ -34,6 +34,7 @@
   import SettingsPanel from '$lib/components/SettingsPanel.svelte';
   import SettingsRow from '$lib/components/SettingsRow.svelte';
   import PendingJumpsMenu from '$lib/components/PendingJumpsMenu.svelte';
+  import ManifestedPanel from '$lib/components/ManifestedPanel.svelte';
   import BurbleSettingsPanel from '$lib/components/BurbleSettingsPanel.svelte';
   import DownloadButton from '$lib/components/DownloadButton.svelte';
   import { totalEarnings as packingTotalEarnings, totalPacks, type Counts as PackingCounts } from '$lib/packing';
@@ -128,6 +129,7 @@
   // and on a slow beat while it's visible. Server `load` data stays the
   // source of truth; this only ever runs *ahead* of it between loads.
   let livePending = $state<PageData['burblePending'] | null>(null);
+  let liveManifested = $state<PageData['burbleManifested'] | null>(null);
   let liveUnmappedCodes = $state<string[] | null>(null);
 
   // Any real `load` — first paint, a commit/dismiss, an invalidateAll —
@@ -135,6 +137,7 @@
   $effect(() => {
     void data.burblePending;
     livePending = null;
+    liveManifested = null;
     liveUnmappedCodes = null;
   });
 
@@ -144,6 +147,7 @@
       if (!res.ok) return;
       const body = await res.json();
       livePending = body.pending;
+      liveManifested = body.manifested;
       liveUnmappedCodes = body.unmappedCodes;
     } catch {
       // offline, or a blip — keep showing whatever we already have
@@ -173,6 +177,7 @@
   });
 
   const burblePending = $derived(livePending ?? data.burblePending);
+  const burbleManifested = $derived(liveManifested ?? data.burbleManifested);
   const burbleUnmappedCodes = $derived(liveUnmappedCodes ?? data.burbleUnmappedCodes);
 
   // Same ghost-segments-on-a-glass-bar treatment as AppTabs.svelte.
@@ -609,6 +614,8 @@
       </div>
     </header>
 
+    <ManifestedPanel manifested={burbleManifested} />
+
     <TandemCategoryCards
       tandemState={data.tandemState}
       visibility={data.tandemVisibility}
@@ -640,6 +647,10 @@
       settings={data.logbookSettings}
       today={data.today}
       dateDisplay={data.dateDisplay}
-    />
+    >
+      {#snippet afterHeader()}
+        <ManifestedPanel manifested={burbleManifested} />
+      {/snippet}
+    </LogForm>
   </div>
 </div>

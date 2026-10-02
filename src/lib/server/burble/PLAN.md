@@ -1,5 +1,15 @@
 # Auto-logging jumps from the Burble manifest
 
+> **Revised 2026-10-02**: a sighting no longer goes straight into "Jumps to
+> confirm". The manifesters reshuffle people between loads until a load is
+> called, which filled the list with jumps that never happened. Slots now sit
+> in `SyncState.manifested` (shown by `ManifestedPanel` on the Tandems and
+> Logbook tabs) and are promoted to `pending` only once the load is on a
+> 4-minute call or less (`isOnShortCall`), shows Departed, or leaves the
+> board having been within ~8 minutes of take-off. Moved off the load
+> earlier, the slot is simply forgotten. The version short-circuit is bypassed
+> while anything is manifested, since `time_left` moves with the clock.
+>
 > **Revised 2026-09-14**: Phase 1's manual "Check the board" button
 > (`?/syncManifest`, `BurbleSyncPanel`) is removed. With Phase 3 running
 > reliably every 2 minutes, the on-demand poll was redundant — same as

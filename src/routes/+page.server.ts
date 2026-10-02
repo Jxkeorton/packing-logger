@@ -15,7 +15,7 @@ import { readTabVisibility } from '$lib/server/tab-visibility';
 import { readRateSettings } from '$lib/server/rate-settings';
 import { readLogbookAndNextNumber } from '$lib/server/logbook';
 import { readLogbookSettings } from '$lib/server/logbook-settings';
-import { pendingForClient, readSyncState } from '$lib/server/burble/sync';
+import { manifestedForClient, pendingForClient, readSyncState } from '$lib/server/burble/sync';
 import { readFastestFive } from '$lib/server/times';
 import { authEnabled } from '$lib/server/auth';
 import { totalGroundSchoolEarnings } from '$lib/ground-school';
@@ -265,6 +265,7 @@ export const load: PageServerLoad = async () => {
   // be rendered without re-deriving it client-side. /api/burble-pending
   // returns this same shape for the open app to re-poll cheaply.
   const burblePending = pendingForClient(burbleState);
+  const burbleManifested = manifestedForClient(burbleState);
 
   const dateDisplay = new Date(`${today}T00:00:00`).toLocaleDateString('en-GB', {
     weekday: 'long',
@@ -297,6 +298,7 @@ export const load: PageServerLoad = async () => {
     nextLogbookNumber,
     logbookSettings,
     burblePending,
+    burbleManifested,
     burbleUnmappedCodes: burbleState.unmappedCodes,
     showLogout: authEnabled(),
   };

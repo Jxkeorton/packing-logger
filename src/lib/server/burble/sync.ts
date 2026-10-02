@@ -32,6 +32,7 @@ import { readLogbookSettings, type BurbleSettings } from '../logbook-settings';
 import { fetchLoads, BurbleError } from './client';
 import {
   FLOWN_STATUSES,
+  isOnShortCall,
   matchSlots,
   normaliseCode,
   realLoads,
@@ -56,6 +57,19 @@ export interface PendingJump extends BurbleMatch {
   sawFlownStatus: boolean;
   /** The load is no longer on the board — the strongest hint available that it went. */
   leftBoard: boolean;
+}
+
+/**
+ * A slot of mine currently on the board whose load hasn't reached a short
+ * call yet. Held here, *not* in `pending`, because the manifesters keep
+ * reshuffling people until the load is called — see isOnShortCall. It is
+ * promoted into `pending` once the call is short enough (or the load
+ * flies / leaves the board), and silently forgotten if the board moves me
+ * off it first.
+ */
+export interface ManifestedJump extends BurbleMatch {
+  firstSeen: string; // ISO
+  lastSeen: string; // ISO — also the moment `timeLeft` was true, for the client's local countdown
 }
 
 export interface SyncState {
@@ -85,6 +99,8 @@ export interface SyncState {
    * completely" is exactly what that looks like.
    */
   lastMatchSettingsKey: string | null;
+  /** Slots of mine on the board that haven't reached a short call yet. */
+  manifested: Record<string, ManifestedJump>;
   pending: Record<string, PendingJump>;
   /** slot id → the logbook `at` it was committed as. The dedupe ledger. */
   committed: Record<string, string>;
@@ -99,6 +115,7 @@ const EMPTY_STATE: SyncState = {
   sessionId: null,
   lastVersion: null,
   lastMatchSettingsKey: null,
+  manifested: {},
   pending: {},
   committed: {},
   unmappedCodes: [],
@@ -121,6 +138,7 @@ export async function readSyncState(): Promise<SyncState> {
       sessionId: typeof parsed.sessionId === 'number' ? parsed.sessionId : null,
       lastVersion: typeof parsed.lastVersion === 'number' ? parsed.lastVersion : null,
       lastMatchSettingsKey: typeof parsed.lastMatchSettingsKey === 'string' ? parsed.lastMatchSettingsKey : null,
+      manifested: isRecord(parsed.manifested) ? (parsed.manifested as Record<string, ManifestedJump>) : {},
       pending: isRecord(parsed.pending) ? (parsed.pending as Record<string, PendingJump>) : {},
       committed: isRecord(parsed.committed) ? (parsed.committed as Record<string, string>) : {},
       unmappedCodes: Array.isArray(parsed.unmappedCodes)
@@ -175,6 +193,31 @@ export function flightHint(jump: PendingJump): string {
  */
 export function pendingForClient(state: SyncState): (PendingJump & { hint: string })[] {
   return pendingJumps(state).map((jump) => ({ ...jump, hint: flightHint(jump) }));
+}
+
+/**
+ * The poll runs every couple of minutes, so a load can go from "5 min" to
+ * gone between two looks and never be seen at 4 or less. Anything last
+ * seen within this many minutes of take-off (or already departed) counts
+ * as having been called when it disappears; a load last seen with a long
+ * countdown or still Building is treated as reshuffled away.
+ */
+const GONE_PROMOTE_MINUTES = 8;
+
+function wasCalledWhenLastSeen(jump: ManifestedJump): boolean {
+  if (isOnShortCall(jump)) return true;
+  return jump.timeLeft !== null && jump.timeLeft <= GONE_PROMOTE_MINUTES;
+}
+
+/**
+ * What the "Manifested" panel shows: every slot of mine on the board that
+ * hasn't been called yet, in load order. `timeLeft` is as of `lastSeen`;
+ * the client counts it down locally between polls.
+ */
+export function manifestedForClient(state: SyncState): ManifestedJump[] {
+  return Object.values(state.manifested).sort(
+    (a, b) => loadOrderKey(a) - loadOrderKey(b) || (a.firstSeen < b.firstSeen ? -1 : 1),
+  );
 }
 
 export interface SyncOutcome {
@@ -249,10 +292,15 @@ export async function syncOnce(settings?: BurbleSettings, board?: BurbleLoadsRes
   // that's already on the board take effect on the very next sync
   // instead of waiting for the board to change on its own.
   const settingsKey = matchSettingsKey(burble);
+  //
+  // Never while something is manifested, though: time_left falls with the
+  // clock, not with the manifest, so the version can sit still while a
+  // load slides under the call threshold.
   if (
     version !== null &&
     state.lastVersion !== null &&
     version === state.lastVersion &&
+    Object.keys(state.manifested).length === 0 &&
     state.lastMatchSettingsKey === settingsKey
   ) {
     await writeSyncState(next);
@@ -264,21 +312,45 @@ export async function syncOnce(settings?: BurbleSettings, board?: BurbleLoadsRes
   const { matches, unmappedCodes } = matchSlots(loads, burble.myNames, burble.codeMap);
   const onBoardLoadIds = new Set(loads.map((l) => l.id));
   const pending = { ...next.pending };
+  const manifested = { ...next.manifested };
+  const matchedSlotIds = new Set(matches.map((m) => m.slotId));
 
-  // Seeing my name is enough to capture it. Confirmation happens later,
-  // by the only party who actually knows: me, once I'm on the ground.
   for (const match of matches) {
     if (next.committed[match.slotId]) continue; // already logged
     const existing = pending[match.slotId];
-    pending[match.slotId] = {
-      ...match,
-      firstSeen: existing?.firstSeen ?? now,
-      lastSeen: now,
-      // Once seen flown, always flown — the status can flick back as the
-      // board redraws, and a load doesn't un-depart.
-      sawFlownStatus: existing?.sawFlownStatus === true || FLOWN_STATUSES.includes(match.status),
-      leftBoard: false,
-    };
+    const seenBefore = manifested[match.slotId];
+
+    // Already promoted: keep refreshing its hints, exactly as before.
+    if (existing || isOnShortCall(match)) {
+      delete manifested[match.slotId];
+      pending[match.slotId] = {
+        ...match,
+        firstSeen: existing?.firstSeen ?? seenBefore?.firstSeen ?? now,
+        lastSeen: now,
+        // Once seen flown, always flown — the status can flick back as the
+        // board redraws, and a load doesn't un-depart.
+        sawFlownStatus: existing?.sawFlownStatus === true || FLOWN_STATUSES.includes(match.status),
+        leftBoard: false,
+      };
+      continue;
+    }
+
+    manifested[match.slotId] = { ...match, firstSeen: seenBefore?.firstSeen ?? now, lastSeen: now };
+  }
+
+  // A manifested slot that's no longer matched: either I was moved off it
+  // (load still displayed — forget it, that jump never happened), or the
+  // whole load left the board while I was on it, which after a call is the
+  // sign it flew. Promote that one rather than risk losing a real jump. A
+  // load that vanished while still uncalled (see wasCalledWhenLastSeen) is
+  // a reshuffle, not a departure, so it is dropped as well.
+  for (const [slotId, jump] of Object.entries(manifested)) {
+    if (matchedSlotIds.has(slotId)) continue;
+    delete manifested[slotId];
+    if (onBoardLoadIds.has(jump.loadId)) continue;
+    if (!wasCalledWhenLastSeen(jump)) continue;
+    if (next.committed[slotId]) continue;
+    pending[slotId] = { ...jump, sawFlownStatus: FLOWN_STATUSES.includes(jump.status), leftBoard: false };
   }
 
   // A load that's no longer displayed has almost certainly gone. Flag it
@@ -290,6 +362,7 @@ export async function syncOnce(settings?: BurbleSettings, board?: BurbleLoadsRes
     pending[slotId] = { ...jump, leftBoard: true };
   }
 
+  next.manifested = manifested;
   next.pending = pending;
   // Additive with the previous list, not a replacement — an unmapped
   // code seen once should keep surfacing even after the load that
@@ -314,7 +387,7 @@ export interface CommitResult {
 }
 
 /** Ascending sort key for a pending jump's load number — Infinity (sorts last) for one Burble didn't give a number. */
-function loadOrderKey(jump: PendingJump): number {
+function loadOrderKey(jump: { loadNumber: string }): number {
   const n = Number(jump.loadNumber);
   return jump.loadNumber !== '' && Number.isFinite(n) ? n : Infinity;
 }

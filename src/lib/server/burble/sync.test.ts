@@ -36,7 +36,7 @@ vi.mock('./client', () => ({
   },
 }));
 
-const { syncOnce, readSyncState, pendingJumps, pendingForClient, flightHint, commitMatches, dismissMatch, forgetCommitted } =
+const { syncOnce, readSyncState, manifestedForClient, pendingJumps, pendingForClient, flightHint, commitMatches, dismissMatch, forgetCommitted } =
   await import('./sync');
 const { readLogbook, removeEntry } = await import('../logbook');
 const { addJump, jumpsInRange, loadTodayState, removeJump } = await import('../tandem');
@@ -45,11 +45,18 @@ function fixture(name: string): BurbleLoadsResponse {
   return JSON.parse(readFileSync(path.join(process.cwd(), 'src/lib/server/burble/fixtures', name), 'utf-8'));
 }
 
-const ON_CALL = fixture('get-loads-on-call.json');
+// Raw captures, before any call-time override: ON_CALL sits at 13 minutes,
+// LANGAR_* are still Building. A sighting only becomes a jump to confirm
+// on a 4-minute call or less, so the shared fixtures below are pinned to
+// a short call and the tests of the earlier, manifested-only stage use the
+// RAW_ ones.
+const RAW_ON_CALL = fixture('get-loads-on-call.json');
+const RAW_LANGAR_BUILDING = fixture('get-loads-langar-building.json');
+const ON_CALL = withTimeLeft(RAW_ON_CALL, 3);
 const DEPARTED = fixture('get-loads-departed.json');
 const EMPTY_BOARD = fixture('get-loads-empty-board.json');
-const LANGAR_BUILDING = fixture('get-loads-langar-building.json');
-const LANGAR_AFF = fixture('get-loads-langar-aff.json');
+const LANGAR_BUILDING = withTimeLeft(RAW_LANGAR_BUILDING, 3);
+const LANGAR_AFF = withTimeLeft(fixture('get-loads-langar-aff.json'), 3);
 
 /**
  * A fixture with the manifest version pinned, so version short-circuiting
@@ -188,7 +195,7 @@ describe('a dropzone that never sets "Departed"', () => {
     script(at(ON_CALL, 1), at(DEPARTED, 2), at(EMPTY_BOARD, 3));
 
     await syncOnce(TI);
-    expect(flightHint(pendingJumps(await readSyncState())[0])).toBe('13 min to go');
+    expect(flightHint(pendingJumps(await readSyncState())[0])).toBe('3 min to go');
 
     await syncOnce(TI); // this capture does carry a Departed status
     expect(flightHint(pendingJumps(await readSyncState())[0])).toBe('Departed');
@@ -683,5 +690,79 @@ describe('Skydive Langar (dz_id 531)', () => {
     expect(jump.status).toBe('Building');
     expect(jump.sawFlownStatus).toBe(false);
     expect(jump.leftBoard).toBe(false);
+  });
+});
+
+describe('holding a jump until it is called', () => {
+  it('shows a slot on an uncalled load as manifested, not as a jump to confirm', async () => {
+    script(at(RAW_ON_CALL, 1)); // time_left 13
+    await syncOnce(TI);
+
+    const state = await readSyncState();
+    expect(pendingJumps(state)).toHaveLength(0);
+    expect(manifestedForClient(state)).toHaveLength(1);
+    expect(manifestedForClient(state)[0]).toMatchObject({
+      role: 'instructor',
+      customerName: 'Miranda Walfield',
+      loadNumber: '6',
+      timeLeft: 13,
+    });
+  });
+
+  it('promotes it to confirm once the load reaches a 4 minute call', async () => {
+    script(at(withTimeLeft(RAW_ON_CALL, 5), 1), at(withTimeLeft(RAW_ON_CALL, 4), 1));
+    await syncOnce(TI);
+    expect(pendingJumps(await readSyncState())).toHaveLength(0);
+
+    // Same manifest version: time_left moves with the clock, not the
+    // manifest, so a manifested slot must not be skipped as "unchanged".
+    await syncOnce(TI);
+    const state = await readSyncState();
+    expect(pendingJumps(state)).toHaveLength(1);
+    expect(manifestedForClient(state)).toHaveLength(0);
+  });
+
+  it('promotes a load that is already Departed', async () => {
+    script(at(DEPARTED, 1));
+    await syncOnce(TI);
+    expect(pendingJumps(await readSyncState())).toHaveLength(1);
+  });
+
+  it('forgets a slot when I am moved off the load before it is called', async () => {
+    const movedOff = renameStudent(RAW_ON_CALL, 'Dylan Whitehair', 'Someone Else');
+    script(at(RAW_ON_CALL, 1), at(movedOff, 2));
+    await syncOnce(TI);
+    await syncOnce(TI);
+
+    const state = await readSyncState();
+    expect(manifestedForClient(state)).toHaveLength(0);
+    expect(pendingJumps(state)).toHaveLength(0);
+  });
+
+  it('forgets a slot whose load vanished while still a long way from a call', async () => {
+    script(at(RAW_ON_CALL, 1), at(EMPTY_BOARD, 2));
+    await syncOnce(TI);
+    await syncOnce(TI);
+
+    const state = await readSyncState();
+    expect(manifestedForClient(state)).toHaveLength(0);
+    expect(pendingJumps(state)).toHaveLength(0);
+  });
+
+  it('promotes a slot whose load vanished soon after a near call, between two polls', async () => {
+    script(at(withTimeLeft(RAW_ON_CALL, 6), 1), at(EMPTY_BOARD, 2));
+    await syncOnce(TI);
+    await syncOnce(TI);
+
+    const [jump] = pendingJumps(await readSyncState());
+    expect(jump.leftBoard).toBe(true);
+  });
+
+  it('keeps a promoted jump when I am later moved off the load', async () => {
+    const movedOff = renameStudent(ON_CALL, 'Dylan Whitehair', 'Someone Else');
+    script(at(ON_CALL, 1), at(movedOff, 2));
+    await syncOnce(TI);
+    await syncOnce(TI);
+    expect(pendingJumps(await readSyncState())).toHaveLength(1);
   });
 });

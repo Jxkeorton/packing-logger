@@ -6,6 +6,7 @@
   // the data-user-touched dance for keeping <select>s in sync). None of that
   // exists here — {#each} replaces the row-template function, $state/$derived
   // replace the DOM reads, and use:enhance replaces the fetch/JSON handlers.
+  import type { Snippet } from 'svelte';
   import { enhance } from '$app/forms';
   import { exitAltitudeDigits, formatExitAltitude } from '$lib/format';
   import Spinner from './Spinner.svelte';
@@ -35,12 +36,15 @@
     settings,
     today,
     dateDisplay,
+    afterHeader,
   }: {
     entries: NumberedEntry[];
     nextNumber: number;
     settings: LogbookSettings;
     today: string;
     dateDisplay: string;
+    /** Rendered directly under the masthead — the manifest panel lives here. */
+    afterHeader?: Snippet;
   } = $props();
 
   interface FormFields {
@@ -208,6 +212,8 @@
     </div>
   </div>
 </header>
+
+{@render afterHeader?.()}
 
 <svelte:window onkeydown={handleKeydown} />
 

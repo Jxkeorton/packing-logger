@@ -135,6 +135,20 @@ const PAYING_TTS = new Set([TANDEM_CUSTOMER_TT, AFF_STUDENT_TT]);
  */
 export const FLOWN_STATUSES = ['Departed', 'Back at Gate'];
 
+/**
+ * A manifested slot only becomes a "jump to confirm" once its load is on a
+ * call this short (minutes to take-off, negative = running late). Before
+ * that the manifesters are still shuffling people between loads, and
+ * anything captured earlier is just clutter for jumps that never happen.
+ */
+export const CONFIRM_CALL_MINUTES = 4;
+
+/** True once a load is close enough to going (or has visibly gone) to treat a slot on it as a real jump. */
+export function isOnShortCall(load: { timeLeft: number | null; status: string }): boolean {
+  if (FLOWN_STATUSES.includes(load.status)) return true;
+  return load.timeLeft !== null && load.timeLeft <= CONFIRM_CALL_MINUTES;
+}
+
 export interface BurbleCodeMapping {
   code: string; // the DZ's shorthand, e.g. "TI" — matched case-insensitively
   role: BurbleRole;
