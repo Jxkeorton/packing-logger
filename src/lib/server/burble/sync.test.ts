@@ -598,7 +598,7 @@ describe('discarding', () => {
 
 describe('a mid-window session_id change', () => {
   // Reported bug: a jump matched at 18:24 BST was gone by the 19:58 sync
-  // the same evening — well inside the 08:45-20:00 operating window. Burble
+  // the same evening — well inside the 08:15-20:00 operating window. Burble
   // had handed out a new session_id in between, and syncOnce used to treat
   // any session_id change as "the previous day's leftovers" and wipe
   // pending/committed outright. Nothing should purge either of them except

@@ -79,7 +79,7 @@ const enabled = (dzId: string, names = ['Jake Orton']): BurbleSettings => ({
   codeSeedVersion: 1,
 });
 
-// A fixed instant inside 08:45–20:00 Europe/London (13:00 BST).
+// A fixed instant inside 08:15–20:00 Europe/London (13:00 BST).
 const INSIDE = new Date('2026-09-09T12:00:00Z');
 
 beforeEach(() => {
@@ -99,14 +99,14 @@ describe('withinPollWindow (Europe/London, DST-aware)', () => {
     expect(withinPollWindow(new Date('2026-01-15T09:00:00Z'))).toBe(true); // 09:00 GMT
   });
 
-  it('is closed before 08:45 and at/after 20:00 local', () => {
-    expect(withinPollWindow(new Date('2026-07-01T07:30:00Z'))).toBe(false); // 08:30 BST
+  it('is closed before 08:15 and at/after 20:00 local', () => {
+    expect(withinPollWindow(new Date('2026-07-01T06:45:00Z'))).toBe(false); // 07:45 BST
     expect(withinPollWindow(new Date('2026-07-01T19:15:00Z'))).toBe(false); // 20:15 BST
     expect(withinPollWindow(new Date('2026-01-15T20:00:00Z'))).toBe(false); // 20:00 GMT, exclusive
   });
 
-  it('includes the 08:45 edge', () => {
-    expect(withinPollWindow(new Date('2026-01-15T08:45:00Z'))).toBe(true); // 08:45 GMT
+  it('includes the 08:15 edge', () => {
+    expect(withinPollWindow(new Date('2026-01-15T08:15:00Z'))).toBe(true); // 08:15 GMT
   });
 });
 

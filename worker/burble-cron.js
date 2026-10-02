@@ -4,7 +4,7 @@
 // app's /api/cron/burble-sync, which fetches each dropzone's board once
 // and advances every user's sync state (see
 // src/lib/server/burble/cron.ts). Ticks outside the app's operating
-// window (08:45–20:00 Europe/London) return immediately without touching
+// window (08:15–20:00 Europe/London) return immediately without touching
 // Burble, so the loose UTC cron bracket in wrangler.toml is fine.
 //
 // Config it needs (wrangler.toml + `wrangler secret put`):

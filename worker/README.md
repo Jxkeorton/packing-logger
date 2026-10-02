@@ -68,7 +68,7 @@ A healthy response looks like:
 { "ran": true, "mode": "multi", "scopes": { "jake": { "status": "skipped-unchanged", "boardLoads": 6 } } }
 ```
 
-Outside 08:45–20:00 Europe/London it's `{ "ran": false, "reason": "outside poll window" }` — expected.
+Outside 08:15–20:00 Europe/London it's `{ "ran": false, "reason": "outside poll window" }` — expected.
 
 The app also tags any failure in its own logs with `[cron/burble-sync]`
 / `[burble-cron]` (Vercel → Logs).

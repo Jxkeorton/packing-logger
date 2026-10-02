@@ -18,7 +18,7 @@ import { syncOnce } from './sync';
 // Europe/London, not UTC — the operating window is a wall-clock thing and
 // has to track BST. The Worker's cron brackets this loosely; this is the
 // exact gate, and it's here (not in the route) so it's unit-testable.
-const WINDOW_START_MIN = 8 * 60 + 45; // 08:45
+const WINDOW_START_MIN = 8 * 60 + 15; // 08:15
 const WINDOW_END_MIN = 20 * 60; //      20:00
 
 function londonMinutesOfDay(now: Date): number {
@@ -33,7 +33,7 @@ function londonMinutesOfDay(now: Date): number {
   return hour * 60 + minute;
 }
 
-/** True during the dropzone's operating hours (08:45–20:00 Europe/London). */
+/** True during the dropzone's operating hours (08:15–20:00 Europe/London). */
 export function withinPollWindow(now: Date): boolean {
   const minutes = londonMinutesOfDay(now);
   return minutes >= WINDOW_START_MIN && minutes < WINDOW_END_MIN;
