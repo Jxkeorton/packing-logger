@@ -601,7 +601,8 @@
         <span class={STAMP_LABEL}>Tandem Log</span>
         <span class={STAMP_DATE}>{data.dateDisplay}</span>
       </div>
-      <div class={TOTALS}>
+      <div class="{TOTALS} flex-wrap gap-y-2.5">
+        <ManifestedPanel manifested={burbleManifested} />
         <div class={TOTALS_BLOCK}>
           <span class={TOTALS_VALUE_GOLD}>{money(tandemTotalEarnings(data.tandemState.counts, data.rateSettings.tandem))}</span>
           <span class={TOTALS_LABEL}>earned today</span>
@@ -613,8 +614,6 @@
         </div>
       </div>
     </header>
-
-    <ManifestedPanel manifested={burbleManifested} />
 
     <TandemCategoryCards
       tandemState={data.tandemState}
@@ -648,7 +647,7 @@
       today={data.today}
       dateDisplay={data.dateDisplay}
     >
-      {#snippet afterHeader()}
+      {#snippet totalsHeader()}
         <ManifestedPanel manifested={burbleManifested} />
       {/snippet}
     </LogForm>

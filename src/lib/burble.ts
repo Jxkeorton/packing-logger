@@ -353,6 +353,39 @@ export function otherStaffName(group: BurbleSlot[], excludeIds: string | Set<str
     .join(' & ');
 }
 
+/** A paying student on a load — a tandem customer or an AFF student — for the tannoy call-out list. */
+export interface BurbleStudent {
+  name: string;
+  kind: 'tandem' | 'aff';
+  /** An AFF student's level as the board words it; '' for a tandem customer. */
+  level: string;
+  /** True when this student is in my own group, i.e. the one I'm jumping with. */
+  mine: boolean;
+}
+
+/**
+ * Every student on a load, in board order. Captured on the match because
+ * the board is the only place it exists, and the load is gone once it
+ * leaves — see BurbleMatch.loadStudents.
+ */
+function studentsOnLoad(load: BurbleLoad, myGroupIndex: number): BurbleStudent[] {
+  const students: BurbleStudent[] = [];
+  load.groups.forEach((group, index) => {
+    for (const slot of group) {
+      if (!slot || typeof slot.name !== 'string' || !slot.name.trim()) continue;
+      const kind = slot.transaction_type_id === TANDEM_CUSTOMER_TT ? 'tandem' : slot.transaction_type_id === AFF_STUDENT_TT ? 'aff' : null;
+      if (!kind) continue;
+      students.push({
+        name: slot.name.trim(),
+        kind,
+        level: kind === 'aff' && typeof slot.jump === 'string' ? slot.jump.trim() : '',
+        mine: index === myGroupIndex,
+      });
+    }
+  });
+  return students;
+}
+
 /** One slot on the board that turned out to be mine. */
 export interface BurbleMatch {
   slotId: string;
@@ -389,6 +422,12 @@ export interface BurbleMatch {
    * match.
    */
   handyCam: boolean;
+  /**
+   * Every tandem customer and AFF student on the same load, mine included
+   * (flagged). `undefined` on a sighting captured before this field
+   * existed and still sitting in burble-sync.json.
+   */
+  loadStudents: BurbleStudent[];
 }
 
 export interface MatchResult {
@@ -414,7 +453,7 @@ export function matchSlots(loads: BurbleLoad[], myNames: string[], codeMap: Burb
 
   for (const load of loads) {
     const { plate, loadNumber } = splitLoadName(load.name);
-    for (const group of load.groups) {
+    for (const [groupIndex, group] of load.groups.entries()) {
       // Collected per group, not pushed straight into `matches` — a
       // self-filmed tandem needs to see every one of my slots in this
       // group before it can tell a dedicated camera flyer from me wearing
@@ -461,6 +500,7 @@ export function matchSlots(loads: BurbleLoad[], myNames: string[], codeMap: Burb
           studentLevel: mapping.role === 'aff' ? student.level : '',
           otherStaffName: mapping.role === 'solo' ? '' : otherStaffName(group, String(slot.id)),
           handyCam: false,
+          loadStudents: studentsOnLoad(load, groupIndex),
         });
       }
 

@@ -36,15 +36,15 @@
     settings,
     today,
     dateDisplay,
-    afterHeader,
+    totalsHeader,
   }: {
     entries: NumberedEntry[];
     nextNumber: number;
     settings: LogbookSettings;
     today: string;
     dateDisplay: string;
-    /** Rendered directly under the masthead — the manifest panel lives here. */
-    afterHeader?: Snippet;
+    /** Rendered as a header row at the top of the totals card — the next-on-manifest row lives here. */
+    totalsHeader?: Snippet;
   } = $props();
 
   interface FormFields {
@@ -205,15 +205,14 @@
     <span class={STAMP_LABEL}>Logbook</span>
     <span class={STAMP_DATE}>{dateDisplay}</span>
   </div>
-  <div class={TOTALS}>
+  <div class="{TOTALS} flex-wrap gap-y-2.5">
+    {@render totalsHeader?.()}
     <div class={TOTALS_BLOCK_FLEX}>
       <span class={TOTALS_VALUE_INK}>{nextNumber - 1}</span>
       <span class={TOTALS_LABEL}>jumps logged</span>
     </div>
   </div>
 </header>
-
-{@render afterHeader?.()}
 
 <svelte:window onkeydown={handleKeydown} />
 

@@ -694,6 +694,16 @@ describe('Skydive Langar (dz_id 531)', () => {
 });
 
 describe('holding a jump until it is called', () => {
+  it('records every student on the load, flagging the one in my group', async () => {
+    script(at(RAW_ON_CALL, 1));
+    await syncOnce(TI);
+
+    const [jump] = manifestedForClient(await readSyncState());
+    expect(jump.loadStudents).toHaveLength(4);
+    expect(jump.loadStudents.every((s) => s.kind === 'tandem')).toBe(true);
+    expect(jump.loadStudents.filter((s) => s.mine).map((s) => s.name)).toEqual(['Miranda Walfield']);
+  });
+
   it('shows a slot on an uncalled load as manifested, not as a jump to confirm', async () => {
     script(at(RAW_ON_CALL, 1)); // time_left 13
     await syncOnce(TI);
@@ -719,7 +729,30 @@ describe('holding a jump until it is called', () => {
     await syncOnce(TI);
     const state = await readSyncState();
     expect(pendingJumps(state)).toHaveLength(1);
+  });
+
+  it('keeps showing a promoted slot on the manifest until its load is off the board', async () => {
+    script(at(withTimeLeft(RAW_ON_CALL, 3), 1), at(EMPTY_BOARD, 2));
+    await syncOnce(TI);
+    let state = await readSyncState();
+    expect(pendingJumps(state)).toHaveLength(1);
+    expect(manifestedForClient(state)).toHaveLength(1);
+
+    await syncOnce(TI);
+    state = await readSyncState();
     expect(manifestedForClient(state)).toHaveLength(0);
+    expect(pendingJumps(state)[0].leftBoard).toBe(true);
+  });
+
+  it('drops a slot from the manifest once it is confirmed', async () => {
+    script(at(ON_CALL, 1), at(ON_CALL, 2));
+    await syncOnce(TI);
+    const [jump] = pendingJumps(await readSyncState());
+    await commitMatches([jump.slotId]);
+    expect(manifestedForClient(await readSyncState())).toHaveLength(0);
+
+    await syncOnce(TI);
+    expect(manifestedForClient(await readSyncState())).toHaveLength(0);
   });
 
   it('promotes a load that is already Departed', async () => {

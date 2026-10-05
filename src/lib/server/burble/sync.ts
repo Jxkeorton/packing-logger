@@ -60,12 +60,13 @@ export interface PendingJump extends BurbleMatch {
 }
 
 /**
- * A slot of mine currently on the board whose load hasn't reached a short
- * call yet. Held here, *not* in `pending`, because the manifesters keep
- * reshuffling people until the load is called — see isOnShortCall. It is
- * promoted into `pending` once the call is short enough (or the load
- * flies / leaves the board), and silently forgotten if the board moves me
- * off it first.
+ * A slot of mine currently on the board. Until its load reaches a short
+ * call it lives *only* here, not in `pending`, because the manifesters
+ * keep reshuffling people until the load is called — see isOnShortCall. It
+ * is promoted into `pending` once the call is short enough (or the load
+ * flies / leaves the board), but stays here too so the Manifest panel
+ * keeps showing it until the load is off the board. Forgotten as soon as
+ * the board stops showing me on it.
  */
 export interface ManifestedJump extends BurbleMatch {
   firstSeen: string; // ISO
@@ -293,14 +294,14 @@ export async function syncOnce(settings?: BurbleSettings, board?: BurbleLoadsRes
   // instead of waiting for the board to change on its own.
   const settingsKey = matchSettingsKey(burble);
   //
-  // Never while something is manifested, though: time_left falls with the
-  // clock, not with the manifest, so the version can sit still while a
-  // load slides under the call threshold.
+  // Never while a manifested slot is still waiting to be called, though:
+  // time_left falls with the clock, not with the manifest, so the version
+  // can sit still while a load slides under the call threshold.
   if (
     version !== null &&
     state.lastVersion !== null &&
     version === state.lastVersion &&
-    Object.keys(state.manifested).length === 0 &&
+    Object.keys(state.manifested).every((slotId) => state.pending[slotId]) &&
     state.lastMatchSettingsKey === settingsKey
   ) {
     await writeSyncState(next);
@@ -316,13 +317,17 @@ export async function syncOnce(settings?: BurbleSettings, board?: BurbleLoadsRes
   const matchedSlotIds = new Set(matches.map((m) => m.slotId));
 
   for (const match of matches) {
-    if (next.committed[match.slotId]) continue; // already logged
+    if (next.committed[match.slotId]) {
+      delete manifested[match.slotId]; // already logged — nothing left to wait for
+      continue;
+    }
     const existing = pending[match.slotId];
     const seenBefore = manifested[match.slotId];
 
-    // Already promoted: keep refreshing its hints, exactly as before.
+    // Promoted once on a short call: keep refreshing its hints. It also
+    // stays in `manifested` (below) so the panel keeps showing it until
+    // the load is off the board.
     if (existing || isOnShortCall(match)) {
-      delete manifested[match.slotId];
       pending[match.slotId] = {
         ...match,
         firstSeen: existing?.firstSeen ?? seenBefore?.firstSeen ?? now,
@@ -332,7 +337,6 @@ export async function syncOnce(settings?: BurbleSettings, board?: BurbleLoadsRes
         sawFlownStatus: existing?.sawFlownStatus === true || FLOWN_STATUSES.includes(match.status),
         leftBoard: false,
       };
-      continue;
     }
 
     manifested[match.slotId] = { ...match, firstSeen: seenBefore?.firstSeen ?? now, lastSeen: now };
@@ -348,6 +352,7 @@ export async function syncOnce(settings?: BurbleSettings, board?: BurbleLoadsRes
     if (matchedSlotIds.has(slotId)) continue;
     delete manifested[slotId];
     if (onBoardLoadIds.has(jump.loadId)) continue;
+    if (pending[slotId]) continue; // already promoted — leftBoard is flagged below
     if (!wasCalledWhenLastSeen(jump)) continue;
     if (next.committed[slotId]) continue;
     pending[slotId] = { ...jump, sawFlownStatus: FLOWN_STATUSES.includes(jump.status), leftBoard: false };
@@ -446,6 +451,7 @@ export async function commitMatches(slotIds: string[]): Promise<CommitResult> {
 
   const committed = { ...state.committed };
   const pending = { ...state.pending };
+  const manifested = { ...state.manifested };
   let logged = 0;
   let skippedDuplicates = 0;
 
@@ -509,10 +515,11 @@ export async function commitMatches(slotIds: string[]): Promise<CommitResult> {
 
     committed[slot.slotId] = at;
     delete pending[slot.slotId];
+    delete manifested[slot.slotId];
     logged += 1;
   }
 
-  await writeSyncState({ ...state, committed, pending });
+  await writeSyncState({ ...state, committed, pending, manifested });
   return { logged, skippedDuplicates };
 }
 

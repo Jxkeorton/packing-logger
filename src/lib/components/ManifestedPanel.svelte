@@ -1,12 +1,7 @@
-<script module lang="ts">
-  // Module-level so the Work jumps and Logbook copies of this panel stay
-  // collapsed or open together, rather than each remembering its own.
-  const view = $state({ open: true });
-</script>
-
 <script lang="ts">
-  // The loads the board has you on that haven't been called yet. Purely
-  // informational: nothing here is a jump until its load reaches a short
+  // The next load the board has you on that hasn't been called yet. Sits
+  // at the top of the totals card on the Work jumps and Logbook tabs, as a
+  // header row. Purely informational: nothing here is a jump until its load reaches a short
   // call, at which point the sync moves it into "Jumps to confirm" and it
   // leaves this panel. If the manifesters move you off a load, the row just
   // disappears — nothing was logged or kept.
@@ -15,7 +10,7 @@
   // are the last-synced value counted down against the clock; `lastSeen`
   // is when that value was true.
   import { BURBLE_ROLE_LABELS } from '$lib/burble';
-  import type { BurbleRole } from '$lib/burble';
+  import type { BurbleRole, BurbleStudent } from '$lib/burble';
 
   interface ManifestedJump {
     slotId: string;
@@ -30,6 +25,8 @@
     studentLevel?: string;
     handyCam?: boolean;
     lastSeen: string;
+    /** Absent on a sighting captured before this was recorded. */
+    loadStudents?: BurbleStudent[];
   }
 
   let { manifested }: { manifested: ManifestedJump[] } = $props();
@@ -60,6 +57,24 @@
     }),
   );
 
+  const next = $derived(sorted[0]);
+
+  // The students on that load, for the tannoy call-out — an instructor has
+  // to read every name out, and picking them from the whole plane's
+  // manifest on the board is the hard part.
+  let studentsOpen = $state(false);
+  // Tandem students only, and only on a tandem instructor jump — AFF and
+  // camera jumps don't make the call-out.
+  const students = $derived(
+    next?.role === 'instructor' ? (next.loadStudents ?? []).filter((s) => s.kind === 'tandem') : [],
+  );
+
+  // Closing on its own when the load leaves the manifest, rather than
+  // leaving a modal about a load that's no longer shown.
+  $effect(() => {
+    if (!next) studentsOpen = false;
+  });
+
   /** Green until 6 minutes out, amber from 6, red from 3. */
   function countdownColor(left: number): string {
     if (left <= 3) return '#f2402b';
@@ -68,49 +83,82 @@
   }
 </script>
 
-{#if manifested.length > 0}
-  <section class="bg-panel border border-line rounded-card shadow-card overflow-hidden" aria-label="Manifest">
-    <button
-      type="button"
-      class="w-full flex items-center justify-between bg-transparent border-0 px-4 py-3.5 font-sans font-semibold text-[15px] text-ink cursor-pointer"
-      aria-expanded={view.open}
-      onclick={() => (view.open = !view.open)}
-    >
-      <span class="flex items-center gap-2">
-        <span
-          class="inline-flex min-w-6 items-center justify-center rounded-full bg-ink px-2 py-0.5 text-[12px] font-bold text-canvas"
-          >{manifested.length}</span
+{#if next}
+  {@const left = minutesLeft(next)}
+  <div class="basis-full flex items-center gap-3 border-b border-line pb-2.5" aria-label="Next on the manifest">
+    <span class="flex-1 text-[13.5px] leading-snug">
+      <span class="block text-xs uppercase tracking-[0.08em] text-ink-soft">Next on manifest</span>
+      <span class="font-semibold">{BURBLE_ROLE_LABELS[next.role]}</span>
+      {#if next.customerName}<span> with {next.customerName}</span>{/if}
+      {#if next.handyCam}<span class="text-ink-soft"> · handy cam</span>{/if}
+      {#if next.studentLevel}<span class="text-ink-soft"> · {next.studentLevel}</span>{/if}
+      <span class="block font-mono text-[11.5px] text-ink-soft">{loadLabel(next)} · {next.code}</span>
+    </span>
+    <span class="flex shrink-0 items-center gap-0.5">
+      {#if students.length > 0}
+        <button
+          type="button"
+          class="inline-flex size-9 appearance-none items-center justify-center rounded-full border border-line-strong bg-transparent p-0 text-ink cursor-pointer touch-manipulation"
+          aria-label="Students list"
+          title="Students list"
+          onclick={() => (studentsOpen = true)}
         >
-        <span>Manifest</span>
-      </span>
-      <span class="transition-transform duration-150 ease text-xl text-ink-soft" class:rotate-90={view.open}
-        >&rsaquo;</span
-      >
-    </button>
-    {#if view.open}
-      <ul class="m-0 list-none border-t border-line px-4 py-1.5">
-        {#each sorted as jump (jump.slotId)}
-          {@const left = minutesLeft(jump)}
-          <li class="flex items-center gap-3 border-b border-line py-2.5 last:border-b-0">
-            <span class="flex-1 text-[13.5px] leading-snug">
-              <span class="font-semibold">{BURBLE_ROLE_LABELS[jump.role]}</span>
-              {#if jump.customerName}<span> with {jump.customerName}</span>{/if}
-              {#if jump.handyCam}<span class="text-ink-soft"> · handy cam</span>{/if}
-              {#if jump.studentLevel}<span class="text-ink-soft"> · {jump.studentLevel}</span>{/if}
-              <span class="block font-mono text-[11.5px] text-ink-soft">{loadLabel(jump)} · {jump.code}</span>
-            </span>
-            {#if left !== null}
-              <span
-                class="w-14 shrink-0 text-center font-mono text-[24px] font-bold leading-none"
-                style:color={countdownColor(left)}
-                aria-label={`${Math.max(0, left)} minutes to take-off`}>{Math.max(0, left)}</span
-              >
-            {:else}
-              <span class="w-14 shrink-0 text-center text-[12px] font-semibold text-ink-soft">{jump.status}</span>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+            <circle cx="9" cy="7" r="4" />
+            <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+            <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+          </svg>
+        </button>
+      {/if}
+      {#if left !== null}
+        <span
+          class="w-9 shrink-0 text-center font-mono text-[24px] font-bold leading-none"
+          style:color={countdownColor(left)}
+          aria-label={`${Math.max(0, left)} minutes to take-off`}>{Math.max(0, left)}</span
+        >
+      {:else}
+        <span class="w-9 shrink-0 text-center text-[12px] font-semibold text-ink-soft">{next.status}</span>
+      {/if}
+    </span>
+  </div>
+{/if}
+
+<svelte:window onkeydown={(e) => e.key === 'Escape' && studentsOpen && (studentsOpen = false)} />
+
+{#if next && studentsOpen}
+  <div
+    class="fixed inset-0 z-20 flex items-center justify-center bg-[rgba(11,22,32,0.5)] p-4"
+    onclick={(e) => {
+      if (e.target === e.currentTarget) studentsOpen = false;
+    }}
+    role="presentation"
+  >
+    <div
+      class="flex max-h-[85vh] w-full max-w-100 flex-col rounded-card bg-panel p-5 shadow-card"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="studentsListTitle"
+    >
+      <h2 class="m-0 mb-0.5 text-[17px] font-bold" id="studentsListTitle">Students list</h2>
+      <p class="mt-0 mb-3 text-[13px] text-ink-soft">
+        {loadLabel(next)} · {students.length} {students.length === 1 ? 'student' : 'students'}
+      </p>
+      <ul class="m-0 min-h-0 flex-1 list-none overflow-y-auto p-0">
+        {#each students as student, i (i)}
+          <li class="flex items-center justify-between gap-3 border-b border-line py-3 last:border-b-0">
+            <span class="text-[19px] font-semibold leading-tight">{student.name}</span>
+            {#if student.mine}
+              <span class="shrink-0 rounded-full bg-ink px-2.5 py-0.5 text-[11px] font-bold text-canvas">Yours</span>
             {/if}
           </li>
         {/each}
       </ul>
-    {/if}
-  </section>
+      <button
+        type="button"
+        class="mt-4 h-11 appearance-none rounded-[var(--radius-control)] border-0 bg-ink font-display text-sm font-bold text-canvas cursor-pointer touch-manipulation"
+        onclick={() => (studentsOpen = false)}>Close</button
+      >
+    </div>
+  </div>
 {/if}
