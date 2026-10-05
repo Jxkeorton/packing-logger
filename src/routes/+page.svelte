@@ -83,6 +83,9 @@
   );
   let packingSubTab = $state<'pack' | 'timer'>('pack');
   let settingsOpen = $state(false);
+  // The jumps-to-confirm page, reached from the bell next to the cog —
+  // same app-view pattern as Settings, and the two are mutually exclusive.
+  let confirmOpen = $state(false);
 
   // Catches the tab you're currently on being hidden out from under you
   // — most directly, unchecking it in Settings > Config right now, but
@@ -242,8 +245,6 @@
 <div
   class="max-w-140 mx-auto px-4 pt-4 [padding-bottom:calc(40px+env(safe-area-inset-bottom))] flex flex-col gap-5.5"
 >
-  <PendingJumpsMenu pending={burblePending} />
-
   <!--
     Sticky so the tabs (and Settings) stay reachable while a long history
     table or logbook list scrolls underneath — glassy rather than solid so
@@ -254,14 +255,45 @@
   <div
     class="header-scope sticky top-0 z-10 flex items-center gap-1 p-1 rounded-[var(--radius-control)] bg-panel/75 backdrop-blur-md border border-line shadow-card"
   >
-    <AppTabs bind:activeTab={activeAppTab} visibility={data.tabVisibility} onSelect={() => (settingsOpen = false)} />
+    <AppTabs bind:activeTab={activeAppTab} visibility={data.tabVisibility} onSelect={() => {
+      settingsOpen = false;
+      confirmOpen = false;
+    }}
+    />
     <div class="w-px self-stretch bg-line-strong/50" aria-hidden="true"></div>
+    <button
+      type="button"
+      class="{ICON_BUTTON_GHOST} relative"
+      aria-label={burblePending.length > 0 ? `Jumps to confirm (${burblePending.length})` : 'Jumps to confirm'}
+      aria-pressed={confirmOpen}
+      onclick={() => {
+        confirmOpen = !confirmOpen;
+        settingsOpen = false;
+      }}
+    >
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+        <path
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          d="M14.857 17.082a23.848 23.848 0 0 0 5.454-1.31A8.967 8.967 0 0 1 18 9.75V9A6 6 0 0 0 6 9v.75a8.967 8.967 0 0 1-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 0 1-5.714 0m5.714 0a3 3 0 1 1-5.714 0"
+        />
+      </svg>
+      {#if burblePending.length > 0}
+        <span
+          class="absolute -top-0.5 -right-0.5 inline-flex min-w-4 items-center justify-center rounded-full bg-gold px-1 text-[10px] font-bold leading-4 text-white"
+          >{burblePending.length}</span
+        >
+      {/if}
+    </button>
     <button
       type="button"
       class={ICON_BUTTON_GHOST}
       aria-label="Settings"
       aria-pressed={settingsOpen}
-      onclick={() => (settingsOpen = !settingsOpen)}
+      onclick={() => {
+        settingsOpen = !settingsOpen;
+        confirmOpen = false;
+      }}
     >
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
         <path
@@ -272,6 +304,19 @@
         <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
       </svg>
     </button>
+  </div>
+
+  <!-- Jumps to confirm — reached from any tab via the bell button above -->
+  <div class={APP_VIEW} hidden={!confirmOpen}>
+    <div class="flex items-center gap-3">
+      <button type="button" class={ICON_BUTTON} aria-label="Back" onclick={() => (confirmOpen = false)}>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
+        </svg>
+      </button>
+      <h1 class={SETTINGS_TITLE}>Jumps to confirm</h1>
+    </div>
+    <PendingJumpsMenu pending={burblePending} />
   </div>
 
   <!-- Settings — reached from any tab via the cog button above -->
@@ -532,7 +577,7 @@
   </div>
 
   <!-- Packing -->
-  <div class={APP_VIEW_COMPACT} hidden={activeAppTab !== 'packing' || settingsOpen}>
+  <div class={APP_VIEW_COMPACT} hidden={activeAppTab !== 'packing' || settingsOpen || confirmOpen}>
     <!--
       Same sticky glass treatment as the app tab bar above, stacked flush
       beneath it (top: var(--app-header-h)) once both are stuck. -mt-3.5
@@ -595,7 +640,7 @@
   </div>
 
   <!-- Tandems -->
-  <div class={APP_VIEW} hidden={activeAppTab !== 'tandems' || settingsOpen}>
+  <div class={APP_VIEW} hidden={activeAppTab !== 'tandems' || settingsOpen || confirmOpen}>
     <header class={MASTHEAD}>
       <div class={STAMP} aria-hidden="false">
         <span class={STAMP_LABEL}>Tandem Log</span>
@@ -639,7 +684,7 @@
   </div>
 
   <!-- Logbook -->
-  <div class={APP_VIEW} hidden={activeAppTab !== 'logbook' || settingsOpen}>
+  <div class={APP_VIEW} hidden={activeAppTab !== 'logbook' || settingsOpen || confirmOpen}>
     <LogForm
       entries={data.logbookEntries}
       nextNumber={data.nextLogbookNumber}

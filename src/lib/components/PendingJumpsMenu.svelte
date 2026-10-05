@@ -1,10 +1,12 @@
 <script lang="ts">
   // Jumps the manifest board saw you on, held until you confirm them.
   //
-  // Lives above the tabs rather than inside the Logbook, because the point
-  // is that you check the board *before* you get on the plane and confirm
-  // *after* you land — by which time you might be on any tab. A count
-  // badge here means you never have to remember to go looking.
+  // Reached from the bell in the header rather than from inside the
+  // Logbook, because the point is that you check the board *before* you
+  // get on the plane and confirm *after* you land — by which time you
+  // might be on any tab. The bell's count badge means you never have to
+  // remember to go looking. This component is just the page body; the
+  // route supplies the back button and title, as it does for Settings.
   import { enhance } from '$app/forms';
   import { BURBLE_ROLE_LABELS } from '$lib/burble';
   import type { BurbleRole } from '$lib/burble';
@@ -41,7 +43,6 @@
 
   let { pending }: { pending: PendingJump[] } = $props();
 
-  let open = $state(false);
   let committing = $state(false);
   // Which slot's "Remove …" button was tapped — that form has one submit
   // button per pending jump, so unlike committing there's no single
@@ -75,28 +76,10 @@
   });
 </script>
 
-{#if pending.length > 0}
+{#if pending.length === 0}
+  <p class="m-0 text-[13.5px] text-ink-soft">Nothing to confirm.</p>
+{:else}
   <section class="bg-panel border border-line rounded-card shadow-card overflow-hidden">
-    <button
-      type="button"
-      class="group w-full flex items-center justify-between bg-transparent border-0 px-4 py-3.5 font-sans font-semibold text-[15px] text-ink cursor-pointer"
-      aria-expanded={open}
-      onclick={() => (open = !open)}
-    >
-      <span class="flex items-center gap-2">
-        <span
-          class="inline-flex min-w-6 items-center justify-center rounded-full bg-gold px-2 py-0.5 text-[12px] font-bold text-white"
-          >{pending.length}</span
-        >
-        <span>{pending.length === 1 ? 'Jump to confirm' : 'Jumps to confirm'}</span>
-      </span>
-      <span
-        class="transition-transform duration-150 ease text-xl text-ink-soft"
-        class:rotate-90={open}
-      >&rsaquo;</span>
-    </button>
-
-    {#if open}
       <div class="border-t border-line px-4 pt-3.5 pb-4">
         <p class="mt-0 mb-3.5 text-[12.5px] text-ink-soft">
           Seen with your name on the board. Confirm the ones you actually jumped — nothing goes in the logbook until
@@ -181,6 +164,5 @@
           {/each}
         </form>
       </div>
-    {/if}
   </section>
 {/if}
